@@ -1,29 +1,188 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../models/salary_model.dart';
+import '../models/salary_record.dart';
+import '../services/salary_storage_service.dart';
 import '../utils/tax_calculator.dart';
+import 'salary_circle_graph.dart';
 
-class ResultCard extends StatelessWidget {
+class ResultCard extends StatefulWidget {
   final SalaryResult result;
+  final TaxCalculationMode mode;
+  final double flatRate;
+  final VoidCallback? onSaved;
 
   const ResultCard({
     super.key,
     required this.result,
+    this.mode = TaxCalculationMode.progressive,
+    this.flatRate = 5.0,
+    this.onSaved,
   });
+
+  @override
+  State<ResultCard> createState() => _ResultCardState();
+}
+
+class _ResultCardState extends State<ResultCard> {
+  bool _isSaved = false;
+
+  void _saveRecord() {
+    final titleController = TextEditingController(
+      text: 'Salary • ${TaxCalculator.formatCurrency(widget.result.netMonthlyIncome)}',
+    );
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.bookmark_add_rounded,
+                    color: theme.colorScheme.primary, size: 20),
+              ),
+              const SizedBox(width: 10),
+              const Text(
+                'Save',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Give this calculation a label to easily locate it in your saved history:',
+                style: TextStyle(fontSize: 13),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: titleController,
+                autofocus: true,
+                decoration: InputDecoration(
+                  labelText: 'Record Title / Label',
+                  hintText: 'e.g. Senior Software Engineer',
+                  prefixIcon: const Icon(Icons.label_outline_rounded),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            FilledButton.icon(
+              icon: const Icon(Icons.check_rounded, size: 18),
+              label: const Text('Save'),
+              onPressed: () async {
+                final id = DateTime.now().millisecondsSinceEpoch.toString();
+                final record = SalaryRecord.fromResult(
+                  id: id,
+                  title: titleController.text,
+                  result: widget.result,
+                  mode: widget.mode,
+                  flatRate: widget.flatRate,
+                );
+
+                await SalaryStorageService.saveRecord(record);
+
+                if (mounted) {
+                  setState(() {
+                    _isSaved = true;
+                  });
+                }
+
+                if (ctx.mounted) {
+                  Navigator.pop(ctx);
+                }
+
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Row(
+                        children: [
+                          const Icon(Icons.check_circle_rounded,
+                              color: Colors.white, size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Saved "${record.title}" to local Hive database!',
+                              style: const TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
+                      ),
+                      backgroundColor: const Color(0xFF10B981),
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  );
+                }
+
+                widget.onSaved?.call();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _copySummary() {
+    final res = widget.result;
+    final summary = StringBuffer();
+    summary.writeln('📋 Salary Calculation Summary:');
+    summary.writeln('--------------------------------');
+    summary.writeln('Basic Salary: ${TaxCalculator.formatCurrency(res.input.basicSalary)}');
+    summary.writeln('House Rent Allowance: ${TaxCalculator.formatCurrency(res.input.houseRentAllowance)}');
+    summary.writeln('Medical Allowance: ${TaxCalculator.formatCurrency(res.input.medicalAllowance)}');
+    summary.writeln('Travel Allowance: ${TaxCalculator.formatCurrency(res.input.travelAllowance)}');
+    summary.writeln('--------------------------------');
+    summary.writeln('Gross Monthly Salary: ${TaxCalculator.formatCurrency(res.grossSalary)}');
+    summary.writeln('Tax Deduction: ${TaxCalculator.formatCurrency(res.taxDeduction)} (${res.taxDescription})');
+    summary.writeln('Net Monthly Take-Home: ${TaxCalculator.formatCurrency(res.netMonthlyIncome)}');
+
+    Clipboard.setData(ClipboardData(text: summary.toString()));
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Salary summary copied to clipboard!'),
+        behavior: SnackBarBehavior.floating,
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final result = widget.result;
 
     return Container(
       margin: const EdgeInsets.only(top: 24.0, bottom: 24.0),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
           ),
         ],
         border: Border.all(
@@ -31,36 +190,71 @@ class ResultCard extends StatelessWidget {
         ),
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(22),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Header banner
+            // Elegant Header banner
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
                     theme.colorScheme.primary,
-                    theme.colorScheme.primary.withValues(alpha: 0.85),
+                    theme.colorScheme.primary.withValues(alpha: 0.88),
                   ],
                 ),
               ),
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Icon(
-                    Icons.receipt_long_rounded,
-                    color: Colors.white,
-                    size: 22,
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    'Calculation Results',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.3,
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.receipt_long_rounded,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Calculation Results',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.3,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
+                  ),
+                  Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.copy_rounded, color: Colors.white, size: 20),
+                        tooltip: 'Copy Summary',
+                        onPressed: _copySummary,
+                      ),
+                      IconButton(
+                        icon: Icon(
+                          _isSaved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+                          color: Colors.white,
+                          size: 22,
+                        ),
+                        tooltip: _isSaved ? 'Saved' : 'Save',
+                        onPressed: _saveRecord,
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -77,9 +271,9 @@ class ResultCard extends StatelessWidget {
                     amount: result.taxDeduction,
                     subtitle: result.taxDescription,
                     icon: Icons.trending_down_rounded,
-                    backgroundColor: const Color(0xFFFFF3E0),
-                    borderColor: const Color(0xFFFFB74D),
-                    textColor: const Color(0xFFC62828),
+                    backgroundColor: const Color(0xFFFEF2F2),
+                    borderColor: const Color(0xFFFECACA),
+                    textColor: const Color(0xFFDC2626),
                     badgeLabel: 'Deduction',
                     isFirst: true,
                   ),
@@ -93,11 +287,19 @@ class ResultCard extends StatelessWidget {
                     amount: result.netMonthlyIncome,
                     subtitle: 'Gross Salary − Tax Deduction',
                     icon: Icons.account_balance_wallet_rounded,
-                    backgroundColor: const Color(0xFFE8F5E9),
-                    borderColor: const Color(0xFF81C784),
-                    textColor: const Color(0xFF1B5E20),
+                    backgroundColor: const Color(0xFFECFDF5),
+                    borderColor: const Color(0xFFA7F3D0),
+                    textColor: const Color(0xFF059669),
                     badgeLabel: 'Take-Home Pay',
                     isFirst: false,
+                  ),
+
+                  const SizedBox(height: 22),
+
+                  // Circle Graph (Embedded Circle Graph visual representation)
+                  SalaryCircleGraph(
+                    result: result,
+                    isCompact: true,
                   ),
 
                   const SizedBox(height: 22),
@@ -193,8 +395,41 @@ class ResultCard extends StatelessWidget {
                     label: 'Net Monthly Income',
                     amount: result.netMonthlyIncome,
                     isBold: true,
-                    highlightColor: const Color(0xFF1B5E20),
+                    highlightColor: const Color(0xFF059669),
                     fontSize: 16,
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Quick Action: Save Record
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: _saveRecord,
+                      icon: Icon(
+                        _isSaved ? Icons.check_circle_rounded : Icons.bookmark_add_rounded,
+                        color: _isSaved ? const Color(0xFF10B981) : theme.colorScheme.primary,
+                      ),
+                      label: Text(
+                        _isSaved ? 'Saved' : 'Save',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: _isSaved ? const Color(0xFF10B981) : theme.colorScheme.primary,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        side: BorderSide(
+                          color: _isSaved
+                              ? const Color(0xFF10B981)
+                              : theme.colorScheme.primary.withValues(alpha: 0.5),
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -305,7 +540,7 @@ class ResultCard extends StatelessWidget {
     final theme = Theme.of(context);
     final color = highlightColor ??
         (isDeduction
-            ? const Color(0xFFC62828)
+            ? const Color(0xFFDC2626)
             : (isMuted
                 ? theme.colorScheme.onSurfaceVariant
                 : theme.colorScheme.onSurface));

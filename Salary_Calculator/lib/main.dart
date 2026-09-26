@@ -1,25 +1,60 @@
 import 'package:flutter/material.dart';
-import 'screens/salary_calculator_screen.dart';
+import 'package:flutter/services.dart';
+import 'screens/main_home_screen.dart';
+import 'services/salary_storage_service.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Hive local database
+  await SalaryStorageService.init();
+
+  // Configure system overlay style for clean status bar
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+    ),
+  );
+
   runApp(const SalaryCalculatorApp());
 }
 
-class SalaryCalculatorApp extends StatelessWidget {
+class SalaryCalculatorApp extends StatefulWidget {
   const SalaryCalculatorApp({super.key});
 
   @override
+  State<SalaryCalculatorApp> createState() => _SalaryCalculatorAppState();
+}
+
+class _SalaryCalculatorAppState extends State<SalaryCalculatorApp> {
+  ThemeMode _themeMode = ThemeMode.system;
+
+  void _toggleTheme() {
+    setState(() {
+      _themeMode =
+          _themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    const seedColor = Color(0xFF1565C0); // Premium deep blue
+    // Professional, decent FinTech palette: Deep Slate Indigo & Emerald
+    const primaryColor = Color(0xFF1E3A8A); // Deep Slate Sapphire
+    const secondaryColor = Color(0xFF0F766E); // Refined Slate Teal
 
     return MaterialApp(
-      title: 'Salary Calculator',
+      title: 'Salary & Tax Pro',
       debugShowCheckedModeBanner: false,
+      themeMode: _themeMode,
       theme: ThemeData(
         useMaterial3: true,
+        brightness: Brightness.light,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: seedColor,
+          seedColor: primaryColor,
+          secondary: secondaryColor,
           brightness: Brightness.light,
+          surface: Colors.white,
         ),
         scaffoldBackgroundColor: const Color(0xFFF8FAFC),
         appBarTheme: const AppBarTheme(
@@ -28,60 +63,96 @@ class SalaryCalculatorApp extends StatelessWidget {
           backgroundColor: Colors.white,
           foregroundColor: Color(0xFF0F172A),
           surfaceTintColor: Colors.transparent,
+          titleTextStyle: TextStyle(
+            color: Color(0xFF0F172A),
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.3,
+          ),
         ),
         cardTheme: CardThemeData(
           color: Colors.white,
-          elevation: 1,
+          elevation: 0,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(18),
+            side: const BorderSide(color: Color(0xFFE2E8F0)),
           ),
         ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: const Color(0xFFF1F5F9),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFF1565C0), width: 2),
-          ),
-          errorBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Colors.redAccent, width: 1.5),
-          ),
+        navigationBarTheme: NavigationBarThemeData(
+          backgroundColor: Colors.white,
+          indicatorColor: const Color(0xFFEFF6FF),
+          elevation: 4,
+          labelTextStyle: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1E3A8A),
+              );
+            }
+            return const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF64748B),
+            );
+          }),
         ),
       ),
       darkTheme: ThemeData(
         useMaterial3: true,
+        brightness: Brightness.dark,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: seedColor,
+          seedColor: const Color(0xFF3B82F6),
+          secondary: const Color(0xFF14B8A6),
           brightness: Brightness.dark,
+          surface: const Color(0xFF1E293B),
         ),
-        scaffoldBackgroundColor: const Color(0xFF0F172A),
+        scaffoldBackgroundColor: const Color(0xFF0B1120),
         appBarTheme: const AppBarTheme(
           centerTitle: false,
           elevation: 0,
           backgroundColor: Color(0xFF1E293B),
           foregroundColor: Colors.white,
           surfaceTintColor: Colors.transparent,
+          titleTextStyle: TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.3,
+          ),
         ),
         cardTheme: CardThemeData(
           color: const Color(0xFF1E293B),
-          elevation: 1,
+          elevation: 0,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(18),
+            side: const BorderSide(color: Color(0xFF334155)),
           ),
         ),
+        navigationBarTheme: NavigationBarThemeData(
+          backgroundColor: const Color(0xFF1E293B),
+          indicatorColor: const Color(0xFF1E3A8A).withValues(alpha: 0.5),
+          elevation: 4,
+          labelTextStyle: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF60A5FA),
+              );
+            }
+            return const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF94A3B8),
+            );
+          }),
+        ),
       ),
-      themeMode: ThemeMode.system,
-      home: const SalaryCalculatorScreen(),
+      home: MainHomeScreen(
+        onToggleTheme: _toggleTheme,
+        isDarkMode: _themeMode == ThemeMode.dark,
+      ),
     );
   }
 }
