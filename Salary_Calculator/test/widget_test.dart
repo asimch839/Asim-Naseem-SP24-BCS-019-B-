@@ -4,7 +4,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:salary_calculator/main.dart';
 import 'package:salary_calculator/services/salary_storage_service.dart';
-import 'package:salary_calculator/widgets/modern_bottom_nav_bar.dart';
 
 void main() {
   late Directory tempDir;
@@ -16,10 +15,11 @@ void main() {
   });
 
   tearDownAll(() async {
-    await Hive.close();
-    if (tempDir.existsSync()) {
-      await tempDir.delete(recursive: true);
-    }
+    try {
+      if (tempDir.existsSync()) {
+        tempDir.deleteSync(recursive: true);
+      }
+    } catch (_) {}
   });
 
   testWidgets('Salary calculator full user interaction test',
@@ -45,13 +45,7 @@ void main() {
     // 2. Tap Calculate while fields are empty to trigger validation
     final calculateBtn =
         find.widgetWithText(ElevatedButton, 'Calculate Salary');
-    debugPrint('NAVBAR RECT: ${tester.getRect(find.byType(ModernBottomNavBar))}');
-    debugPrint('BUTTON RECT: ${tester.getRect(calculateBtn)}');
-    final hitResult = tester.hitTestOnBinding(const Offset(270, 800));
-    for (final entry in hitResult.path) {
-      debugPrint('HIT: ${entry.target.runtimeType}');
-    }
-    await tester.tap(calculateBtn, warnIfMissed: false);
+    await tester.tap(calculateBtn);
     await tester.pumpAndSettle();
 
     expect(find.text('Please enter Basic Salary'), findsOneWidget);
@@ -76,7 +70,7 @@ void main() {
 
     // 4. Tap Calculate
     await tester.ensureVisible(calculateBtn);
-    await tester.tap(calculateBtn, warnIfMissed: false);
+    await tester.tap(calculateBtn);
     await tester.pumpAndSettle();
 
     // Verify Results:
@@ -159,13 +153,29 @@ void main() {
 
     final calculateBtn =
         find.widgetWithText(ElevatedButton, 'Calculate Salary');
-    await tester.tap(calculateBtn, warnIfMissed: false);
+    await tester.scrollUntilVisible(calculateBtn, 100,
+        scrollable: find.byType(Scrollable).first);
+    await tester.tap(calculateBtn);
     await tester.pumpAndSettle();
 
     // Verify Save button exists and tap it
     final saveBtn = find.text('Save');
+    await tester.scrollUntilVisible(saveBtn, 100,
+        scrollable: find.byType(Scrollable).first);
     expect(saveBtn, findsOneWidget);
     await tester.tap(saveBtn);
+    await tester.pumpAndSettle();
+
+    // Confirm dialog save
+    final dialogSaveBtn = find.descendant(
+      of: find.byType(AlertDialog),
+      matching: find.widgetWithText(FilledButton, 'Save'),
+    );
+    expect(dialogSaveBtn, findsOneWidget);
+    await tester.tap(dialogSaveBtn);
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    });
     await tester.pumpAndSettle();
 
     // Verify it changed to 'Saved'

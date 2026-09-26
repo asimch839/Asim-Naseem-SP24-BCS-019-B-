@@ -97,8 +97,11 @@ class _ResultCardState extends State<ResultCard> {
                   flatRate: widget.flatRate,
                 );
 
-                await SalaryStorageService.saveRecord(record);
-
+                try {
+                  await SalaryStorageService.saveRecord(record);
+                } catch (e) {
+                  debugPrint('saveRecord error: $e');
+                }
                 if (mounted) {
                   setState(() {
                     _isSaved = true;
@@ -310,13 +313,17 @@ class _ResultCardState extends State<ResultCard> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'Salary Breakdown',
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: theme.colorScheme.onSurface,
+                      Expanded(
+                        child: Text(
+                          'Salary Breakdown',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                      const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,
@@ -504,13 +511,17 @@ class _ResultCardState extends State<ResultCard> {
             ],
           ),
           const SizedBox(height: 8),
-          Text(
-            TaxCalculator.formatCurrency(amount),
-            style: TextStyle(
-              fontSize: isFirst ? 24 : 26,
-              fontWeight: FontWeight.w800,
-              color: textColor,
-              letterSpacing: -0.5,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              TaxCalculator.formatCurrency(amount),
+              style: TextStyle(
+                fontSize: isFirst ? 24 : 26,
+                fontWeight: FontWeight.w800,
+                color: textColor,
+                letterSpacing: -0.5,
+              ),
             ),
           ),
           const SizedBox(height: 4),

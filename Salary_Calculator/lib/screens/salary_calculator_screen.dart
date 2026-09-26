@@ -45,7 +45,11 @@ class SalaryCalculatorScreenState extends State<SalaryCalculatorScreen> {
   void initState() {
     super.initState();
     if (widget.recordToLoad != null) {
-      loadRecord(widget.recordToLoad!);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && widget.recordToLoad != null) {
+          loadRecord(widget.recordToLoad!);
+        }
+      });
     }
   }
 
@@ -54,7 +58,11 @@ class SalaryCalculatorScreenState extends State<SalaryCalculatorScreen> {
     super.didUpdateWidget(oldWidget);
     if (widget.recordToLoad != null &&
         widget.recordToLoad != oldWidget.recordToLoad) {
-      loadRecord(widget.recordToLoad!);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && widget.recordToLoad != null) {
+          loadRecord(widget.recordToLoad!);
+        }
+      });
     }
   }
 
@@ -87,7 +95,7 @@ class SalaryCalculatorScreenState extends State<SalaryCalculatorScreen> {
   }
 
   void _calculateSalary({bool scrollDown = true}) {
-    FocusScope.of(context).unfocus();
+    FocusManager.instance.primaryFocus?.unfocus();
 
     if (_formKey.currentState?.validate() ?? false) {
       final basic = double.parse(_basicSalaryController.text.trim());
@@ -114,7 +122,11 @@ class SalaryCalculatorScreenState extends State<SalaryCalculatorScreen> {
         _salaryResult = result;
       });
 
-      widget.onCalculated?.call(result, _taxMode, flatRate);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          widget.onCalculated?.call(result, _taxMode, flatRate);
+        }
+      });
 
       if (scrollDown) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
