@@ -17,7 +17,7 @@ class TableColumnDef {
   });
 }
 
-class DataTableWidget extends StatelessWidget {
+class DataTableWidget extends StatefulWidget {
   final List<TableColumnDef> columns;
   final List<List<Widget>> rows;
   final bool isLoading;
@@ -38,8 +38,23 @@ class DataTableWidget extends StatelessWidget {
   });
 
   @override
+  State<DataTableWidget> createState() => _DataTableWidgetState();
+}
+
+class _DataTableWidgetState extends State<DataTableWidget> {
+  final ScrollController _horizontalController = ScrollController();
+  final ScrollController _verticalController = ScrollController();
+
+  @override
+  void dispose() {
+    _horizontalController.dispose();
+    _verticalController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (isLoading) {
+    if (widget.isLoading) {
       return Container(
         height: 300,
         decoration: AppStyles.cardDecoration,
@@ -49,15 +64,15 @@ class DataTableWidget extends StatelessWidget {
       );
     }
 
-    if (rows.isEmpty) {
+    if (widget.rows.isEmpty) {
       return Container(
         constraints: const BoxConstraints(minHeight: 280),
         decoration: AppStyles.cardDecoration,
         child: EmptyStateWidget(
-          title: emptyTitle,
-          description: emptySubtitle,
-          actionText: emptyActionText,
-          onAction: onEmptyAction,
+          title: widget.emptyTitle,
+          description: widget.emptySubtitle,
+          actionText: widget.emptyActionText,
+          onAction: widget.onEmptyAction,
         ),
       );
     }
@@ -68,6 +83,7 @@ class DataTableWidget extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           Widget tableContent = SingleChildScrollView(
+            controller: _horizontalController,
             scrollDirection: Axis.horizontal,
             child: ConstrainedBox(
               constraints: BoxConstraints(minWidth: constraints.maxWidth),
@@ -82,7 +98,7 @@ class DataTableWidget extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                   color: AppColors.textPrimary,
                 ),
-                columns: columns.map((col) {
+                columns: widget.columns.map((col) {
                   return DataColumn(
                     label: Align(
                       alignment: col.alignment,
@@ -91,7 +107,7 @@ class DataTableWidget extends StatelessWidget {
                     numeric: col.isNumeric,
                   );
                 }).toList(),
-                rows: rows.map((rowCells) {
+                rows: widget.rows.map((rowCells) {
                   return DataRow(
                     cells: rowCells.map((cellWidget) {
                       return DataCell(cellWidget);
@@ -103,16 +119,14 @@ class DataTableWidget extends StatelessWidget {
           );
 
           if (constraints.maxHeight.isFinite) {
-            tableContent = SingleChildScrollView(
+            return SingleChildScrollView(
+              controller: _verticalController,
               scrollDirection: Axis.vertical,
               child: tableContent,
             );
           }
 
-          return Scrollbar(
-            thumbVisibility: false,
-            child: tableContent,
-          );
+          return tableContent;
         },
       ),
     );

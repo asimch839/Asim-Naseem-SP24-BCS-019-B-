@@ -7,6 +7,7 @@ import '../../core/services/auth_service.dart';
 import '../../core/utils/responsive.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_dialog.dart';
+import '../../widgets/interactive_scroll_view.dart';
 import 'main_layout_controller.dart';
 import '../dashboard/dashboard_view.dart';
 import '../students/student_view.dart';
@@ -52,34 +53,38 @@ class MainLayoutView extends GetView<MainLayoutController> {
 
                   // Active Module View
                   Expanded(
-                    child: Obx(() {
-                      switch (controller.selectedIndex.value) {
-                        case 0:
-                          return const DashboardView();
-                        case 1:
-                          return const StudentView();
-                        case 2:
-                          return const RoomView();
-                        case 3:
-                          return const AdmissionView();
-                        case 4:
-                          return const RentView();
-                        case 5:
-                          return const ReceiptView();
-                        case 6:
-                          return const ExpenseView();
-                        case 7:
-                          return const HistoryView();
-                        case 8:
-                          return const ReportView();
-                        case 9:
-                          return const UserView();
-                        case 10:
-                          return const SettingsView();
-                        default:
-                          return const DashboardView();
-                      }
-                    }),
+                    child: InteractiveBiDirectionalScrollView(
+                      minWidth: isMobile ? 650.0 : 1050.0,
+                      minHeight: 680.0,
+                      child: Obx(() {
+                        switch (controller.selectedIndex.value) {
+                          case 0:
+                            return const DashboardView();
+                          case 1:
+                            return const StudentView();
+                          case 2:
+                            return const RoomView();
+                          case 3:
+                            return const AdmissionView();
+                          case 4:
+                            return const RentView();
+                          case 5:
+                            return const ReceiptView();
+                          case 6:
+                            return const ExpenseView();
+                          case 7:
+                            return const HistoryView();
+                          case 8:
+                            return const ReportView();
+                          case 9:
+                            return const UserView();
+                          case 10:
+                            return const SettingsView();
+                          default:
+                            return const DashboardView();
+                        }
+                      }),
+                    ),
                   ),
                 ],
               ),

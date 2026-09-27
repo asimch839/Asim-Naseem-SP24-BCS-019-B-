@@ -17,93 +17,90 @@ class SettingsView extends GetView<SettingsController> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Top Header & Action
-            ResponsiveHeader(
-              title: 'System Settings & Maintenance',
-              subtitle: 'Manage hostel identity, billing rules, offline data storage & backup, and account security',
-              actions: [
-                Obx(() {
-                  if (controller.selectedTab.value == 0) {
-                    return CustomButton(
-                      text: 'Save All Settings',
-                      icon: Icons.save_rounded,
-                      isLoading: controller.isSaving.value,
-                      onPressed: controller.saveSettings,
-                    );
-                  } else if (controller.selectedTab.value == 1) {
-                    return CustomButton(
-                      text: 'Refresh Status',
-                      icon: Icons.refresh_rounded,
-                      type: ButtonType.secondary,
-                      isLoading: controller.isLoadingDbInfo.value,
-                      onPressed: controller.loadDatabaseInfo,
-                    );
-                  } else {
-                    return const SizedBox.shrink();
-                  }
-                }),
-              ],
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Top Header & Action
+          ResponsiveHeader(
+            title: 'System Settings & Maintenance',
+            subtitle: 'Manage hostel identity, billing rules, offline data storage & backup, and account security',
+            actions: [
+              Obx(() {
+                if (controller.selectedTab.value == 0) {
+                  return CustomButton(
+                    text: 'Save All Settings',
+                    icon: Icons.save_rounded,
+                    isLoading: controller.isSaving.value,
+                    onPressed: controller.saveSettings,
+                  );
+                } else if (controller.selectedTab.value == 1) {
+                  return CustomButton(
+                    text: 'Refresh Status',
+                    icon: Icons.refresh_rounded,
+                    type: ButtonType.secondary,
+                    isLoading: controller.isLoadingDbInfo.value,
+                    onPressed: controller.loadDatabaseInfo,
+                  );
+                } else {
+                  return const SizedBox.shrink();
+                }
+              }),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // Modern Tab Navigation with Horizontal Scroll Safety
+          Obx(() => Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.border),
             ),
-            const SizedBox(height: 20),
-
-            // Modern Tab Navigation with Horizontal Scroll Safety
-            Obx(() => Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppColors.border),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildTabButton(
+                    index: 0,
+                    label: 'General Configuration',
+                    icon: Icons.tune_rounded,
+                    isSelected: controller.selectedTab.value == 0,
+                  ),
+                  const SizedBox(width: 4),
+                  _buildTabButton(
+                    index: 1,
+                    label: 'Data & Backup Center',
+                    icon: Icons.storage_rounded,
+                    isSelected: controller.selectedTab.value == 1,
+                  ),
+                  const SizedBox(width: 4),
+                  _buildTabButton(
+                    index: 2,
+                    label: 'Account & Security',
+                    icon: Icons.security_rounded,
+                    isSelected: controller.selectedTab.value == 2,
+                  ),
+                ],
               ),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _buildTabButton(
-                      index: 0,
-                      label: 'General Configuration',
-                      icon: Icons.tune_rounded,
-                      isSelected: controller.selectedTab.value == 0,
-                    ),
-                    const SizedBox(width: 4),
-                    _buildTabButton(
-                      index: 1,
-                      label: 'Data & Backup Center',
-                      icon: Icons.storage_rounded,
-                      isSelected: controller.selectedTab.value == 1,
-                    ),
-                    const SizedBox(width: 4),
-                    _buildTabButton(
-                      index: 2,
-                      label: 'Account & Security',
-                      icon: Icons.security_rounded,
-                      isSelected: controller.selectedTab.value == 2,
-                    ),
-                  ],
-                ),
-              ),
-            )),
-            const SizedBox(height: 24),
+            ),
+          )),
+          const SizedBox(height: 24),
 
-            // Tab Content
-            Obx(() {
-              if (controller.selectedTab.value == 0) {
-                return _buildGeneralSettingsTab();
-              } else if (controller.selectedTab.value == 1) {
-                return _buildDataAndBackupTab();
-              } else {
-                return _buildAccountSecurityTab();
-              }
-            }),
-          ],
-        ),
+          // Tab Content
+          Obx(() {
+            if (controller.selectedTab.value == 0) {
+              return _buildGeneralSettingsTab();
+            } else if (controller.selectedTab.value == 1) {
+              return _buildDataAndBackupTab();
+            } else {
+              return _buildAccountSecurityTab();
+            }
+          }),
+        ],
       ),
     );
   }

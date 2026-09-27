@@ -14,13 +14,11 @@ class ReceiptView extends GetView<ReceiptController> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
             // Header Bar
             const ResponsiveHeader(
               title: 'Receipts & Invoices',
@@ -59,9 +57,8 @@ class ReceiptView extends GetView<ReceiptController> {
             const SizedBox(height: 20),
 
             // Receipts Table
-            Expanded(
-              child: Obx(() {
-                final list = controller.receipts;
+            Obx(() {
+              final list = controller.receipts;
 
                 final List<List<Widget>> tableRows = list.map((r) {
                   return [
@@ -127,10 +124,8 @@ class ReceiptView extends GetView<ReceiptController> {
                   emptySubtitle: 'Payment receipts will appear here automatically when payments are recorded.',
                 );
               }),
-            ),
-          ],
+            ],
         ),
-      ),
-    );
-  }
+      );
+    }
 }

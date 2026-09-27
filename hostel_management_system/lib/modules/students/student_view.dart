@@ -723,13 +723,11 @@ class StudentView extends GetView<StudentController> {
   Widget build(BuildContext context) {
     final layout = Get.find<MainLayoutController>();
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
             // Header Bar
             ResponsiveHeader(
               title: 'Student Directory',
@@ -806,9 +804,8 @@ class StudentView extends GetView<StudentController> {
             const SizedBox(height: 20),
 
             // Students Data Table
-            Expanded(
-              child: Obx(() {
-                final studentList = controller.students;
+            Obx(() {
+              final studentList = controller.students;
 
                 final List<List<Widget>> tableRows = studentList.map((s) {
                   return [
@@ -908,12 +905,10 @@ class StudentView extends GetView<StudentController> {
                   onEmptyAction: () => layout.setNavIndex(3),
                 );
               }),
-            ),
-          ],
+            ],
         ),
-      ),
-    );
-  }
+      );
+    }
 
   Widget _buildSectionHeader(String title) {
     return Padding(

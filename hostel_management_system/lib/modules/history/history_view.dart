@@ -17,9 +17,7 @@ class HistoryView extends GetView<HistoryController> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: LayoutBuilder(
+    return LayoutBuilder(
         builder: (context, constraints) {
           final isCompact = constraints.maxWidth < 900 || constraints.maxHeight < 720;
           final isNarrow = constraints.maxWidth < 650;
@@ -104,22 +102,19 @@ class HistoryView extends GetView<HistoryController> {
                 const SizedBox(height: 20),
 
                 // Main Tab View
-                Expanded(
-                  child: Obx(() {
-                    if (controller.selectedTab.value == 0) {
-                      return _buildStudentsHistoryTab(constraints, isCardsNarrow, isNarrow, isCompact);
-                    } else {
-                      return _buildAuditLogsTab(constraints, isCardsNarrow, isNarrow, isCompact);
-                    }
-                  }),
-                ),
+                Obx(() {
+                  if (controller.selectedTab.value == 0) {
+                    return _buildStudentsHistoryTab(constraints, isCardsNarrow, isNarrow, isCompact);
+                  } else {
+                    return _buildAuditLogsTab(constraints, isCardsNarrow, isNarrow, isCompact);
+                  }
+                }),
               ],
             ),
           );
         },
-      ),
-    );
-  }
+      );
+    }
 
   Widget _buildTabButton({
     required int index,
@@ -406,7 +401,7 @@ class HistoryView extends GetView<HistoryController> {
         const SizedBox(height: 16),
         searchFilterBar,
         const SizedBox(height: 16),
-        Expanded(child: tableWidget),
+        tableWidget,
       ],
     );
   }
@@ -609,7 +604,7 @@ class HistoryView extends GetView<HistoryController> {
         const SizedBox(height: 16),
         searchFilterBar,
         const SizedBox(height: 16),
-        Expanded(child: tableWidget),
+        tableWidget,
       ],
     );
   }

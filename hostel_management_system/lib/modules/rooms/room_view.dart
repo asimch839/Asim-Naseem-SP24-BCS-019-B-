@@ -168,12 +168,10 @@ class RoomView extends GetView<RoomController> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Header Bar
             ResponsiveHeader(
@@ -252,8 +250,7 @@ class RoomView extends GetView<RoomController> {
             const SizedBox(height: 20),
 
             // Content Area: Split View (Rooms List + Selected Room Beds Visualizer)
-            Expanded(
-              child: Obx(() {
+            Obx(() {
                 if (controller.isLoading.value && controller.rooms.isEmpty) {
                   return const Center(child: CircularProgressIndicator(color: AppColors.primary));
                 }
@@ -271,12 +268,13 @@ class RoomView extends GetView<RoomController> {
                   builder: (context, constraints) {
                     final isVertical = constraints.maxWidth < 950;
 
-                    final leftGrid = Expanded(
-                      flex: 3,
-                      child: GridView.builder(
+                    Widget buildGrid() {
+                      return GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
                         gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
                           maxCrossAxisExtent: 320,
-                          mainAxisExtent: 170,
+                          mainAxisExtent: 195,
                           crossAxisSpacing: 16,
                           mainAxisSpacing: 16,
                         ),
@@ -314,35 +312,55 @@ class RoomView extends GetView<RoomController> {
                                     Row(
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
-                                        Text('Room ${room.roomNumber}', style: AppStyles.h3),
+                                        Expanded(
+                                          child: Text(
+                                            'Room ${room.roomNumber}',
+                                            style: AppStyles.h3,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 4),
                                         StatusBadge(status: room.roomStatus),
                                       ],
                                     ),
                                     const SizedBox(height: 4),
-                                    Text('${room.block} • ${room.floor} • ${room.roomType}', style: AppStyles.caption),
+                                    Text(
+                                      '${room.block} • ${room.floor} • ${room.roomType}',
+                                      style: AppStyles.caption,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                     const Spacer(),
                                     Row(
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
-                                        Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text('Occupancy', style: AppStyles.caption),
-                                            Text(
-                                              '${room.occupiedBedsCount} / ${room.totalBeds} Beds',
-                                              style: AppStyles.bodySmall.copyWith(fontWeight: FontWeight.w700),
-                                            ),
-                                          ],
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text('Occupancy', style: AppStyles.caption),
+                                              Text(
+                                                '${room.occupiedBedsCount} / ${room.totalBeds} Beds',
+                                                style: AppStyles.bodySmall.copyWith(fontWeight: FontWeight.w700),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ],
+                                          ),
                                         ),
-                                        Column(
-                                          crossAxisAlignment: CrossAxisAlignment.end,
-                                          children: [
-                                            Text('Rent', style: AppStyles.caption),
-                                            Text(
-                                              CurrencyFormatter.format(room.monthlyRent),
-                                              style: AppStyles.bodySmall.copyWith(fontWeight: FontWeight.w700, color: AppColors.primary),
-                                            ),
-                                          ],
+                                        const SizedBox(width: 6),
+                                        Flexible(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.end,
+                                            children: [
+                                              Text('Rent', style: AppStyles.caption),
+                                              FittedBox(
+                                                fit: BoxFit.scaleDown,
+                                                child: Text(
+                                                  CurrencyFormatter.format(room.monthlyRent),
+                                                  style: AppStyles.bodySmall.copyWith(fontWeight: FontWeight.w700, color: AppColors.primary),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
                                         ),
                                       ],
                                     ),
@@ -364,12 +382,11 @@ class RoomView extends GetView<RoomController> {
                             );
                           });
                         },
-                      ),
-                    );
+                      );
+                    }
 
-                    final rightBedManager = Expanded(
-                      flex: 2,
-                      child: Container(
+                    Widget buildBedManager() {
+                      return Container(
                         padding: const EdgeInsets.all(20),
                         decoration: AppStyles.cardDecoration,
                         child: Obx(() {
@@ -384,14 +401,17 @@ class RoomView extends GetView<RoomController> {
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text('Room ${r.roomNumber} Beds', style: AppStyles.h3),
-                                      Text('${r.block} | ${r.floor} | ${r.roomType}', style: AppStyles.caption),
-                                    ],
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text('Room ${r.roomNumber} Beds', style: AppStyles.h3, overflow: TextOverflow.ellipsis),
+                                        Text('${r.block} | ${r.floor} | ${r.roomType}', style: AppStyles.caption, overflow: TextOverflow.ellipsis),
+                                      ],
+                                    ),
                                   ),
                                   Row(
+                                    mainAxisSize: MainAxisSize.min,
                                     children: [
                                       IconButton(
                                         icon: const Icon(Icons.edit_outlined, size: 20, color: AppColors.primary),
@@ -423,87 +443,88 @@ class RoomView extends GetView<RoomController> {
                               if (controller.isLoadingBeds.value)
                                 const Center(child: CircularProgressIndicator())
                               else
-                                Expanded(
-                                  child: ListView.separated(
-                                    itemCount: controller.selectedRoomBeds.length,
-                                    separatorBuilder: (_, _) => const SizedBox(height: 10),
-                                    itemBuilder: (context, bIdx) {
-                                      final bed = controller.selectedRoomBeds[bIdx];
-                                      return Container(
-                                        padding: const EdgeInsets.all(12),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.surfaceSecondary,
-                                          borderRadius: BorderRadius.circular(8),
-                                          border: Border.all(color: AppColors.border),
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            Container(
-                                              padding: const EdgeInsets.all(8),
-                                              decoration: BoxDecoration(
-                                                color: bed.isOccupied
-                                                    ? AppColors.primaryLight.withValues(alpha: 0.1)
-                                                    : (bed.isMaintenance ? AppColors.infoBg : AppColors.successBg),
-                                                borderRadius: BorderRadius.circular(6),
-                                              ),
-                                              child: Icon(
-                                                Icons.single_bed_rounded,
-                                                color: bed.isOccupied
-                                                    ? AppColors.primaryLight
-                                                    : (bed.isMaintenance ? AppColors.info : AppColors.success),
-                                                size: 24,
-                                              ),
+                                ListView.separated(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  itemCount: controller.selectedRoomBeds.length,
+                                  separatorBuilder: (_, _) => const SizedBox(height: 10),
+                                  itemBuilder: (context, bIdx) {
+                                    final bed = controller.selectedRoomBeds[bIdx];
+                                    return Container(
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.surfaceSecondary,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: AppColors.border),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.all(8),
+                                            decoration: BoxDecoration(
+                                              color: bed.isOccupied
+                                                  ? AppColors.primaryLight.withValues(alpha: 0.1)
+                                                  : (bed.isMaintenance ? AppColors.infoBg : AppColors.successBg),
+                                              borderRadius: BorderRadius.circular(6),
                                             ),
-                                            const SizedBox(width: 12),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(bed.bedNumber, style: AppStyles.bodyMedium.copyWith(fontWeight: FontWeight.w700)),
-                                                  const SizedBox(height: 2),
-                                                  if (bed.studentName != null)
-                                                    Text(
-                                                      'Occupant: ${bed.studentName} (${bed.studentIdCode})',
-                                                      style: AppStyles.caption.copyWith(color: AppColors.primary),
-                                                    )
-                                                  else
-                                                    Text('No student assigned', style: AppStyles.caption),
-                                                ],
-                                              ),
+                                            child: Icon(
+                                              Icons.single_bed_rounded,
+                                              color: bed.isOccupied
+                                                  ? AppColors.primaryLight
+                                                  : (bed.isMaintenance ? AppColors.info : AppColors.success),
+                                              size: 24,
                                             ),
-                                            StatusBadge(status: bed.bedStatus),
-                                            const SizedBox(width: 8),
-                                            if (!bed.isOccupied)
-                                              PopupMenuButton<String>(
-                                                icon: const Icon(Icons.more_vert, size: 18),
-                                                onSelected: (newStatus) {
-                                                  if (bed.id != null) {
-                                                    controller.setBedStatus(bed.id!, newStatus);
-                                                  }
-                                                },
-                                                itemBuilder: (context) => [
-                                                  const PopupMenuItem(value: 'Available', child: Text('Mark Available')),
-                                                  const PopupMenuItem(value: 'Maintenance', child: Text('Mark Maintenance')),
-                                                ],
-                                              ),
-                                          ],
-                                        ),
-                                      );
-                                    },
-                                  ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(bed.bedNumber, style: AppStyles.bodyMedium.copyWith(fontWeight: FontWeight.w700)),
+                                                const SizedBox(height: 2),
+                                                if (bed.studentName != null)
+                                                  Text(
+                                                    'Occupant: ${bed.studentName} (${bed.studentIdCode})',
+                                                    style: AppStyles.caption.copyWith(color: AppColors.primary),
+                                                    overflow: TextOverflow.ellipsis,
+                                                  )
+                                                else
+                                                  Text('No student assigned', style: AppStyles.caption),
+                                              ],
+                                            ),
+                                          ),
+                                          StatusBadge(status: bed.bedStatus),
+                                          const SizedBox(width: 8),
+                                          if (!bed.isOccupied)
+                                            PopupMenuButton<String>(
+                                              icon: const Icon(Icons.more_vert, size: 18),
+                                              onSelected: (newStatus) {
+                                                if (bed.id != null) {
+                                                  controller.setBedStatus(bed.id!, newStatus);
+                                                }
+                                              },
+                                              itemBuilder: (context) => [
+                                                const PopupMenuItem(value: 'Available', child: Text('Mark Available')),
+                                                const PopupMenuItem(value: 'Maintenance', child: Text('Mark Maintenance')),
+                                              ],
+                                            ),
+                                        ],
+                                      ),
+                                    );
+                                  },
                                 ),
                             ],
                           );
                         }),
-                      ),
-                    );
+                      );
+                    }
 
                     if (isVertical) {
                       return Column(
                         children: [
-                          leftGrid,
+                          buildGrid(),
                           const SizedBox(height: 16),
-                          rightBedManager,
+                          buildBedManager(),
                         ],
                       );
                     }
@@ -511,18 +532,16 @@ class RoomView extends GetView<RoomController> {
                     return Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        leftGrid,
+                        Expanded(flex: 3, child: buildGrid()),
                         const SizedBox(width: 20),
-                        rightBedManager,
+                        Expanded(flex: 2, child: buildBedManager()),
                       ],
                     );
                   },
                 );
               }),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+            ],
+          ),
+        );
+    }
 }

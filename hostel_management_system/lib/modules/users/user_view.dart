@@ -133,13 +133,11 @@ class UserView extends GetView<UserController> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
             // Header Bar
             ResponsiveHeader(
               title: 'User & Role Management',
@@ -155,9 +153,8 @@ class UserView extends GetView<UserController> {
             const SizedBox(height: 20),
 
             // Users Table
-            Expanded(
-              child: Obx(() {
-                final list = controller.users;
+            Obx(() {
+              final list = controller.users;
 
                 final List<List<Widget>> tableRows = list.map((u) {
                   return [
@@ -223,10 +220,8 @@ class UserView extends GetView<UserController> {
                   emptySubtitle: 'No user accounts found in local database.',
                 );
               }),
-            ),
-          ],
+            ],
         ),
-      ),
-    );
-  }
+      );
+    }
 }

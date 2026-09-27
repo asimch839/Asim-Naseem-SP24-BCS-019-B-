@@ -28,48 +28,87 @@ class _IncomeExpenseChartState extends State<IncomeExpenseChart> {
       return const Center(child: Text('No income/expense records found for chart'));
     }
 
-    return Column(
-      children: [
-        // Top Toolbar: Chart Type Selector & Dynamic Legend
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            // Dynamic Legend based on active graph
-            Expanded(child: _buildDynamicLegend()),
-            const SizedBox(width: 8),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 640;
 
-            // Graph Selector Toggle Buttons
-            Container(
-              padding: const EdgeInsets.all(2),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceSecondary,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.border),
+        return Column(
+          children: [
+            // Top Toolbar: Chart Type Selector & Dynamic Legend
+            if (isCompact)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildDynamicLegend(),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceSecondary,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _buildTypeBtn(2, 'Circle', Icons.pie_chart_rounded),
+                          _buildTypeBtn(0, 'Bars', Icons.bar_chart_rounded),
+                          _buildTypeBtn(1, 'Lines', Icons.show_chart_rounded),
+                          _buildTypeBtn(3, 'Area Wave', Icons.area_chart_rounded),
+                          _buildTypeBtn(4, 'Net P&L', Icons.waterfall_chart_rounded),
+                          _buildTypeBtn(5, 'Stacked', Icons.stacked_bar_chart_rounded),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            else
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Dynamic Legend based on active graph
+                  Expanded(child: _buildDynamicLegend()),
+                  const SizedBox(width: 8),
+
+                  // Graph Selector Toggle Buttons
+                  Flexible(
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceSecondary,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _buildTypeBtn(2, 'Circle', Icons.pie_chart_rounded),
+                            _buildTypeBtn(0, 'Bars', Icons.bar_chart_rounded),
+                            _buildTypeBtn(1, 'Lines', Icons.show_chart_rounded),
+                            _buildTypeBtn(3, 'Area Wave', Icons.area_chart_rounded),
+                            _buildTypeBtn(4, 'Net P&L', Icons.waterfall_chart_rounded),
+                            _buildTypeBtn(5, 'Stacked', Icons.stacked_bar_chart_rounded),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _buildTypeBtn(2, 'Circle', Icons.pie_chart_rounded),
-                    _buildTypeBtn(0, 'Bars', Icons.bar_chart_rounded),
-                    _buildTypeBtn(1, 'Lines', Icons.show_chart_rounded),
-                    _buildTypeBtn(3, 'Area Wave', Icons.area_chart_rounded),
-                    _buildTypeBtn(4, 'Net P&L', Icons.waterfall_chart_rounded),
-                    _buildTypeBtn(5, 'Stacked', Icons.stacked_bar_chart_rounded),
-                  ],
-                ),
-              ),
+            const SizedBox(height: 14),
+
+            // Active Chart Display
+            Expanded(
+              child: _buildActiveChart(),
             ),
           ],
-        ),
-        const SizedBox(height: 14),
-
-        // Active Chart Display
-        Expanded(
-          child: _buildActiveChart(),
-        ),
-      ],
+        );
+      },
     );
   }
 
@@ -93,12 +132,16 @@ class _IncomeExpenseChartState extends State<IncomeExpenseChart> {
               color: isSelected ? Colors.white : AppColors.textSecondary,
             ),
             const SizedBox(width: 5),
-            Text(
-              label,
-              style: AppStyles.caption.copyWith(
-                color: isSelected ? Colors.white : AppColors.textSecondary,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                fontSize: 11,
+            Flexible(
+              child: Text(
+                label,
+                style: AppStyles.caption.copyWith(
+                  color: isSelected ? Colors.white : AppColors.textSecondary,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  fontSize: 11,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
@@ -108,65 +151,58 @@ class _IncomeExpenseChartState extends State<IncomeExpenseChart> {
   }
 
   Widget _buildDynamicLegend() {
+    List<Widget> items;
     switch (_selectedChartType) {
       case 1:
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildLegendItem('Rent Income', AppColors.primaryLight),
-            const SizedBox(width: 14),
-            _buildLegendItem('Expenses', AppColors.danger),
-            const SizedBox(width: 14),
-            _buildLegendItem('Net Surplus', AppColors.success),
-          ],
-        );
+        items = [
+          _buildLegendItem('Rent Income', AppColors.primaryLight),
+          _buildLegendItem('Expenses', AppColors.danger),
+          _buildLegendItem('Net Surplus', AppColors.success),
+        ];
+        break;
       case 2:
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildLegendItem('Total Income', AppColors.primary),
-            const SizedBox(width: 14),
-            _buildLegendItem('Total Expenses', AppColors.danger),
-          ],
-        );
+        items = [
+          _buildLegendItem('Total Income', AppColors.primary),
+          _buildLegendItem('Total Expenses', AppColors.danger),
+        ];
+        break;
       case 3:
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildLegendItem('Income Wave', AppColors.primary),
-            const SizedBox(width: 14),
-            _buildLegendItem('Expense Wave', AppColors.danger),
-          ],
-        );
+        items = [
+          _buildLegendItem('Income Wave', AppColors.primary),
+          _buildLegendItem('Expense Wave', AppColors.danger),
+        ];
+        break;
       case 4:
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildLegendItem('Net Profit (+)', AppColors.success),
-            const SizedBox(width: 14),
-            _buildLegendItem('Net Deficit (-)', AppColors.danger),
-          ],
-        );
+        items = [
+          _buildLegendItem('Net Profit (+)', AppColors.success),
+          _buildLegendItem('Net Deficit (-)', AppColors.danger),
+        ];
+        break;
       case 5:
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildLegendItem('Expenses Paid', AppColors.danger),
-            const SizedBox(width: 14),
-            _buildLegendItem('Retained Profit', AppColors.success),
-          ],
-        );
+        items = [
+          _buildLegendItem('Expenses Paid', AppColors.danger),
+          _buildLegendItem('Retained Profit', AppColors.success),
+        ];
+        break;
       case 0:
       default:
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildLegendItem('Rent Income', AppColors.primaryLight),
-            const SizedBox(width: 14),
-            _buildLegendItem('Expenses', AppColors.danger),
-          ],
-        );
+        items = [
+          _buildLegendItem('Rent Income', AppColors.primaryLight),
+          _buildLegendItem('Expenses', AppColors.danger),
+        ];
+        break;
     }
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: items
+            .expand((w) => [w, const SizedBox(width: 14)])
+            .toList()
+          ..removeLast(),
+      ),
+    );
   }
 
   Widget _buildLegendItem(String label, Color color) {
@@ -657,132 +693,154 @@ class _IncomeExpenseChartState extends State<IncomeExpenseChart> {
     final incomePct = (totalIncome / totalCombined * 100);
     final expensePct = (totalExpense / totalCombined * 100);
 
-    return Row(
-      children: [
-        // Interactive Circle (Pie) Chart with Center Dynamic Card
-        Expanded(
-          flex: 4,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              PieChart(
-                PieChartData(
-                  pieTouchData: PieTouchData(
-                    touchCallback: (FlTouchEvent event, pieTouchResponse) {
-                      setState(() {
-                        if (!event.isInterestedForInteractions ||
-                            pieTouchResponse == null ||
-                            pieTouchResponse.touchedSection == null) {
-                          _touchedPieIndex = -1;
-                          return;
-                        }
-                        _touchedPieIndex =
-                            pieTouchResponse.touchedSection!.touchedSectionIndex;
-                      });
-                    },
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isStack = constraints.maxWidth < 450;
+
+        final pieChartWidget = Stack(
+          alignment: Alignment.center,
+          children: [
+            PieChart(
+              PieChartData(
+                pieTouchData: PieTouchData(
+                  touchCallback: (FlTouchEvent event, pieTouchResponse) {
+                    setState(() {
+                      if (!event.isInterestedForInteractions ||
+                          pieTouchResponse == null ||
+                          pieTouchResponse.touchedSection == null) {
+                        _touchedPieIndex = -1;
+                        return;
+                      }
+                      _touchedPieIndex =
+                          pieTouchResponse.touchedSection!.touchedSectionIndex;
+                    });
+                  },
+                ),
+                sectionsSpace: 3,
+                centerSpaceRadius: 36,
+                sections: [
+                  PieChartSectionData(
+                    value: totalIncome > 0 ? totalIncome : 0.001,
+                    color: AppColors.primary,
+                    title: '${incomePct.toStringAsFixed(0)}%',
+                    radius: _touchedPieIndex == 0 ? 40 : 34,
+                    titleStyle: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                    ),
                   ),
-                  sectionsSpace: 3,
-                  centerSpaceRadius: 44,
-                  sections: [
-                    // Section 0: Total Rent Income
-                    PieChartSectionData(
-                      value: totalIncome > 0 ? totalIncome : 0.001,
-                      color: AppColors.primary,
-                      title: '${incomePct.toStringAsFixed(0)}%',
-                      radius: _touchedPieIndex == 0 ? 46 : 38,
-                      titleStyle: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
+                  PieChartSectionData(
+                    value: totalExpense > 0 ? totalExpense : 0.001,
+                    color: AppColors.danger,
+                    title: '${expensePct.toStringAsFixed(0)}%',
+                    radius: _touchedPieIndex == 1 ? 40 : 34,
+                    titleStyle: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
                     ),
-                    // Section 1: Total Expenses
-                    PieChartSectionData(
-                      value: totalExpense > 0 ? totalExpense : 0.001,
-                      color: AppColors.danger,
-                      title: '${expensePct.toStringAsFixed(0)}%',
-                      radius: _touchedPieIndex == 1 ? 46 : 38,
-                      titleStyle: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
+                  ),
+                ],
+              ),
+            ),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Padding(
+                padding: const EdgeInsets.all(4.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_touchedPieIndex == 0) ...[
+                      Text(
+                        'Income',
+                        style: AppStyles.caption.copyWith(fontSize: 10, color: AppColors.primary, fontWeight: FontWeight.bold),
                       ),
-                    ),
+                      Text(
+                        'Rs. ${(totalIncome / 1000).toStringAsFixed(1)}k',
+                        style: AppStyles.bodyMedium.copyWith(fontWeight: FontWeight.bold, color: AppColors.primary, fontSize: 12),
+                      ),
+                    ] else if (_touchedPieIndex == 1) ...[
+                      Text(
+                        'Expense',
+                        style: AppStyles.caption.copyWith(fontSize: 10, color: AppColors.danger, fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        'Rs. ${(totalExpense / 1000).toStringAsFixed(1)}k',
+                        style: AppStyles.bodyMedium.copyWith(fontWeight: FontWeight.bold, color: AppColors.danger, fontSize: 12),
+                      ),
+                    ] else ...[
+                      Text(
+                        '${isProfit ? '+' : ''}${totalIncome > 0 ? ((netProfit / totalIncome) * 100).toStringAsFixed(0) : '0'}%',
+                        style: AppStyles.h3.copyWith(
+                          color: isProfit ? AppColors.success : AppColors.danger,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
+                      ),
+                      Text(
+                        'Net Margin',
+                        style: AppStyles.caption.copyWith(fontSize: 10, color: AppColors.textSecondary),
+                      ),
+                    ],
                   ],
                 ),
               ),
-              // Dynamic Center Badge
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (_touchedPieIndex == 0) ...[
-                    Text(
-                      'Income',
-                      style: AppStyles.caption.copyWith(fontSize: 10, color: AppColors.primary, fontWeight: FontWeight.bold),
-                    ),
-                    Text(
-                      'Rs. ${(totalIncome / 1000).toStringAsFixed(1)}k',
-                      style: AppStyles.bodyMedium.copyWith(fontWeight: FontWeight.bold, color: AppColors.primary, fontSize: 13),
-                    ),
-                  ] else if (_touchedPieIndex == 1) ...[
-                    Text(
-                      'Expense',
-                      style: AppStyles.caption.copyWith(fontSize: 10, color: AppColors.danger, fontWeight: FontWeight.bold),
-                    ),
-                    Text(
-                      'Rs. ${(totalExpense / 1000).toStringAsFixed(1)}k',
-                      style: AppStyles.bodyMedium.copyWith(fontWeight: FontWeight.bold, color: AppColors.danger, fontSize: 13),
-                    ),
-                  ] else ...[
-                    Text(
-                      '${isProfit ? '+' : ''}${totalIncome > 0 ? ((netProfit / totalIncome) * 100).toStringAsFixed(0) : '0'}%',
-                      style: AppStyles.h3.copyWith(
-                        color: isProfit ? AppColors.success : AppColors.danger,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      'Net Margin',
-                      style: AppStyles.caption.copyWith(fontSize: 10, color: AppColors.textSecondary),
-                    ),
-                  ],
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 16),
+            ),
+          ],
+        );
 
-        // Key Summary Metric Tiles
-        Expanded(
-          flex: 4,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _buildBreakdownMetricTile(
-                title: 'Total Rent Income',
-                amount: 'Rs. ${totalIncome.toInt()}',
-                color: AppColors.primary,
-                icon: Icons.account_balance_wallet_rounded,
+        final metricsWidget = Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _buildBreakdownMetricTile(
+              title: 'Total Rent Income',
+              amount: 'Rs. ${totalIncome.toInt()}',
+              color: AppColors.primary,
+              icon: Icons.account_balance_wallet_rounded,
+            ),
+            const SizedBox(height: 6),
+            _buildBreakdownMetricTile(
+              title: 'Total Expenses Paid',
+              amount: 'Rs. ${totalExpense.toInt()}',
+              color: AppColors.danger,
+              icon: Icons.payments_rounded,
+            ),
+            const SizedBox(height: 6),
+            _buildBreakdownMetricTile(
+              title: isProfit ? 'Net Profit Retained' : 'Net Cash Deficit',
+              amount: 'Rs. ${netProfit.abs().toInt()}',
+              color: isProfit ? AppColors.success : AppColors.danger,
+              icon: isProfit ? Icons.trending_up_rounded : Icons.trending_down_rounded,
+            ),
+          ],
+        );
+
+        if (isStack) {
+          return SingleChildScrollView(
+            child: Column(
+              children: [
+                SizedBox(height: 180, child: pieChartWidget),
+                const SizedBox(height: 10),
+                metricsWidget,
+              ],
+            ),
+          );
+        }
+
+        return Row(
+          children: [
+            Expanded(flex: 5, child: pieChartWidget),
+            const SizedBox(width: 8),
+            Expanded(
+              flex: 4,
+              child: SingleChildScrollView(
+                child: metricsWidget,
               ),
-              const SizedBox(height: 8),
-              _buildBreakdownMetricTile(
-                title: 'Total Expenses Paid',
-                amount: 'Rs. ${totalExpense.toInt()}',
-                color: AppColors.danger,
-                icon: Icons.payments_rounded,
-              ),
-              const SizedBox(height: 8),
-              _buildBreakdownMetricTile(
-                title: isProfit ? 'Net Profit Retained' : 'Net Cash Deficit',
-                amount: 'Rs. ${netProfit.abs().toInt()}',
-                color: isProfit ? AppColors.success : AppColors.danger,
-                icon: isProfit ? Icons.trending_up_rounded : Icons.trending_down_rounded,
-              ),
-            ],
-          ),
-        ),
-      ],
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -793,7 +851,7 @@ class _IncomeExpenseChartState extends State<IncomeExpenseChart> {
     required IconData icon,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.07),
         borderRadius: BorderRadius.circular(8),
@@ -801,23 +859,31 @@ class _IncomeExpenseChartState extends State<IncomeExpenseChart> {
       ),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: color),
-          const SizedBox(width: 8),
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 6),
           Expanded(
             child: Text(
               title,
               style: AppStyles.caption.copyWith(
                 color: AppColors.textSecondary,
-                fontSize: 11,
+                fontSize: 10,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
-          Text(
-            amount,
-            style: AppStyles.bodyMedium.copyWith(
-              fontWeight: FontWeight.bold,
-              color: color,
-              fontSize: 12,
+          const SizedBox(width: 4),
+          Flexible(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                amount,
+                style: AppStyles.bodyMedium.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                  fontSize: 11,
+                ),
+              ),
             ),
           ),
         ],

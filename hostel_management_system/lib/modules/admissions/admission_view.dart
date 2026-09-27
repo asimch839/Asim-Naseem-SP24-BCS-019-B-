@@ -14,15 +14,13 @@ class AdmissionView extends GetView<AdmissionController> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Form(
-          key: controller.formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Form(
+        key: controller.formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
               // Header
               ResponsiveHeader(
                 title: 'Student Admission Wizard',
@@ -276,9 +274,8 @@ class AdmissionView extends GetView<AdmissionController> {
             ],
           ),
         ),
-      ),
-    );
-  }
+      );
+    }
 
   Widget _formRow(bool isMobile, Widget child1, Widget child2) {
     if (isMobile) {

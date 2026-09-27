@@ -25,7 +25,7 @@ class DashboardView extends GetView<DashboardController> {
       final m = controller.metrics.value;
       final layout = Get.find<MainLayoutController>();
 
-      return SingleChildScrollView(
+      return Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

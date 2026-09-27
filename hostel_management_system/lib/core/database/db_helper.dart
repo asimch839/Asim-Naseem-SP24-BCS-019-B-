@@ -94,6 +94,9 @@ class DbHelper {
         final supportDir = await getApplicationSupportDirectory();
         basePath = supportDir.path;
       }
+    } else if (Platform.isAndroid || Platform.isIOS) {
+      final docDir = await getApplicationDocumentsDirectory();
+      basePath = docDir.path;
     } else {
       final supportDir = await getApplicationSupportDirectory();
       basePath = supportDir.path;

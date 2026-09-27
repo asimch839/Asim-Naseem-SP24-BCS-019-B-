@@ -164,13 +164,11 @@ class ExpenseView extends GetView<ExpenseController> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
             // Header Bar
             ResponsiveHeader(
               title: 'Expense Management',
@@ -337,9 +335,8 @@ class ExpenseView extends GetView<ExpenseController> {
             const SizedBox(height: 20),
 
             // Expense Table
-            Expanded(
-              child: Obx(() {
-                final list = controller.expenses;
+            Obx(() {
+              final list = controller.expenses;
 
                 final List<List<Widget>> tableRows = list.map((exp) {
                   return [
@@ -407,10 +404,8 @@ class ExpenseView extends GetView<ExpenseController> {
                   onEmptyAction: () => _showExpenseFormDialog(),
                 );
               }),
-            ),
-          ],
+            ],
         ),
-      ),
-    );
-  }
+      );
+    }
 }

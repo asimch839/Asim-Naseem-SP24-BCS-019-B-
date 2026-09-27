@@ -396,13 +396,11 @@ class RentView extends GetView<RentController> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
             // Header Bar
             ResponsiveHeader(
               title: 'Rent & Payment Management',
@@ -519,9 +517,8 @@ class RentView extends GetView<RentController> {
             const SizedBox(height: 20),
 
             // Rent Records Data Table
-            Expanded(
-              child: Obx(() {
-                final list = controller.rentRecords;
+            Obx(() {
+              final list = controller.rentRecords;
 
                 final List<List<Widget>> tableRows = list.map((r) {
                   return [
@@ -622,10 +619,8 @@ class RentView extends GetView<RentController> {
                   onEmptyAction: _showGenerateBillsDialog,
                 );
               }),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+            ],
+          ),
+        );
+    }
 }

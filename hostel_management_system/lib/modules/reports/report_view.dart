@@ -18,12 +18,10 @@ class ReportView extends GetView<ReportController> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Header Bar
             ResponsiveHeader(
@@ -72,33 +70,30 @@ class ReportView extends GetView<ReportController> {
             const SizedBox(height: 20),
 
             // Tab Body
-            Expanded(
-              child: Obx(() {
-                if (controller.isLoading.value) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+            Obx(() {
+              if (controller.isLoading.value) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-                switch (controller.selectedTab.value) {
-                  case 0:
-                    return _buildStudentsReport();
-                  case 1:
-                    return _buildRoomsReport();
-                  case 2:
-                    return _buildRentReport();
-                  case 3:
-                    return _buildExpenseReport();
-                  case 4:
-                    return _buildFinancialReport();
-                  default:
-                    return const SizedBox.shrink();
-                }
-              }),
-            ),
+              switch (controller.selectedTab.value) {
+                case 0:
+                  return _buildStudentsReport();
+                case 1:
+                  return _buildRoomsReport();
+                case 2:
+                  return _buildRentReport();
+                case 3:
+                  return _buildExpenseReport();
+                case 4:
+                  return _buildFinancialReport();
+                default:
+                  return const SizedBox.shrink();
+              }
+            }),
           ],
         ),
-      ),
-    );
-  }
+      );
+    }
 
   Widget _buildTabButton(int index, String title, IconData icon) {
     final isSelected = controller.selectedTab.value == index;
