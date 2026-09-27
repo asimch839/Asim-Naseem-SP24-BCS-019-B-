@@ -18,7 +18,7 @@ class SettingsView extends GetView<SettingsController> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(Responsive.isMobile(context) ? 12 : 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -156,7 +156,7 @@ class SettingsView extends GetView<SettingsController> {
             children: [
               // Card 1: Hostel Profile Details
               Container(
-                padding: const EdgeInsets.all(24),
+                padding: EdgeInsets.all(isMobile ? 14 : 24),
                 decoration: AppStyles.cardDecoration,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -272,7 +272,7 @@ class SettingsView extends GetView<SettingsController> {
 
               // Card 2: Invoice & Receipt Details
               Container(
-                padding: const EdgeInsets.all(24),
+                padding: EdgeInsets.all(isMobile ? 14 : 24),
                 decoration: AppStyles.cardDecoration,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -335,7 +335,7 @@ class SettingsView extends GetView<SettingsController> {
           final rightCol = Column(
             children: [
               Container(
-                padding: const EdgeInsets.all(24),
+                padding: EdgeInsets.all(isMobile ? 14 : 24),
                 decoration: AppStyles.cardDecoration,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -431,9 +431,12 @@ class SettingsView extends GetView<SettingsController> {
                           child: const Icon(Icons.code_rounded, size: 18, color: AppColors.primary),
                         ),
                         const SizedBox(width: 12),
-                        const Text(
-                          'Software Development & Support',
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                        const Expanded(
+                          child: Text(
+                            'Software Development & Support',
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ],
                     ),
@@ -450,9 +453,12 @@ class SettingsView extends GetView<SettingsController> {
                       children: [
                         const Icon(Icons.phone_rounded, size: 14, color: AppColors.textSecondary),
                         const SizedBox(width: 6),
-                        Text(
-                          'Contact / Support: ${AppStrings.developerContact}',
-                          style: AppStyles.caption.copyWith(color: AppColors.textSecondary),
+                        Expanded(
+                          child: Text(
+                            'Contact / Support: ${AppStrings.developerContact}',
+                            style: AppStyles.caption.copyWith(color: AppColors.textSecondary),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ],
                     ),
@@ -538,7 +544,7 @@ class SettingsView extends GetView<SettingsController> {
               children: [
                 // Card: Database Information
                 Container(
-                  padding: const EdgeInsets.all(24),
+                  padding: EdgeInsets.all(Responsive.isMobile(context) ? 14 : 24),
                   decoration: AppStyles.cardDecoration,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

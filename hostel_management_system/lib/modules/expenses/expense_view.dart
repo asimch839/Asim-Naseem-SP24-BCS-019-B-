@@ -42,80 +42,113 @@ class ExpenseView extends GetView<ExpenseController> {
               validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
             ),
             const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: Obx(() => Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Category *', style: AppStyles.bodySmall.copyWith(fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 6),
-                      DropdownButtonFormField<String>(
-                        initialValue: selectedCategory.value,
-                        decoration: InputDecoration(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                        items: AppStrings.expenseCategories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                        onChanged: (v) {
-                          if (v != null) selectedCategory.value = v;
-                        },
+            LayoutBuilder(
+              builder: (context, dialogConstraints) {
+                final isCompact = dialogConstraints.maxWidth < 460;
+
+                final categoryField = Obx(() => Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Category *', style: AppStyles.bodySmall.copyWith(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 6),
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedCategory.value,
+                      decoration: InputDecoration(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                       ),
+                      items: AppStrings.expenseCategories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                      onChanged: (v) {
+                        if (v != null) selectedCategory.value = v;
+                      },
+                    ),
+                  ],
+                ));
+
+                final amountField = CustomTextField(
+                  label: 'Amount (PKR) *',
+                  hint: 'e.g. 45000',
+                  controller: amountCtrl,
+                  keyboardType: TextInputType.number,
+                  validator: (v) {
+                    final p = double.tryParse(v ?? '');
+                    if (p == null || p <= 0) return 'Valid amount required';
+                    return null;
+                  },
+                );
+
+                if (isCompact) {
+                  return Column(
+                    children: [
+                      categoryField,
+                      const SizedBox(height: 14),
+                      amountField,
                     ],
-                  )),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: CustomTextField(
-                    label: 'Amount (PKR) *',
-                    hint: 'e.g. 45000',
-                    controller: amountCtrl,
-                    keyboardType: TextInputType.number,
-                    validator: (v) {
-                      final p = double.tryParse(v ?? '');
-                      if (p == null || p <= 0) return 'Valid amount required';
-                      return null;
-                    },
-                  ),
-                ),
-              ],
+                  );
+                }
+
+                return Row(
+                  children: [
+                    Expanded(child: categoryField),
+                    const SizedBox(width: 14),
+                    Expanded(child: amountField),
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: CustomTextField(
-                    label: 'Expense Date (YYYY-MM-DD) *',
-                    controller: dateCtrl,
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Obx(() => Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Payment Method *', style: AppStyles.bodySmall.copyWith(fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 6),
-                      DropdownButtonFormField<String>(
-                        initialValue: selectedMethod.value,
-                        decoration: InputDecoration(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                        items: [
-                          AppStrings.paymentMethodCash,
-                          AppStrings.paymentMethodBank,
-                          AppStrings.paymentMethodOther,
-                        ].map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
-                        onChanged: (v) {
-                          if (v != null) selectedMethod.value = v;
-                        },
+
+            LayoutBuilder(
+              builder: (context, dialogConstraints) {
+                final isCompact = dialogConstraints.maxWidth < 460;
+
+                final dateField = CustomTextField(
+                  label: 'Expense Date (YYYY-MM-DD) *',
+                  controller: dateCtrl,
+                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                );
+
+                final methodField = Obx(() => Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Payment Method *', style: AppStyles.bodySmall.copyWith(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 6),
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedMethod.value,
+                      decoration: InputDecoration(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                       ),
+                      items: [
+                        AppStrings.paymentMethodCash,
+                        AppStrings.paymentMethodBank,
+                        AppStrings.paymentMethodOther,
+                      ].map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+                      onChanged: (v) {
+                        if (v != null) selectedMethod.value = v;
+                      },
+                    ),
+                  ],
+                ));
+
+                if (isCompact) {
+                  return Column(
+                    children: [
+                      dateField,
+                      const SizedBox(height: 14),
+                      methodField,
                     ],
-                  )),
-                ),
-              ],
+                  );
+                }
+
+                return Row(
+                  children: [
+                    Expanded(child: dateField),
+                    const SizedBox(width: 14),
+                    Expanded(child: methodField),
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 14),
             CustomTextField(
@@ -165,7 +198,7 @@ class ExpenseView extends GetView<ExpenseController> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(Responsive.isMobile(context) ? 12 : 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

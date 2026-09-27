@@ -211,9 +211,12 @@ class RentView extends GetView<RentController> {
                 padding: const EdgeInsets.only(bottom: 12),
                 child: OutlinedButton.icon(
                   icon: const Icon(Icons.shield_outlined, size: 16, color: AppColors.accent),
-                  label: Text(
-                    'Use Available Security Deposit (Max Rs. ${(rent.studentSecurityDeposit ?? 0.0) < rent.remainingAmount ? CurrencyFormatter.format(rent.studentSecurityDeposit ?? 0.0) : CurrencyFormatter.format(rent.remainingAmount)})',
-                    style: AppStyles.caption.copyWith(color: AppColors.accent, fontWeight: FontWeight.w600),
+                  label: Flexible(
+                    child: Text(
+                      'Use Available Security Deposit (Max Rs. ${(rent.studentSecurityDeposit ?? 0.0) < rent.remainingAmount ? CurrencyFormatter.format(rent.studentSecurityDeposit ?? 0.0) : CurrencyFormatter.format(rent.remainingAmount)})',
+                      style: AppStyles.caption.copyWith(color: AppColors.accent, fontWeight: FontWeight.w600),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: AppColors.accent),
@@ -231,77 +234,110 @@ class RentView extends GetView<RentController> {
                 ),
               ),
 
-            Row(
-              children: [
-                Expanded(
-                  child: CustomTextField(
-                    label: 'Rent Payment (PKR) *',
-                    controller: amountCtrl,
-                    keyboardType: TextInputType.number,
-                    validator: (v) {
-                      final p = double.tryParse(v ?? '');
-                      if (p == null || p < 0) return 'Enter valid amount';
-                      if (p > rent.remainingAmount) return 'Cannot exceed balance';
-                      if (selectedMethod.value == AppStrings.paymentMethodSecurityDeposit) {
-                        final available = rent.studentSecurityDeposit ?? 0.0;
-                        if (p > available) return 'Exceeds available security ($available)';
-                      }
-                      final sec = double.tryParse(securityAmountCtrl.text) ?? 0.0;
-                      if (p <= 0 && sec <= 0) return 'Enter rent or security amount';
-                      return null;
-                    },
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: CustomTextField(
-                    label: 'Security Deposit (PKR)',
-                    hint: '0 if not paying security',
-                    controller: securityAmountCtrl,
-                    keyboardType: TextInputType.number,
-                    validator: (v) {
-                      final s = double.tryParse(v ?? '0');
-                      if (s == null || s < 0) return 'Enter valid deposit';
-                      return null;
-                    },
-                  ),
-                ),
-              ],
+            LayoutBuilder(
+              builder: (context, dialogConstraints) {
+                final isCompact = dialogConstraints.maxWidth < 450;
+
+                final rentAmountField = CustomTextField(
+                  label: 'Rent Payment (PKR) *',
+                  controller: amountCtrl,
+                  keyboardType: TextInputType.number,
+                  validator: (v) {
+                    final p = double.tryParse(v ?? '');
+                    if (p == null || p < 0) return 'Enter valid amount';
+                    if (p > rent.remainingAmount) return 'Cannot exceed balance';
+                    if (selectedMethod.value == AppStrings.paymentMethodSecurityDeposit) {
+                      final available = rent.studentSecurityDeposit ?? 0.0;
+                      if (p > available) return 'Exceeds available security ($available)';
+                    }
+                    final sec = double.tryParse(securityAmountCtrl.text) ?? 0.0;
+                    if (p <= 0 && sec <= 0) return 'Enter rent or security amount';
+                    return null;
+                  },
+                );
+
+                final securityAmountField = CustomTextField(
+                  label: 'Security Deposit (PKR)',
+                  hint: '0 if not paying security',
+                  controller: securityAmountCtrl,
+                  keyboardType: TextInputType.number,
+                  validator: (v) {
+                    final s = double.tryParse(v ?? '0');
+                    if (s == null || s < 0) return 'Enter valid deposit';
+                    return null;
+                  },
+                );
+
+                if (isCompact) {
+                  return Column(
+                    children: [
+                      rentAmountField,
+                      const SizedBox(height: 12),
+                      securityAmountField,
+                    ],
+                  );
+                }
+
+                return Row(
+                  children: [
+                    Expanded(child: rentAmountField),
+                    const SizedBox(width: 14),
+                    Expanded(child: securityAmountField),
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 14),
 
-            Row(
-              children: [
-                Expanded(
-                  child: CustomTextField(
-                    label: 'Payment Date (YYYY-MM-DD) *',
-                    controller: dateCtrl,
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+            LayoutBuilder(
+              builder: (context, dialogConstraints) {
+                final isCompact = dialogConstraints.maxWidth < 450;
+
+                final dateField = CustomTextField(
+                  label: 'Payment Date (YYYY-MM-DD) *',
+                  controller: dateCtrl,
+                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                );
+
+                final payableBox = Obx(() => Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryLight.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
                   ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Obx(() => Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryLight.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Total Amount Payable:', style: AppStyles.caption.copyWith(fontWeight: FontWeight.w600)),
-                        const SizedBox(height: 2),
-                        Text(
-                          CurrencyFormatter.format(rentAmountRx.value + securityAmountRx.value),
-                          style: AppStyles.bodyMedium.copyWith(fontWeight: FontWeight.w700, color: AppColors.primary),
-                        ),
-                      ],
-                    ),
-                  )),
-                ),
-              ],
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Total Amount Payable:', style: AppStyles.caption.copyWith(fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 2),
+                      Text(
+                        CurrencyFormatter.format(rentAmountRx.value + securityAmountRx.value),
+                        style: AppStyles.bodyMedium.copyWith(fontWeight: FontWeight.w700, color: AppColors.primary),
+                      ),
+                    ],
+                  ),
+                ));
+
+                if (isCompact) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      dateField,
+                      const SizedBox(height: 12),
+                      payableBox,
+                    ],
+                  );
+                }
+
+                return Row(
+                  children: [
+                    Expanded(child: dateField),
+                    const SizedBox(width: 14),
+                    Expanded(child: payableBox),
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 14),
 
@@ -397,7 +433,7 @@ class RentView extends GetView<RentController> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(Responsive.isMobile(context) ? 12 : 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

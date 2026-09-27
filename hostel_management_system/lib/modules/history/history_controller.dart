@@ -117,17 +117,21 @@ class HistoryController extends GetxController {
       Builder(
         builder: (context) {
           final screenSize = MediaQuery.of(context).size;
+          final isMobile = screenSize.width < 600;
           return Dialog(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             backgroundColor: AppColors.surface,
-            insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+            insetPadding: EdgeInsets.symmetric(
+              horizontal: isMobile ? 10 : 24,
+              vertical: isMobile ? 12 : 24,
+            ),
             child: ConstrainedBox(
               constraints: BoxConstraints(
                 maxWidth: 1050,
                 maxHeight: screenSize.height * 0.92,
               ),
               child: Padding(
-                padding: const EdgeInsets.all(24),
+                padding: EdgeInsets.all(isMobile ? 12 : 24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -152,7 +156,9 @@ class HistoryController extends GetxController {
                             children: [
                               Row(
                                 children: [
-                                  Text(student.fullName, style: AppStyles.h3),
+                                  Expanded(
+                                    child: Text(student.fullName, style: AppStyles.h3, overflow: TextOverflow.ellipsis),
+                                  ),
                                   const SizedBox(width: 10),
                                   StatusBadge(status: student.status),
                                 ],
@@ -226,9 +232,12 @@ class HistoryController extends GetxController {
             children: [
               const Icon(Icons.badge_rounded, size: 18, color: AppColors.primary),
               const SizedBox(width: 8),
-              const Text(
-                'Complete Student Profile & Admission Details',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textPrimary),
+              const Expanded(
+                child: Text(
+                  'Complete Student Profile & Admission Details',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textPrimary),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),
@@ -258,19 +267,24 @@ class HistoryController extends GetxController {
   }
 
   Widget _buildDetailItem(String label, String value) {
-    return SizedBox(
-      width: 200,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: AppStyles.caption.copyWith(color: AppColors.textMuted, fontSize: 11)),
-          const SizedBox(height: 2),
-          Text(
-            value.isNotEmpty ? value : '-',
-            style: AppStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = MediaQuery.of(context).size.width < 600;
+        return SizedBox(
+          width: isMobile ? 150 : 200,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: AppStyles.caption.copyWith(color: AppColors.textMuted, fontSize: 11)),
+              const SizedBox(height: 2),
+              Text(
+                value.isNotEmpty ? value : '-',
+                style: AppStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -289,16 +303,21 @@ class HistoryController extends GetxController {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              runSpacing: 6,
               children: [
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     const Icon(Icons.payments_rounded, size: 18, color: AppColors.success),
                     const SizedBox(width: 8),
-                    const Text(
-                      'Rent & Payment History Ledger',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textPrimary),
+                    const Flexible(
+                      child: Text(
+                        'Rent & Payment History Ledger',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textPrimary),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                     const SizedBox(width: 8),
                     Container(
@@ -345,11 +364,9 @@ class HistoryController extends GetxController {
                 ),
               )
             else
-              Scrollbar(
-                thumbVisibility: true,
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: DataTable(
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: DataTable(
                     columnSpacing: 16,
                     horizontalMargin: 12,
                     headingRowColor: WidgetStateProperty.all(AppColors.surfaceSecondary),
@@ -409,7 +426,6 @@ class HistoryController extends GetxController {
                     }).toList(),
                   ),
                 ),
-              ),
           ],
         ),
       );
@@ -466,9 +482,12 @@ class HistoryController extends GetxController {
               children: [
                 const Icon(Icons.meeting_room_rounded, size: 18, color: AppColors.primary),
                 const SizedBox(width: 8),
-                const Text(
-                  'Room & Bed Allocation History',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textPrimary),
+                const Expanded(
+                  child: Text(
+                    'Room & Bed Allocation History',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textPrimary),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ],
             ),
@@ -573,16 +592,23 @@ class HistoryController extends GetxController {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              runSpacing: 8,
               children: [
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     const Icon(Icons.shield_outlined, size: 18, color: AppColors.accent),
                     const SizedBox(width: 8),
-                    const Text(
-                      'Security Deposit & Departure Settlement History',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textPrimary),
+                    const Flexible(
+                      child: Text(
+                        'Security Deposit & Departure Settlement History',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textPrimary),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ],
                 ),
@@ -665,30 +691,35 @@ class HistoryController extends GetxController {
   }
 
   Widget _buildSettlementStat(String label, String value, Color color, IconData icon) {
-    return Container(
-      width: 190,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceSecondary,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 20, color: color),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label, style: AppStyles.caption.copyWith(fontSize: 10, color: AppColors.textSecondary), maxLines: 1, overflow: TextOverflow.ellipsis),
-                const SizedBox(height: 2),
-                Text(value, style: AppStyles.bodySmall.copyWith(fontWeight: FontWeight.bold, color: color)),
-              ],
-            ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = MediaQuery.of(context).size.width < 600;
+        return Container(
+          width: isMobile ? 145 : 190,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceSecondary,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.border),
           ),
-        ],
-      ),
+          child: Row(
+            children: [
+              Icon(icon, size: 20, color: color),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(label, style: AppStyles.caption.copyWith(fontSize: 10, color: AppColors.textSecondary), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 2),
+                    Text(value, style: AppStyles.bodySmall.copyWith(fontWeight: FontWeight.bold, color: color)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

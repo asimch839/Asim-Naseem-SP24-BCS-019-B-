@@ -92,7 +92,7 @@ class HistoryView extends GetView<HistoryController> {
           ));
 
           return Padding(
-            padding: const EdgeInsets.all(24),
+            padding: EdgeInsets.all(Responsive.isMobile(context) ? 12 : 24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -104,9 +104,9 @@ class HistoryView extends GetView<HistoryController> {
                 // Main Tab View
                 Obx(() {
                   if (controller.selectedTab.value == 0) {
-                    return _buildStudentsHistoryTab(constraints, isCardsNarrow, isNarrow, isCompact);
+                    return _buildStudentsHistoryTab(context, constraints, isCardsNarrow, isNarrow, isCompact);
                   } else {
-                    return _buildAuditLogsTab(constraints, isCardsNarrow, isNarrow, isCompact);
+                    return _buildAuditLogsTab(context, constraints, isCardsNarrow, isNarrow, isCompact);
                   }
                 }),
               ],
@@ -156,6 +156,7 @@ class HistoryView extends GetView<HistoryController> {
   // TAB 0: STUDENTS COMPLETE HISTORY
   // ==========================================
   Widget _buildStudentsHistoryTab(
+    BuildContext context,
     BoxConstraints constraints,
     bool isCardsNarrow,
     bool isNarrow,
@@ -200,28 +201,16 @@ class HistoryView extends GetView<HistoryController> {
         ),
       ];
 
-      if (isCardsNarrow) {
-        return SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: cards.map((c) => Padding(
-              padding: const EdgeInsets.only(right: 16),
-              child: SizedBox(width: 230, child: c),
-            )).toList(),
-          ),
-        );
-      }
-
       final double cardWidth = Responsive.calculateCardWidth(
-        availableWidth: constraints.maxWidth - 48,
-        minCardWidth: 230,
-        spacing: 16,
+        availableWidth: constraints.maxWidth,
+        minCardWidth: Responsive.isMobile(context) ? 140 : 220,
+        spacing: Responsive.isMobile(context) ? 10 : 16,
         maxColumns: 4,
       );
 
       return Wrap(
-        spacing: 16,
-        runSpacing: 16,
+        spacing: Responsive.isMobile(context) ? 10 : 16,
+        runSpacing: Responsive.isMobile(context) ? 10 : 16,
         children: cards.map((c) => SizedBox(width: cardWidth, child: c)).toList(),
       );
     });
@@ -410,6 +399,7 @@ class HistoryView extends GetView<HistoryController> {
   // TAB 1: SYSTEM ACTIVITY AUDIT LOGS
   // ==========================================
   Widget _buildAuditLogsTab(
+    BuildContext context,
     BoxConstraints constraints,
     bool isCardsNarrow,
     bool isNarrow,
@@ -449,28 +439,16 @@ class HistoryView extends GetView<HistoryController> {
         ),
       ];
 
-      if (isCardsNarrow) {
-        return SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: cards.map((c) => Padding(
-              padding: const EdgeInsets.only(right: 16),
-              child: SizedBox(width: 230, child: c),
-            )).toList(),
-          ),
-        );
-      }
-
       final double cardWidth = Responsive.calculateCardWidth(
-        availableWidth: constraints.maxWidth - 48,
-        minCardWidth: 230,
-        spacing: 16,
+        availableWidth: constraints.maxWidth,
+        minCardWidth: Responsive.isMobile(context) ? 140 : 220,
+        spacing: Responsive.isMobile(context) ? 10 : 16,
         maxColumns: 4,
       );
 
       return Wrap(
-        spacing: 16,
-        runSpacing: 16,
+        spacing: Responsive.isMobile(context) ? 10 : 16,
+        runSpacing: Responsive.isMobile(context) ? 10 : 16,
         children: cards.map((c) => SizedBox(width: cardWidth, child: c)).toList(),
       );
     });

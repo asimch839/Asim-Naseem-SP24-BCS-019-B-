@@ -19,7 +19,7 @@ class ReportView extends GetView<ReportController> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(Responsive.isMobile(context) ? 12 : 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -85,7 +85,7 @@ class ReportView extends GetView<ReportController> {
                 case 3:
                   return _buildExpenseReport();
                 case 4:
-                  return _buildFinancialReport();
+                  return _buildFinancialReport(context);
                 default:
                   return const SizedBox.shrink();
               }
@@ -280,13 +280,14 @@ class ReportView extends GetView<ReportController> {
     );
   }
 
-  Widget _buildFinancialReport() {
+  Widget _buildFinancialReport(BuildContext context) {
     final m = controller.financialMetrics.value;
 
     return Center(
       child: Container(
-        width: 650,
-        padding: const EdgeInsets.all(28),
+        width: double.infinity,
+        constraints: const BoxConstraints(maxWidth: 650),
+        padding: EdgeInsets.all(Responsive.isMobile(context) ? 14 : 28),
         decoration: AppStyles.cardDecoration,
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -295,7 +296,8 @@ class ReportView extends GetView<ReportController> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Statement of Profit & Loss', style: AppStyles.h2),
+                Expanded(child: Text('Statement of Profit & Loss', style: AppStyles.h2, overflow: TextOverflow.ellipsis)),
+                const SizedBox(width: 8),
                 Text(controller.dateLabel.value, style: AppStyles.caption),
               ],
             ),
@@ -324,15 +326,25 @@ class ReportView extends GetView<ReportController> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: isGrandTotal ? AppStyles.h3 : AppStyles.bodyMedium.copyWith(fontWeight: FontWeight.w500),
+        Expanded(
+          child: Text(
+            label,
+            style: isGrandTotal ? AppStyles.h3 : AppStyles.bodyMedium.copyWith(fontWeight: FontWeight.w500),
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
-        Text(
-          value,
-          style: isGrandTotal
-              ? AppStyles.h2.copyWith(color: color, fontWeight: FontWeight.w800)
-              : AppStyles.bodyLarge.copyWith(color: color, fontWeight: FontWeight.w700),
+        const SizedBox(width: 8),
+        Flexible(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerRight,
+            child: Text(
+              value,
+              style: isGrandTotal
+                  ? AppStyles.h2.copyWith(color: color, fontWeight: FontWeight.w800)
+                  : AppStyles.bodyLarge.copyWith(color: color, fontWeight: FontWeight.w700),
+            ),
+          ),
         ),
       ],
     );

@@ -54,8 +54,8 @@ class MainLayoutView extends GetView<MainLayoutController> {
                   // Active Module View
                   Expanded(
                     child: InteractiveBiDirectionalScrollView(
-                      minWidth: isMobile ? 650.0 : 1050.0,
-                      minHeight: 680.0,
+                      minWidth: isMobile ? 0.0 : 1050.0,
+                      minHeight: isMobile ? 0.0 : 680.0,
                       child: Obx(() {
                         switch (controller.selectedIndex.value) {
                           case 0:

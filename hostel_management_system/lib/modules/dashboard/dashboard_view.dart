@@ -26,7 +26,7 @@ class DashboardView extends GetView<DashboardController> {
       final layout = Get.find<MainLayoutController>();
 
       return Padding(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(Responsive.isMobile(context) ? 12 : 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -47,88 +47,92 @@ class DashboardView extends GetView<DashboardController> {
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: Responsive.isMobile(context) ? 12 : 20),
 
             // Quick Actions Bar
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: EdgeInsets.symmetric(
+                horizontal: Responsive.isMobile(context) ? 10 : 16,
+                vertical: Responsive.isMobile(context) ? 8 : 12,
+              ),
               decoration: BoxDecoration(
                 color: AppColors.surface,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: AppColors.border),
               ),
               child: Wrap(
-                spacing: 10,
-                runSpacing: 10,
+                spacing: 8,
+                runSpacing: 8,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   Text('Quick Actions:', style: AppStyles.bodySmall.copyWith(fontWeight: FontWeight.w700)),
                   CustomButton(
                     text: 'New Admission',
                     icon: Icons.how_to_reg_rounded,
-                    height: 36,
+                    height: 34,
                     onPressed: () => layout.setNavIndex(3),
                   ),
                   CustomButton(
                     text: 'Add Student',
                     icon: Icons.person_add_alt_1_rounded,
                     type: ButtonType.secondary,
-                    height: 36,
+                    height: 34,
                     onPressed: () => layout.setNavIndex(1),
                   ),
                   CustomButton(
                     text: 'Add Room',
                     icon: Icons.meeting_room_rounded,
                     type: ButtonType.secondary,
-                    height: 36,
+                    height: 34,
                     onPressed: () => layout.setNavIndex(2),
                   ),
                   CustomButton(
                     text: 'Record Rent',
                     icon: Icons.payments_rounded,
                     type: ButtonType.secondary,
-                    height: 36,
+                    height: 34,
                     onPressed: () => layout.setNavIndex(4),
                   ),
                   CustomButton(
                     text: 'View Receipts',
                     icon: Icons.receipt_long_rounded,
                     type: ButtonType.secondary,
-                    height: 36,
+                    height: 34,
                     onPressed: () => layout.setNavIndex(5),
                   ),
                   CustomButton(
                     text: 'Add Expense',
                     icon: Icons.receipt_rounded,
                     type: ButtonType.secondary,
-                    height: 36,
+                    height: 34,
                     onPressed: () => layout.setNavIndex(6),
                   ),
                   CustomButton(
                     text: 'View History',
                     icon: Icons.history_rounded,
                     type: ButtonType.outline,
-                    height: 36,
+                    height: 34,
                     onPressed: () => layout.setNavIndex(7),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 24),
+            SizedBox(height: Responsive.isMobile(context) ? 16 : 24),
 
             // 12 Summary KPI Cards Grid with Dynamic Responsive Column Calculation
             LayoutBuilder(builder: (context, constraints) {
+              final isMobile = constraints.maxWidth < 650;
               final double cardWidth = Responsive.calculateCardWidth(
                 availableWidth: constraints.maxWidth,
-                minCardWidth: 230,
-                spacing: 16,
+                minCardWidth: isMobile ? 140 : 220,
+                spacing: isMobile ? 10 : 16,
                 maxColumns: 4,
               );
 
               return Wrap(
-                spacing: 16,
-                runSpacing: 16,
+                spacing: isMobile ? 10 : 16,
+                runSpacing: isMobile ? 10 : 16,
                 children: [
                   SizedBox(
                     width: cardWidth,
