@@ -120,9 +120,10 @@ class StudentView extends GetView<StudentController> {
                               _infoTile('Assigned Bed', student.bedNumber ?? 'Not Assigned'),
                               _infoTile('Monthly Rent', CurrencyFormatter.format(student.monthlyRent)),
                               _infoTile('Security Deposit', CurrencyFormatter.format(student.securityDeposit)),
-                              _infoTile('Current Month Rent', student.currentRentStatus ?? (student.isActive ? 'Pending' : 'N/A')),
+                              _infoTile('Total Initial Dues', CurrencyFormatter.format(student.monthlyRent + student.securityDeposit)),
+                              _infoTile('Current Rent Status', student.currentRentStatus ?? (student.isActive ? 'Pending' : 'N/A')),
                               if (student.currentRentRemaining != null)
-                                _infoTile('Remaining Rent Due', CurrencyFormatter.format(student.currentRentRemaining!)),
+                                _infoTile('Remaining Dues (Rent + Sec)', CurrencyFormatter.format(student.currentRentRemaining!)),
                             ]),
                             const Divider(height: 24),
                             _buildSectionHeader('Personal & Contact Info'),
@@ -460,47 +461,73 @@ class StudentView extends GetView<StudentController> {
             ),
             const SizedBox(height: 14),
 
-            Row(
-              children: [
-                Expanded(
-                  child: CustomTextField(
-                    label: 'Leaving Date (YYYY-MM-DD) *',
-                    controller: dateCtrl,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: CustomTextField(
-                    label: 'Reason for Leaving',
-                    hint: 'e.g. Completed studies, Job relocation',
-                    controller: reasonCtrl,
-                  ),
-                ),
-              ],
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final isCompact = constraints.maxWidth < 450;
+                final dateField = CustomTextField(
+                  label: 'Leaving Date (YYYY-MM-DD) *',
+                  controller: dateCtrl,
+                );
+                final reasonField = CustomTextField(
+                  label: 'Reason for Leaving',
+                  hint: 'e.g. Completed studies, Job relocation',
+                  controller: reasonCtrl,
+                );
+
+                if (isCompact) {
+                  return Column(
+                    children: [
+                      dateField,
+                      const SizedBox(height: 14),
+                      reasonField,
+                    ],
+                  );
+                }
+                return Row(
+                  children: [
+                    Expanded(child: dateField),
+                    const SizedBox(width: 14),
+                    Expanded(child: reasonField),
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 14),
 
             _buildSectionHeader('Security Settlement Options'),
-            Row(
-              children: [
-                Expanded(
-                  child: CustomTextField(
-                    label: 'Adjust Towards Rent (PKR)',
-                    hint: defaultAdjust > 0 ? 'e.g. ${defaultAdjust.toStringAsFixed(0)}' : '0',
-                    controller: adjustCtrl,
-                    keyboardType: TextInputType.number,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: CustomTextField(
-                    label: 'Refund to Student (PKR)',
-                    hint: defaultRefund > 0 ? 'e.g. ${defaultRefund.toStringAsFixed(0)}' : '0',
-                    controller: refundCtrl,
-                    keyboardType: TextInputType.number,
-                  ),
-                ),
-              ],
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final isCompact = constraints.maxWidth < 450;
+                final adjustField = CustomTextField(
+                  label: 'Adjust Towards Rent (PKR)',
+                  hint: defaultAdjust > 0 ? 'e.g. ${defaultAdjust.toStringAsFixed(0)}' : '0',
+                  controller: adjustCtrl,
+                  keyboardType: TextInputType.number,
+                );
+                final refundField = CustomTextField(
+                  label: 'Refund to Student (PKR)',
+                  hint: defaultRefund > 0 ? 'e.g. ${defaultRefund.toStringAsFixed(0)}' : '0',
+                  controller: refundCtrl,
+                  keyboardType: TextInputType.number,
+                );
+
+                if (isCompact) {
+                  return Column(
+                    children: [
+                      adjustField,
+                      const SizedBox(height: 14),
+                      refundField,
+                    ],
+                  );
+                }
+                return Row(
+                  children: [
+                    Expanded(child: adjustField),
+                    const SizedBox(width: 14),
+                    Expanded(child: refundField),
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 6),
             Text(
@@ -583,106 +610,126 @@ class StudentView extends GetView<StudentController> {
       width: 650,
       content: Form(
         key: formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isCompact = constraints.maxWidth < 480;
+
+            Widget buildRow2(Widget c1, Widget c2) {
+              if (isCompact) {
+                return Column(
+                  children: [
+                    c1,
+                    const SizedBox(height: 14),
+                    c2,
+                  ],
+                );
+              }
+              return Row(
+                children: [
+                  Expanded(child: c1),
+                  const SizedBox(width: 14),
+                  Expanded(child: c2),
+                ],
+              );
+            }
+
+            final row1 = buildRow2(
+              CustomTextField(
+                label: 'Full Name *',
+                controller: nameCtrl,
+                validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+              ),
+              CustomTextField(
+                label: 'Father / Guardian Name',
+                controller: fatherCtrl,
+              ),
+            );
+
+            final row2 = buildRow2(
+              CustomTextField(
+                label: 'CNIC / B-Form',
+                hint: '35202-xxxxxxx-x',
+                controller: cnicCtrl,
+              ),
+              CustomTextField(
+                label: 'Phone Number *',
+                hint: '03001234567',
+                controller: phoneCtrl,
+                validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+              ),
+            );
+
+            final row3 = buildRow2(
+              CustomTextField(
+                label: 'Emergency Contact Phone',
+                controller: emergencyCtrl,
+              ),
+              CustomTextField(
+                label: 'Monthly Rent (PKR) *',
+                controller: rentCtrl,
+                keyboardType: TextInputType.number,
+                validator: (v) => (double.tryParse(v ?? '') == null) ? 'Valid rent required' : null,
+              ),
+            );
+
+            final uniField = CustomTextField(
+              label: 'University / Institute',
+              controller: uniCtrl,
+            );
+            final deptField = CustomTextField(
+              label: 'Department',
+              controller: deptCtrl,
+            );
+            final semField = CustomTextField(
+              label: 'Semester',
+              controller: semCtrl,
+            );
+
+            final row4 = isCompact
+                ? Column(
+                    children: [
+                      uniField,
+                      const SizedBox(height: 14),
+                      deptField,
+                      const SizedBox(height: 14),
+                      semField,
+                    ],
+                  )
+                : Row(
+                    children: [
+                      Expanded(child: uniField),
+                      const SizedBox(width: 14),
+                      Expanded(child: deptField),
+                      const SizedBox(width: 14),
+                      Expanded(child: semField),
+                    ],
+                  );
+
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: CustomTextField(
-                    label: 'Full Name *',
-                    controller: nameCtrl,
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
-                  ),
+                row1,
+                const SizedBox(height: 14),
+                row2,
+                const SizedBox(height: 14),
+                row3,
+                const SizedBox(height: 14),
+                row4,
+                const SizedBox(height: 14),
+                CustomTextField(
+                  label: 'Permanent Address',
+                  controller: addressCtrl,
                 ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: CustomTextField(
-                    label: 'Father / Guardian Name',
-                    controller: fatherCtrl,
-                  ),
+                const SizedBox(height: 14),
+                CustomTextField(
+                  label: 'Notes / Remarks',
+                  controller: notesCtrl,
+                  maxLines: 2,
                 ),
               ],
-            ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: CustomTextField(
-                    label: 'CNIC / B-Form',
-                    hint: '35202-xxxxxxx-x',
-                    controller: cnicCtrl,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: CustomTextField(
-                    label: 'Phone Number *',
-                    hint: '03001234567',
-                    controller: phoneCtrl,
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: CustomTextField(
-                    label: 'Emergency Contact Phone',
-                    controller: emergencyCtrl,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: CustomTextField(
-                    label: 'Monthly Rent (PKR) *',
-                    controller: rentCtrl,
-                    keyboardType: TextInputType.number,
-                    validator: (v) => (double.tryParse(v ?? '') == null) ? 'Valid rent required' : null,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: CustomTextField(
-                    label: 'University / Institute',
-                    controller: uniCtrl,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: CustomTextField(
-                    label: 'Department',
-                    controller: deptCtrl,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: CustomTextField(
-                    label: 'Semester',
-                    controller: semCtrl,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            CustomTextField(
-              label: 'Permanent Address',
-              controller: addressCtrl,
-            ),
-            const SizedBox(height: 14),
-            CustomTextField(
-              label: 'Notes / Remarks',
-              controller: notesCtrl,
-              maxLines: 2,
-            ),
-          ],
+            );
+          },
         ),
       ),
       actions: [
@@ -834,6 +881,14 @@ class StudentView extends GetView<StudentController> {
                             child: Text(
                               'Due: ${CurrencyFormatter.format(s.currentRentRemaining!)}',
                               style: AppStyles.caption.copyWith(color: AppColors.danger, fontWeight: FontWeight.w600, fontSize: 11),
+                            ),
+                          ),
+                        if (s.securityDeposit > 0)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(
+                              '(Rent: ${CurrencyFormatter.format(s.monthlyRent)} + Sec: ${CurrencyFormatter.format(s.securityDeposit)})',
+                              style: AppStyles.caption.copyWith(color: AppColors.textSecondary, fontSize: 10),
                             ),
                           ),
                       ],

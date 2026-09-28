@@ -30,23 +30,41 @@ class RoomView extends GetView<RoomController> {
       title: room == null ? 'Add New Room' : 'Edit Room ${room.roomNumber}',
       content: Form(
         key: formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isCompact = constraints.maxWidth < 450;
+
+            Widget buildRow(Widget c1, Widget c2) {
+              if (isCompact) {
+                return Column(
+                  children: [
+                    c1,
+                    const SizedBox(height: 14),
+                    c2,
+                  ],
+                );
+              }
+              return Row(
+                children: [
+                  Expanded(child: c1),
+                  const SizedBox(width: 14),
+                  Expanded(child: c2),
+                ],
+              );
+            }
+
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: CustomTextField(
+                buildRow(
+                  CustomTextField(
                     label: 'Room Number *',
                     hint: 'e.g. 101, 102',
                     controller: roomNumberCtrl,
                     validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
                   ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Obx(() => Column(
+                  Obx(() => Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('Room Type', style: AppStyles.bodySmall.copyWith(fontWeight: FontWeight.w600)),
@@ -71,48 +89,34 @@ class RoomView extends GetView<RoomController> {
                     ],
                   )),
                 ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: CustomTextField(
+                const SizedBox(height: 14),
+                buildRow(
+                  CustomTextField(
                     label: 'Block / Building',
                     hint: 'e.g. Block A, West Wing',
                     controller: blockCtrl,
                   ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: CustomTextField(
+                  CustomTextField(
                     label: 'Floor',
                     hint: 'e.g. Ground Floor, 2nd Floor',
                     controller: floorCtrl,
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: CustomTextField(
+                const SizedBox(height: 14),
+                buildRow(
+                  CustomTextField(
                     label: 'Total Beds *',
                     hint: 'Number of beds',
                     controller: bedsCtrl,
                     keyboardType: TextInputType.number,
-                    readOnly: room != null, // bed count shouldn't be blindly shrunk when existing
+                    readOnly: room != null,
                     validator: (v) {
                       final parsed = int.tryParse(v ?? '');
                       if (parsed == null || parsed <= 0) return 'Valid number > 0 required';
                       return null;
                     },
                   ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: CustomTextField(
+                  CustomTextField(
                     label: 'Monthly Rent (PKR) *',
                     hint: 'e.g. 15000',
                     controller: rentCtrl,
@@ -124,16 +128,16 @@ class RoomView extends GetView<RoomController> {
                     },
                   ),
                 ),
+                const SizedBox(height: 14),
+                CustomTextField(
+                  label: 'Notes / Facilities',
+                  hint: 'e.g. Attached bath, AC, Balcony',
+                  controller: notesCtrl,
+                  maxLines: 2,
+                ),
               ],
-            ),
-            const SizedBox(height: 14),
-            CustomTextField(
-              label: 'Notes / Facilities',
-              hint: 'e.g. Attached bath, AC, Balcony',
-              controller: notesCtrl,
-              maxLines: 2,
-            ),
-          ],
+            );
+          },
         ),
       ),
       actions: [

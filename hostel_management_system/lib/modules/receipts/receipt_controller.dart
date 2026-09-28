@@ -59,7 +59,6 @@ class ReceiptController extends GetxController {
         builder: (context) {
           final screenSize = MediaQuery.of(context).size;
           final isNarrow = screenSize.width < 640;
-
           final titleCol = Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
@@ -80,75 +79,92 @@ class ReceiptController extends GetxController {
             ],
           );
 
-          final actionsRow = Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Obx(() => SegmentedButton<bool>(
-                segments: const [
-                  ButtonSegment(value: false, label: Text('A4')),
-                  ButtonSegment(value: true, label: Text('Thermal')),
-                ],
-                selected: {isThermal.value},
-                onSelectionChanged: (set) => isThermal.value = set.first,
-              )),
-              const SizedBox(width: 8),
-              CustomButton(
-                text: 'Share',
-                icon: Icons.share_rounded,
-                type: ButtonType.secondary,
-                height: 36,
-                onPressed: () {
-                  WhatsAppService.showShareDialog(
-                    context: context,
-                    receipt: receipt,
-                    settings: settings,
-                    isThermal: isThermal.value,
-                  );
-                },
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                icon: const Icon(Icons.close, size: 20),
-                tooltip: 'Close',
-                onPressed: () {
-                  if (Get.isDialogOpen == true) Get.back();
-                },
-              ),
+          final closeButton = IconButton(
+            icon: const Icon(Icons.close, size: 20),
+            tooltip: 'Close',
+            onPressed: () {
+              if (Get.isDialogOpen == true) Get.back();
+            },
+          );
+
+          final segmentedButton = Obx(() => SegmentedButton<bool>(
+            segments: const [
+              ButtonSegment(value: false, label: Text('A4')),
+              ButtonSegment(value: true, label: Text('Thermal')),
             ],
+            selected: {isThermal.value},
+            onSelectionChanged: (set) => isThermal.value = set.first,
+          ));
+
+          final shareButton = CustomButton(
+            text: 'Share',
+            icon: Icons.share_rounded,
+            type: ButtonType.secondary,
+            height: 36,
+            onPressed: () {
+              WhatsAppService.showShareDialog(
+                context: context,
+                receipt: receipt,
+                settings: settings,
+                isThermal: isThermal.value,
+              );
+            },
           );
 
           return Dialog(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             backgroundColor: AppColors.surface,
-            insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+            insetPadding: EdgeInsets.symmetric(
+              horizontal: isNarrow ? 8 : 16,
+              vertical: isNarrow ? 12 : 24,
+            ),
             child: ConstrainedBox(
               constraints: BoxConstraints(
                 maxWidth: 850,
-                maxHeight: screenSize.height * 0.9,
+                maxHeight: screenSize.height * 0.92,
               ),
               child: Padding(
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.all(isNarrow ? 10 : 16),
                 child: Column(
                   children: [
                     // Header
-                    isNarrow
-                        ? Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                    if (isNarrow) ...[
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(child: titleCol),
+                          closeButton,
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          segmentedButton,
+                          shareButton,
+                        ],
+                      ),
+                    ] else
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(child: titleCol),
+                          const SizedBox(width: 12),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
-                              titleCol,
-                              const SizedBox(height: 10),
-                              actionsRow,
-                            ],
-                          )
-                        : Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Expanded(child: titleCol),
-                              const SizedBox(width: 12),
-                              actionsRow,
+                              segmentedButton,
+                              shareButton,
+                              closeButton,
                             ],
                           ),
-                    const Divider(height: 20),
+                        ],
+                      ),
+                    const Divider(height: 16),
 
                     // PDF Preview View
                     Expanded(
@@ -177,7 +193,7 @@ class ReceiptController extends GetxController {
                           canChangeOrientation: false,
                           canChangePageFormat: false,
                           dynamicLayout: false,
-                          previewPageMargin: const EdgeInsets.all(12),
+                          previewPageMargin: EdgeInsets.all(isNarrow ? 4 : 12),
                         );
                       }),
                     ),

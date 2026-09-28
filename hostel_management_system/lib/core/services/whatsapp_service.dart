@@ -222,11 +222,11 @@ class WhatsAppService {
       Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         backgroundColor: AppColors.surface,
-        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 16),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 580, maxHeight: 720),
           child: Padding(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
@@ -254,7 +254,7 @@ class WhatsAppService {
                           const Text(
                             'Send WhatsApp Rent Reminder',
                             style: TextStyle(
-                              fontSize: 18,
+                              fontSize: 16,
                               fontWeight: FontWeight.bold,
                               color: AppColors.textPrimary,
                             ),
@@ -263,6 +263,7 @@ class WhatsAppService {
                           Text(
                             '${rent.studentName ?? "Student"} (${rent.studentIdCode ?? "-"}) • Room ${rent.roomNumber ?? "-"}',
                             style: AppStyles.caption.copyWith(color: AppColors.textSecondary),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ),
@@ -275,81 +276,99 @@ class WhatsAppService {
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 const Divider(height: 1),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
 
                 // Due Dues Status Summary Banner
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: isOverdue
-                        ? AppColors.danger.withValues(alpha: 0.08)
-                        : AppColors.surfaceSecondary,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: isOverdue
-                          ? AppColors.danger.withValues(alpha: 0.3)
-                          : AppColors.border,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Text(
-                                'Pending Balance: ',
-                                style: AppStyles.caption.copyWith(fontWeight: FontWeight.w600),
-                              ),
-                              Text(
-                                CurrencyFormatter.format(rent.remainingAmount),
-                                style: AppStyles.bodyMedium.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.danger,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Billing Month: ${DateFormatter.formatMonthYearString(rent.rentMonth)}',
-                            style: AppStyles.caption,
-                          ),
-                        ],
-                      ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: isOverdue ? AppColors.danger : AppColors.warning,
-                              borderRadius: BorderRadius.circular(6),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isCompact = constraints.maxWidth < 420;
+                    final pendingCol = Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              'Pending Balance: ',
+                              style: AppStyles.caption.copyWith(fontWeight: FontWeight.w600),
                             ),
-                            child: Text(
-                              isOverdue ? 'OVERDUE' : 'DUE SOON',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 11,
+                            Text(
+                              CurrencyFormatter.format(rent.remainingAmount),
+                              style: AppStyles.bodyMedium.copyWith(
                                 fontWeight: FontWeight.bold,
+                                color: AppColors.danger,
                               ),
                             ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Billing Month: ${DateFormatter.formatMonthYearString(rent.rentMonth)}',
+                          style: AppStyles.caption,
+                        ),
+                      ],
+                    );
+
+                    final statusCol = Column(
+                      crossAxisAlignment: isCompact ? CrossAxisAlignment.start : CrossAxisAlignment.end,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: isOverdue ? AppColors.danger : AppColors.warning,
+                            borderRadius: BorderRadius.circular(6),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Due: ${DateFormatter.formatDate(DateTime.tryParse(rent.dueDate))}',
-                            style: AppStyles.caption.copyWith(fontWeight: FontWeight.w600),
+                          child: Text(
+                            isOverdue ? 'OVERDUE' : 'DUE SOON',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                        ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Due: ${DateFormatter.formatDate(DateTime.tryParse(rent.dueDate))}',
+                          style: AppStyles.caption.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    );
+
+                    return Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isOverdue
+                            ? AppColors.danger.withValues(alpha: 0.08)
+                            : AppColors.surfaceSecondary,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: isOverdue
+                              ? AppColors.danger.withValues(alpha: 0.3)
+                              : AppColors.border,
+                        ),
                       ),
-                    ],
-                  ),
+                      child: isCompact
+                          ? Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                pendingCol,
+                                const SizedBox(height: 8),
+                                statusCol,
+                              ],
+                            )
+                          : Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                pendingCol,
+                                statusCol,
+                              ],
+                            ),
+                    );
+                  },
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
 
                 // Recipient Contact Phone
                 CustomTextField(
@@ -359,12 +378,12 @@ class WhatsAppService {
                   prefixIcon: Icons.phone_rounded,
                   keyboardType: TextInputType.phone,
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
                 Text(
-                  'Pre-filled with student contact number. You can change this to parent/guardian number if required.',
+                  'Pre-filled with student contact number. Change if sending to parent/guardian.',
                   style: AppStyles.caption.copyWith(fontSize: 11, color: AppColors.textMuted),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 10),
 
                 // Editable Message Preview
                 const Text(
@@ -375,7 +394,7 @@ class WhatsAppService {
                     color: AppColors.textPrimary,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
                 Expanded(
                   child: TextField(
                     controller: messageCtrl,
@@ -383,72 +402,76 @@ class WhatsAppService {
                     expands: true,
                     style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
                     decoration: InputDecoration(
-                      contentPadding: const EdgeInsets.all(12),
+                      contentPadding: const EdgeInsets.all(10),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                       filled: true,
                       fillColor: AppColors.surfaceSecondary,
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
 
                 // Action Buttons
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    OutlinedButton.icon(
-                      icon: const Icon(Icons.copy_rounded, size: 16),
-                      label: const Text('Copy Message'),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                      onPressed: () {
-                        Clipboard.setData(ClipboardData(text: messageCtrl.text));
-                        Get.snackbar(
-                          'Copied to Clipboard',
-                          'Reminder message copied successfully!',
-                          snackPosition: SnackPosition.BOTTOM,
-                          duration: const Duration(seconds: 3),
-                        );
-                      },
-                    ),
-                    const SizedBox(width: 12),
-                    ElevatedButton.icon(
-                      icon: const Icon(Icons.send_rounded, size: 16, color: Colors.white),
-                      label: const Text(
-                        'Send on WhatsApp',
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.whatsappDark,
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                      onPressed: () async {
-                        final phone = phoneCtrl.text.trim();
-                        final msg = messageCtrl.text.trim();
-                        if (Get.isDialogOpen == true) Get.back();
-
-                        final success = await openWhatsApp(
-                          phone: phone,
-                          message: msg,
-                        );
-
-                        if (success) {
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Wrap(
+                    alignment: WrapAlignment.end,
+                    spacing: 10,
+                    runSpacing: 8,
+                    children: [
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.copy_rounded, size: 16),
+                        label: const Text('Copy Message'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: messageCtrl.text));
                           Get.snackbar(
-                            'WhatsApp Opened',
-                            'Opening chat with ${rent.studentName ?? "student"}. Message is ready in the chat!',
+                            'Copied to Clipboard',
+                            'Reminder message copied successfully!',
                             snackPosition: SnackPosition.BOTTOM,
-                            backgroundColor: AppColors.surface,
-                            colorText: AppColors.textPrimary,
-                            icon: const Icon(Icons.check_circle_rounded, color: AppColors.whatsappDark),
-                            duration: const Duration(seconds: 4),
+                            duration: const Duration(seconds: 3),
                           );
-                        }
-                      },
-                    ),
-                  ],
+                        },
+                      ),
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.send_rounded, size: 16, color: Colors.white),
+                        label: const Text(
+                          'Send on WhatsApp',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.whatsappDark,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        onPressed: () async {
+                          final phone = phoneCtrl.text.trim();
+                          final msg = messageCtrl.text.trim();
+                          if (Get.isDialogOpen == true) Get.back();
+
+                          final success = await openWhatsApp(
+                            phone: phone,
+                            message: msg,
+                          );
+
+                          if (success) {
+                            Get.snackbar(
+                              'WhatsApp Opened',
+                              'Opening chat with ${rent.studentName ?? "student"}. Message is ready in the chat!',
+                              snackPosition: SnackPosition.BOTTOM,
+                              backgroundColor: AppColors.surface,
+                              colorText: AppColors.textPrimary,
+                              icon: const Icon(Icons.check_circle_rounded, color: AppColors.whatsappDark),
+                              duration: const Duration(seconds: 4),
+                            );
+                          }
+                        },
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -468,7 +491,27 @@ class WhatsAppService {
     final hasMessage = message != null && message.trim().isNotEmpty;
     final encodedText = hasMessage ? Uri.encodeComponent(message) : '';
 
-    // 1. Try native desktop scheme: whatsapp://send?phone=...
+    // Copy message text to clipboard automatically as a fallback
+    if (hasMessage) {
+      try {
+        await Clipboard.setData(ClipboardData(text: message));
+      } catch (_) {}
+    }
+
+    // 1. Try universal wa.me URI (most reliable on Windows WhatsApp Desktop & Web)
+    if (cleanPhone.isNotEmpty) {
+      final waUri = hasMessage
+          ? Uri.parse('https://wa.me/$cleanPhone?text=$encodedText')
+          : Uri.parse('https://wa.me/$cleanPhone');
+      try {
+        if (await canLaunchUrl(waUri)) {
+          final launched = await launchUrl(waUri, mode: LaunchMode.externalApplication);
+          if (launched) return true;
+        }
+      } catch (_) {}
+    }
+
+    // 2. Try native desktop scheme: whatsapp://send?phone=...
     final nativeUri = cleanPhone.isNotEmpty
         ? (hasMessage
             ? Uri.parse('whatsapp://send?phone=$cleanPhone&text=$encodedText')
@@ -484,7 +527,7 @@ class WhatsAppService {
       }
     } catch (_) {}
 
-    // 2. Fallback to official web/universal link: https://api.whatsapp.com/send
+    // 3. Fallback to official web/universal link: https://api.whatsapp.com/send
     final webUri = cleanPhone.isNotEmpty
         ? (hasMessage
             ? Uri.parse('https://api.whatsapp.com/send?phone=$cleanPhone&text=$encodedText')
@@ -498,7 +541,7 @@ class WhatsAppService {
       if (launched) return true;
     } catch (_) {}
 
-    // 3. Last fallback: web.whatsapp.com
+    // 4. Last fallback: web.whatsapp.com
     final webDirectUri = cleanPhone.isNotEmpty
         ? (hasMessage
             ? Uri.parse('https://web.whatsapp.com/send?phone=$cleanPhone&text=$encodedText')
@@ -591,16 +634,17 @@ class WhatsAppService {
         try {
           final escapedPath = imageFile.path.replaceAll("'", "''");
           final script = "Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing; \$data = New-Object System.Windows.Forms.DataObject; \$img = [System.Drawing.Image]::FromFile('$escapedPath'); \$data.SetImage(\$img); \$files = New-Object System.Collections.Specialized.StringCollection; \$files.Add('$escapedPath'); \$data.SetFileDropList(\$files); [System.Windows.Forms.Clipboard]::SetDataObject(\$data, \$true)";
-          await Process.run('powershell', ['-NoProfile', '-Command', script]);
+          await Process.run('powershell', ['-STA', '-NoProfile', '-Command', script]);
         } catch (_) {}
       }
 
-      // 5. Open WhatsApp chat with student (without plain text message so picture can be pasted)
+      // 5. Open WhatsApp chat with student
       final phone = customPhone ?? receipt.studentPhone;
-      await openWhatsApp(phone: phone, message: null);
+      final textMsg = generateReceiptMessage(receipt: receipt, settings: settings);
+      await openWhatsApp(phone: phone, message: textMsg);
 
       // 6. Native Win32 hardware simulation: Automatically sends Ctrl+V and Enter without user pressing Ctrl+V!
-      _simulatePasteAndSend(delayMs: 2800, sendEnter: true);
+      _simulatePasteAndSend(delayMs: 3000, sendEnter: true);
 
       // 7. Non-intrusive status snackbar
       Get.snackbar(
@@ -649,23 +693,22 @@ class WhatsAppService {
       final targetFile = File('${receiptsFolder.path}\\Receipt_$cleanNum.pdf');
       await targetFile.writeAsBytes(pdfBytes);
 
-      // 3. Put PDF file reference on Windows Clipboard (ready for Ctrl+V)
+      // 3. Put PDF file reference on Windows Clipboard in STA mode (ready for Ctrl+V)
       if (Platform.isWindows) {
         try {
-          await Process.run('powershell', [
-            '-NoProfile',
-            '-Command',
-            'Set-Clipboard -Path "${targetFile.path}"'
-          ]);
+          final escapedPath = targetFile.path.replaceAll("'", "''");
+          final script = "Add-Type -AssemblyName System.Windows.Forms; \$data = New-Object System.Windows.Forms.DataObject; \$files = New-Object System.Collections.Specialized.StringCollection; \$files.Add('$escapedPath'); \$data.SetFileDropList(\$files); [System.Windows.Forms.Clipboard]::SetDataObject(\$data, \$true)";
+          await Process.run('powershell', ['-STA', '-NoProfile', '-Command', script]);
         } catch (_) {}
       }
 
-      // 4. Open WhatsApp chat with student (without plain text message!)
+      // 4. Open WhatsApp chat with student
       final phone = customPhone ?? receipt.studentPhone;
-      await openWhatsApp(phone: phone, message: null);
+      final textMsg = generateReceiptMessage(receipt: receipt, settings: settings);
+      await openWhatsApp(phone: phone, message: textMsg);
 
       // 5. Native Win32 hardware simulation: Automatically sends Ctrl+V and Enter without user pressing Ctrl+V!
-      _simulatePasteAndSend(delayMs: 2800, sendEnter: true);
+      _simulatePasteAndSend(delayMs: 3000, sendEnter: true);
 
       // 6. Non-intrusive status snackbar
       Get.snackbar(
@@ -696,11 +739,11 @@ class WhatsAppService {
       Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         backgroundColor: AppColors.surface,
-        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 16),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 580, maxHeight: 730),
           child: Padding(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,

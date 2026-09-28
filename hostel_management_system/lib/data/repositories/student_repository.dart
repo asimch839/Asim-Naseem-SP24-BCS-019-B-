@@ -178,12 +178,12 @@ class StudentRepository {
         'room_id': roomId,
         'bed_id': bedId,
         'rent_month': rentMonth,
-        'rent_amount': monthlyRent,
+        'rent_amount': monthlyRent + securityDeposit,
         'paid_amount': 0.0,
-        'remaining_amount': monthlyRent,
+        'remaining_amount': monthlyRent + securityDeposit,
         'due_date': dueDate,
         'status': 'Pending',
-        'notes': 'Initial rent on admission.',
+        'notes': 'Initial bill on admission (Rent: Rs. ${monthlyRent.toStringAsFixed(0)} + Security: Rs. ${securityDeposit.toStringAsFixed(0)}).',
         'created_at': now,
       });
 

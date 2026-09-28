@@ -25,8 +25,8 @@ class LoginView extends GetView<LoginController> {
             builder: (context, constraints) {
               final isSmall = constraints.maxWidth < 500;
               return InteractiveBiDirectionalScrollView(
-                minWidth: 460,
-                minHeight: 580,
+                minWidth: isSmall ? 0.0 : 460.0,
+                minHeight: isSmall ? 0.0 : 580.0,
                 child: Center(
                   child: Padding(
                     padding: EdgeInsets.symmetric(
