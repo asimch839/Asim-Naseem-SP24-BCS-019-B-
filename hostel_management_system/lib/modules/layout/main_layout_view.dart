@@ -372,74 +372,82 @@ class MainLayoutView extends GetView<MainLayoutController> {
   }
 
   Widget _buildTopAppBar(BuildContext context, bool isMobile) {
+    final topPadding = isMobile ? (MediaQuery.of(context).padding.top + 8.0) : 0.0;
     return Container(
-      height: 60,
-      padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 20),
+      padding: EdgeInsets.only(
+        top: topPadding,
+        left: isMobile ? 12 : 20,
+        right: isMobile ? 12 : 20,
+        bottom: isMobile ? 8 : 0,
+      ),
       decoration: const BoxDecoration(
         color: AppColors.surface,
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // Left: Menu button (Mobile) or Collapse Toggle (Desktop/Tablet) + DB Badge
-          Row(
-            children: [
-              if (isMobile) ...[
-                IconButton(
-                  icon: const Icon(Icons.menu_rounded, color: AppColors.textPrimary),
-                  tooltip: 'Open Menu',
-                  onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+      child: SizedBox(
+        height: 52,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            // Left: Menu button (Mobile) or Collapse Toggle (Desktop/Tablet) + DB Badge
+            Row(
+              children: [
+                if (isMobile) ...[
+                  IconButton(
+                    icon: const Icon(Icons.menu_rounded, color: AppColors.textPrimary),
+                    tooltip: 'Open Menu',
+                    onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+                  ),
+                  const SizedBox(width: 6),
+                ] else ...[
+                  IconButton(
+                    icon: Obx(() => Icon(
+                      controller.isSidebarCollapsed.value ? Icons.menu_open_rounded : Icons.menu_rounded,
+                      color: AppColors.textSecondary,
+                      size: 20,
+                    )),
+                    tooltip: 'Toggle Sidebar',
+                    onPressed: controller.toggleSidebar,
+                  ),
+                ],
+              ],
+            ),
+
+            // Right: Realtime Clock & Refresh View
+            Row(
+              children: [
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final screenW = MediaQuery.of(context).size.width;
+                    if (screenW < 450) {
+                      return const SizedBox.shrink(); // hide clock on extremely small phone screen
+                    }
+                    return Row(
+                      children: [
+                        const Icon(Icons.access_time_rounded, size: 15, color: AppColors.textSecondary),
+                        const SizedBox(width: 6),
+                        Obx(() => Text(
+                          controller.currentTimeString.value,
+                          style: AppStyles.bodySmall.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textSecondary,
+                            fontSize: screenW < 700 ? 11 : 12,
+                          ),
+                        )),
+                        const SizedBox(width: 12),
+                      ],
+                    );
+                  },
                 ),
-                const SizedBox(width: 6),
-              ] else ...[
                 IconButton(
-                  icon: Obx(() => Icon(
-                    controller.isSidebarCollapsed.value ? Icons.menu_open_rounded : Icons.menu_rounded,
-                    color: AppColors.textSecondary,
-                    size: 20,
-                  )),
-                  tooltip: 'Toggle Sidebar',
-                  onPressed: controller.toggleSidebar,
+                  icon: const Icon(Icons.refresh_rounded, color: AppColors.primary, size: 20),
+                  tooltip: 'Refresh Current View',
+                  onPressed: () => controller.setNavIndex(controller.selectedIndex.value),
                 ),
               ],
-            ],
-          ),
-
-          // Right: Realtime Clock & Refresh View
-          Row(
-            children: [
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final screenW = MediaQuery.of(context).size.width;
-                  if (screenW < 450) {
-                    return const SizedBox.shrink(); // hide clock on extremely small phone screen
-                  }
-                  return Row(
-                    children: [
-                      const Icon(Icons.access_time_rounded, size: 15, color: AppColors.textSecondary),
-                      const SizedBox(width: 6),
-                      Obx(() => Text(
-                        controller.currentTimeString.value,
-                        style: AppStyles.bodySmall.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textSecondary,
-                          fontSize: screenW < 700 ? 11 : 12,
-                        ),
-                      )),
-                      const SizedBox(width: 12),
-                    ],
-                  );
-                },
-              ),
-              IconButton(
-                icon: const Icon(Icons.refresh_rounded, color: AppColors.primary, size: 20),
-                tooltip: 'Refresh Current View',
-                onPressed: () => controller.setNavIndex(controller.selectedIndex.value),
-              ),
-            ],
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }

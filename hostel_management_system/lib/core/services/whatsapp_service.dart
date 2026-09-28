@@ -1,4 +1,3 @@
-import 'dart:ffi';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -17,46 +16,65 @@ import '../../data/models/hostel_settings_model.dart';
 import '../../widgets/custom_text_field.dart';
 import 'pdf_service.dart';
 
-typedef _KeybdEventNative = Void Function(
-    Uint8 bVk, Uint8 bScan, Uint32 dwFlags, IntPtr dwExtraInfo);
-typedef _KeybdEventDart = void Function(
-    int bVk, int bScan, int dwFlags, int dwExtraInfo);
-
 class WhatsAppService {
-  /// Automatically sends native Windows keyboard events (Ctrl + V and Enter)
-  /// directly to the active foreground WhatsApp window without requiring user interaction.
+  /// Automatically brings active WhatsApp desktop window into foreground focus,
+  /// pastes (Ctrl + V) the receipt slip from clipboard, and sends (Enter).
   static void _simulatePasteAndSend({
-    int delayMs = 2800,
+    int delayMs = 2200,
     bool sendEnter = true,
   }) {
     if (!Platform.isWindows) return;
 
     Future.delayed(Duration(milliseconds: delayMs), () async {
       try {
-        final user32 = DynamicLibrary.open('user32.dll');
-        final keybdEvent = user32.lookupFunction<_KeybdEventNative, _KeybdEventDart>('keybd_event');
+        final doSendVal = sendEnter ? '\$true' : '\$false';
+        final script = '''
+Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+using System.Threading;
 
-        const int vkControl = 0x11;
-        const int vkV = 0x56;
-        const int vkReturn = 0x0D;
-        const int keyeventfKeyup = 0x0002;
+public class KeySender {
+    [DllImport("user32.dll")]
+    public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+    [DllImport("user32.dll")]
+    public static extern bool SetForegroundWindow(IntPtr hWnd);
 
-        // 1. Synthesize Ctrl + V (Paste picture or file)
-        keybdEvent(vkControl, 0, 0, 0);
-        await Future.delayed(const Duration(milliseconds: 60));
-        keybdEvent(vkV, 0, 0, 0);
-        await Future.delayed(const Duration(milliseconds: 120));
-        keybdEvent(vkV, 0, keyeventfKeyup, 0);
-        await Future.delayed(const Duration(milliseconds: 60));
-        keybdEvent(vkControl, 0, keyeventfKeyup, 0);
+    private const byte VK_CONTROL = 0x11;
+    private const byte VK_V = 0x56;
+    private const byte VK_RETURN = 0x0D;
+    private const uint KEYEVENTF_KEYUP = 0x0002;
 
-        // 2. Wait for WhatsApp image/document preview modal to appear and hit Enter to send
-        if (sendEnter) {
-          await Future.delayed(const Duration(milliseconds: 1400));
-          keybdEvent(vkReturn, 0, 0, 0);
-          await Future.delayed(const Duration(milliseconds: 100));
-          keybdEvent(vkReturn, 0, keyeventfKeyup, 0);
+    public static void PasteAndSend(bool doSend) {
+        // 1. Send Ctrl + V (Paste image/document from clipboard)
+        keybd_event(VK_CONTROL, 0, 0, UIntPtr.Zero);
+        keybd_event(VK_V, 0, 0, UIntPtr.Zero);
+        Thread.Sleep(80);
+        keybd_event(VK_V, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+        keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+
+        if (doSend) {
+            // Wait for WhatsApp picture send preview screen to open
+            Thread.Sleep(1200);
+
+            // 2. Send ENTER (Submit & Send in WhatsApp)
+            keybd_event(VK_RETURN, 0, 0, UIntPtr.Zero);
+            Thread.Sleep(80);
+            keybd_event(VK_RETURN, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
         }
+    }
+}
+"@
+
+try {
+    \$wshell = New-Object -ComObject WScript.Shell
+    \$wshell.AppActivate("WhatsApp")
+} catch {}
+
+Start-Sleep -Milliseconds 400
+[KeySender]::PasteAndSend($doSendVal)
+''';
+        await Process.run('powershell', ['-STA', '-NoProfile', '-Command', script]);
       } catch (_) {}
     });
   }
@@ -498,7 +516,20 @@ class WhatsAppService {
       } catch (_) {}
     }
 
-    // 1. Try universal wa.me URI (most reliable on Windows WhatsApp Desktop & Web)
+    // 1. On Windows Desktop, try native app scheme first so it launches WhatsApp Desktop instantly!
+    if (Platform.isWindows && cleanPhone.isNotEmpty) {
+      final nativeUri = hasMessage
+          ? Uri.parse('whatsapp://send?phone=$cleanPhone&text=$encodedText')
+          : Uri.parse('whatsapp://send?phone=$cleanPhone');
+      try {
+        if (await canLaunchUrl(nativeUri)) {
+          final launched = await launchUrl(nativeUri, mode: LaunchMode.externalApplication);
+          if (launched) return true;
+        }
+      } catch (_) {}
+    }
+
+    // 2. Try universal wa.me URI (for web / non-windows)
     if (cleanPhone.isNotEmpty) {
       final waUri = hasMessage
           ? Uri.parse('https://wa.me/$cleanPhone?text=$encodedText')
@@ -511,7 +542,7 @@ class WhatsAppService {
       } catch (_) {}
     }
 
-    // 2. Try native desktop scheme: whatsapp://send?phone=...
+    // 3. Fallback to native desktop scheme on other platforms
     final nativeUri = cleanPhone.isNotEmpty
         ? (hasMessage
             ? Uri.parse('whatsapp://send?phone=$cleanPhone&text=$encodedText')
@@ -638,10 +669,9 @@ class WhatsAppService {
         } catch (_) {}
       }
 
-      // 5. Open WhatsApp chat with student
+      // 5. Open WhatsApp chat with student (without text message so picture slip is pasted & shared directly)
       final phone = customPhone ?? receipt.studentPhone;
-      final textMsg = generateReceiptMessage(receipt: receipt, settings: settings);
-      await openWhatsApp(phone: phone, message: textMsg);
+      await openWhatsApp(phone: phone, message: null);
 
       // 6. Native Win32 hardware simulation: Automatically sends Ctrl+V and Enter without user pressing Ctrl+V!
       _simulatePasteAndSend(delayMs: 3000, sendEnter: true);

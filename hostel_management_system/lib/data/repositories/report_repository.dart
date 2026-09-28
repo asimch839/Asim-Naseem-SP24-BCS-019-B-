@@ -78,23 +78,26 @@ class ReportRepository {
     final availableBeds = (totalBeds - occupiedBeds).clamp(0, totalBeds);
     final occupancyRate = totalBeds > 0 ? (occupiedBeds / totalBeds) * 100 : 0.0;
 
-    // 3. Rent for current period / filtered range
+    // 3. Rent for current period / filtered range (e.g. This Month, This Year, etc.)
+    final startMonth = DateFormatter.toIsoMonth(DateTime.tryParse(startDate) ?? DateTime.now());
+    final endMonth = DateFormatter.toIsoMonth(DateTime.tryParse(endDate) ?? DateTime.now());
+
     final rentRecRes = await db.rawQuery(
       '''
       SELECT COALESCE(SUM(rent_amount), 0) as expected,
              COALESCE(SUM(paid_amount), 0) as paid,
              COALESCE(SUM(remaining_amount), 0) as pending
       FROM ${DbTables.rentRecords}
-      WHERE rent_month = ?
+      WHERE rent_month BETWEEN ? AND ?
       ''',
-      [currentMonthIso],
+      [startMonth, endMonth],
     );
     final expectedRent = (rentRecRes.first['expected'] as num?)?.toDouble() ?? 0.0;
     final pendingRent = (rentRecRes.first['pending'] as num?)?.toDouble() ?? 0.0;
 
     // Actual payments collected in the selected date range
     final paymentRes = await db.rawQuery(
-      'SELECT COALESCE(SUM(amount), 0) as total FROM ${DbTables.payments} WHERE payment_date BETWEEN ? AND ?',
+      'SELECT COALESCE(SUM(amount), 0) as total FROM ${DbTables.payments} WHERE SUBSTR(payment_date, 1, 10) BETWEEN ? AND ?',
       [startDate, endDate],
     );
     final rentCollected = (paymentRes.first['total'] as num?)?.toDouble() ?? 0.0;
@@ -102,7 +105,7 @@ class ReportRepository {
 
     // 4. Expenses in the selected date range
     final expRes = await db.rawQuery(
-      'SELECT COALESCE(SUM(amount), 0) as total FROM ${DbTables.expenses} WHERE expense_date BETWEEN ? AND ?',
+      'SELECT COALESCE(SUM(amount), 0) as total FROM ${DbTables.expenses} WHERE SUBSTR(expense_date, 1, 10) BETWEEN ? AND ?',
       [startDate, endDate],
     );
     final totalExpenses = (expRes.first['total'] as num?)?.toDouble() ?? 0.0;
@@ -136,7 +139,7 @@ class ReportRepository {
       final paymentRes = await db.rawQuery('''
         SELECT amount, created_at, payment_date
         FROM ${DbTables.payments}
-        WHERE payment_date = ?
+        WHERE SUBSTR(payment_date, 1, 10) = ?
       ''', [startIso]);
 
       final currentMonthIso = DateFormatter.toIsoMonth(fromDate);
@@ -210,10 +213,10 @@ class ReportRepository {
       final endIso = DateFormatter.toIsoDate(daysList.last);
 
       final paymentRes = await db.rawQuery('''
-        SELECT payment_date, SUM(amount) as collected
+        SELECT SUBSTR(payment_date, 1, 10) as payment_date, SUM(amount) as collected
         FROM ${DbTables.payments}
-        WHERE payment_date BETWEEN ? AND ?
-        GROUP BY payment_date
+        WHERE SUBSTR(payment_date, 1, 10) BETWEEN ? AND ?
+        GROUP BY SUBSTR(payment_date, 1, 10)
       ''', [startIso, endIso]);
 
       final Map<String, double> collMap = {};
@@ -251,10 +254,10 @@ class ReportRepository {
       final currentMonthIso = DateFormatter.toIsoMonth(fromDate);
 
       final paymentRes = await db.rawQuery('''
-        SELECT payment_date, SUM(amount) as collected
+        SELECT SUBSTR(payment_date, 1, 10) as payment_date, SUM(amount) as collected
         FROM ${DbTables.payments}
-        WHERE payment_date BETWEEN ? AND ?
-        GROUP BY payment_date
+        WHERE SUBSTR(payment_date, 1, 10) BETWEEN ? AND ?
+        GROUP BY SUBSTR(payment_date, 1, 10)
       ''', [startIso, endIso]);
 
       final Map<String, double> collMap = {};
@@ -336,10 +339,10 @@ class ReportRepository {
       // 1. Single Day / Today: 4 Time slots (Morning, Afternoon, Evening, Night)
       final startIso = DateFormatter.toIsoDate(fromDate);
       final paymentRes = await db.rawQuery('''
-        SELECT amount, created_at FROM ${DbTables.payments} WHERE payment_date = ?
+        SELECT amount, created_at FROM ${DbTables.payments} WHERE SUBSTR(payment_date, 1, 10) = ?
       ''', [startIso]);
       final expenseRes = await db.rawQuery('''
-        SELECT amount, created_at FROM ${DbTables.expenses} WHERE expense_date = ?
+        SELECT amount, created_at FROM ${DbTables.expenses} WHERE SUBSTR(expense_date, 1, 10) = ?
       ''', [startIso]);
 
       double morningInc = 0.0, afternoonInc = 0.0, eveningInc = 0.0, nightInc = 0.0;
@@ -402,17 +405,17 @@ class ReportRepository {
       final endIso = DateFormatter.toIsoDate(daysList.last);
 
       final paymentRes = await db.rawQuery('''
-        SELECT payment_date, SUM(amount) as income
+        SELECT SUBSTR(payment_date, 1, 10) as payment_date, SUM(amount) as income
         FROM ${DbTables.payments}
-        WHERE payment_date BETWEEN ? AND ?
-        GROUP BY payment_date
+        WHERE SUBSTR(payment_date, 1, 10) BETWEEN ? AND ?
+        GROUP BY SUBSTR(payment_date, 1, 10)
       ''', [startIso, endIso]);
 
       final expenseRes = await db.rawQuery('''
-        SELECT expense_date, SUM(amount) as expense
+        SELECT SUBSTR(expense_date, 1, 10) as expense_date, SUM(amount) as expense
         FROM ${DbTables.expenses}
-        WHERE expense_date BETWEEN ? AND ?
-        GROUP BY expense_date
+        WHERE SUBSTR(expense_date, 1, 10) BETWEEN ? AND ?
+        GROUP BY SUBSTR(expense_date, 1, 10)
       ''', [startIso, endIso]);
 
       final Map<String, double> incMap = {};
@@ -447,17 +450,17 @@ class ReportRepository {
       final endIso = DateFormatter.toIsoDate(toDate);
 
       final paymentRes = await db.rawQuery('''
-        SELECT payment_date, SUM(amount) as income
+        SELECT SUBSTR(payment_date, 1, 10) as payment_date, SUM(amount) as income
         FROM ${DbTables.payments}
-        WHERE payment_date BETWEEN ? AND ?
-        GROUP BY payment_date
+        WHERE SUBSTR(payment_date, 1, 10) BETWEEN ? AND ?
+        GROUP BY SUBSTR(payment_date, 1, 10)
       ''', [startIso, endIso]);
 
       final expenseRes = await db.rawQuery('''
-        SELECT expense_date, SUM(amount) as expense
+        SELECT SUBSTR(expense_date, 1, 10) as expense_date, SUM(amount) as expense
         FROM ${DbTables.expenses}
-        WHERE expense_date BETWEEN ? AND ?
-        GROUP BY expense_date
+        WHERE SUBSTR(expense_date, 1, 10) BETWEEN ? AND ?
+        GROUP BY SUBSTR(expense_date, 1, 10)
       ''', [startIso, endIso]);
 
       final Map<String, double> incMap = {};
@@ -506,7 +509,7 @@ class ReportRepository {
       final paymentRes = await db.rawQuery('''
         SELECT SUBSTR(payment_date, 1, 7) as month, SUM(amount) as income
         FROM ${DbTables.payments}
-        WHERE payment_date BETWEEN ? AND ?
+        WHERE SUBSTR(payment_date, 1, 10) BETWEEN ? AND ?
         GROUP BY month
         ORDER BY month ASC
       ''', [startIso, endIso]);
@@ -514,7 +517,7 @@ class ReportRepository {
       final expenseRes = await db.rawQuery('''
         SELECT SUBSTR(expense_date, 1, 7) as month, SUM(amount) as expense
         FROM ${DbTables.expenses}
-        WHERE expense_date BETWEEN ? AND ?
+        WHERE SUBSTR(expense_date, 1, 10) BETWEEN ? AND ?
         GROUP BY month
         ORDER BY month ASC
       ''', [startIso, endIso]);

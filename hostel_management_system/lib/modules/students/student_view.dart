@@ -278,6 +278,7 @@ class StudentView extends GetView<StudentController> {
           Text('Select Destination Room *', style: AppStyles.bodySmall.copyWith(fontWeight: FontWeight.w600)),
           const SizedBox(height: 6),
           DropdownButtonFormField<RoomModel>(
+            isExpanded: true,
             initialValue: selectedRoom.value,
             decoration: InputDecoration(
               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
@@ -287,7 +288,10 @@ class StudentView extends GetView<StudentController> {
             items: controller.availableRooms.map((r) {
               return DropdownMenuItem(
                 value: r,
-                child: Text('Room ${r.roomNumber} (${r.availableBedsCount} beds free) - ${r.block}'),
+                child: Text(
+                  'Room ${r.roomNumber} (${r.availableBedsCount} beds free) - ${r.block}',
+                  overflow: TextOverflow.ellipsis,
+                ),
               );
             }).toList(),
             onChanged: (room) {
@@ -303,6 +307,7 @@ class StudentView extends GetView<StudentController> {
             Text('Select Destination Bed *', style: AppStyles.bodySmall.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: 6),
             DropdownButtonFormField<BedModel>(
+              isExpanded: true,
               initialValue: selectedBed.value,
               decoration: InputDecoration(
                 contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
@@ -312,7 +317,10 @@ class StudentView extends GetView<StudentController> {
               items: controller.availableBedsForTransfer.map((b) {
                 return DropdownMenuItem(
                   value: b,
-                  child: Text('${b.bedNumber} (Available)'),
+                  child: Text(
+                    '${b.bedNumber} (Available)',
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 );
               }).toList(),
               onChanged: (b) => selectedBed.value = b,
@@ -332,27 +340,51 @@ class StudentView extends GetView<StudentController> {
         ],
       )),
       actions: [
-        CustomButton(
-          text: 'Cancel',
-          type: ButtonType.secondary,
-          onPressed: () {
-            if (Get.isDialogOpen == true) Get.back();
-          },
-        ),
-        const SizedBox(width: 12),
-        CustomButton(
-          text: 'Confirm Room Transfer',
-          onPressed: () {
-            if (selectedRoom.value == null || selectedBed.value == null) {
-              Get.snackbar('Validation', 'Please select both destination room and bed.');
-              return;
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final isCompact = constraints.maxWidth < 450;
+            final cancelBtn = CustomButton(
+              text: 'Cancel',
+              type: ButtonType.secondary,
+              onPressed: () {
+                if (Get.isDialogOpen == true) Get.back();
+              },
+            );
+            final confirmBtn = CustomButton(
+              text: 'Confirm Room Transfer',
+              onPressed: () {
+                if (selectedRoom.value == null || selectedBed.value == null) {
+                  Get.snackbar('Validation', 'Please select both destination room and bed.');
+                  return;
+                }
+                controller.transferRoom(
+                  studentId: student.id!,
+                  newRoomId: selectedRoom.value!.id!,
+                  newBedId: selectedBed.value!.id!,
+                  transferDate: dateCtrl.text,
+                  reason: reasonCtrl.text.trim().isNotEmpty ? reasonCtrl.text.trim() : 'Transferred by management',
+                );
+              },
+            );
+
+            if (isCompact) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  confirmBtn,
+                  const SizedBox(height: 8),
+                  cancelBtn,
+                ],
+              );
             }
-            controller.transferRoom(
-              studentId: student.id!,
-              newRoomId: selectedRoom.value!.id!,
-              newBedId: selectedBed.value!.id!,
-              transferDate: dateCtrl.text,
-              reason: reasonCtrl.text.trim().isNotEmpty ? reasonCtrl.text.trim() : 'Transferred by management',
+            return Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                cancelBtn,
+                const SizedBox(width: 12),
+                confirmBtn,
+              ],
             );
           },
         ),
@@ -411,7 +443,8 @@ class StudentView extends GetView<StudentController> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Monthly Rent Package:', style: AppStyles.caption),
+                      Expanded(child: Text('Monthly Rent Package:', style: AppStyles.caption)),
+                      const SizedBox(width: 8),
                       Text(CurrencyFormatter.format(student.monthlyRent), style: AppStyles.bodySmall.copyWith(fontWeight: FontWeight.w600)),
                     ],
                   ),
@@ -419,7 +452,8 @@ class StudentView extends GetView<StudentController> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Security Deposit Received / Available:', style: AppStyles.caption),
+                      Expanded(child: Text('Security Deposit Available:', style: AppStyles.caption)),
+                      const SizedBox(width: 8),
                       Text(
                         CurrencyFormatter.format(securityDeposit),
                         style: AppStyles.bodySmall.copyWith(fontWeight: FontWeight.w700, color: AppColors.accent),
@@ -430,7 +464,8 @@ class StudentView extends GetView<StudentController> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Unpaid / Pending Rent Dues:', style: AppStyles.caption),
+                      Expanded(child: Text('Unpaid / Pending Rent Dues:', style: AppStyles.caption)),
+                      const SizedBox(width: 8),
                       Text(
                         CurrencyFormatter.format(pendingRent),
                         style: AppStyles.bodySmall.copyWith(
@@ -444,11 +479,12 @@ class StudentView extends GetView<StudentController> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Net Settlement Balance:', style: AppStyles.caption),
+                      Expanded(child: Text('Net Settlement Balance:', style: AppStyles.caption)),
+                      const SizedBox(width: 8),
                       Text(
                         (securityDeposit - pendingRent) >= 0
                             ? '+${CurrencyFormatter.format(securityDeposit - pendingRent)} (Refundable)'
-                            : '-${CurrencyFormatter.format((pendingRent - securityDeposit))} (Deficit / Due)',
+                            : '-${CurrencyFormatter.format((pendingRent - securityDeposit))} (Due)',
                         style: AppStyles.bodySmall.copyWith(
                           fontWeight: FontWeight.w700,
                           color: (securityDeposit - pendingRent) >= 0 ? AppColors.success : AppColors.danger,
@@ -546,44 +582,68 @@ class StudentView extends GetView<StudentController> {
         ),
       ),
       actions: [
-        CustomButton(
-          text: 'Cancel',
-          type: ButtonType.secondary,
-          onPressed: () {
-            if (Get.isDialogOpen == true) Get.back();
-          },
-        ),
-        const SizedBox(width: 12),
-        CustomButton(
-          text: 'Confirm Departure & Settle',
-          type: ButtonType.danger,
-          onPressed: () {
-            final adjustVal = adjustCtrl.text.trim().isNotEmpty
-                ? (double.tryParse(adjustCtrl.text.trim()) ?? 0.0)
-                : defaultAdjust;
-            final refundVal = refundCtrl.text.trim().isNotEmpty
-                ? (double.tryParse(refundCtrl.text.trim()) ?? 0.0)
-                : defaultRefund;
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final isCompact = constraints.maxWidth < 450;
+            final cancelBtn = CustomButton(
+              text: 'Cancel',
+              type: ButtonType.secondary,
+              onPressed: () {
+                if (Get.isDialogOpen == true) Get.back();
+              },
+            );
+            final confirmBtn = CustomButton(
+              text: 'Confirm Departure & Settle',
+              type: ButtonType.danger,
+              onPressed: () {
+                final adjustVal = adjustCtrl.text.trim().isNotEmpty
+                    ? (double.tryParse(adjustCtrl.text.trim()) ?? 0.0)
+                    : defaultAdjust;
+                final refundVal = refundCtrl.text.trim().isNotEmpty
+                    ? (double.tryParse(refundCtrl.text.trim()) ?? 0.0)
+                    : defaultRefund;
 
-            if (adjustVal + refundVal > securityDeposit) {
-              Get.snackbar(
-                'Invalid Settlement',
-                'Adjusted + Refunded total (Rs. ${adjustVal + refundVal}) cannot exceed available security (Rs. $securityDeposit).',
+                if (adjustVal + refundVal > securityDeposit) {
+                  Get.snackbar(
+                    'Invalid Settlement',
+                    'Adjusted + Refunded total (Rs. ${adjustVal + refundVal}) cannot exceed available security (Rs. $securityDeposit).',
+                  );
+                  return;
+                }
+
+                final reasonVal = reasonCtrl.text.trim().isNotEmpty
+                    ? reasonCtrl.text.trim()
+                    : 'Completed studies';
+
+                controller.markStudentAsLeft(
+                  studentId: student.id!,
+                  leavingDate: dateCtrl.text,
+                  reason: reasonVal,
+                  adjustSecurityToRent: adjustVal,
+                  refundSecurityAmount: refundVal,
+                  settlementNotes: notesCtrl.text.isNotEmpty ? notesCtrl.text : null,
+                );
+              },
+            );
+
+            if (isCompact) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  confirmBtn,
+                  const SizedBox(height: 8),
+                  cancelBtn,
+                ],
               );
-              return;
             }
-
-            final reasonVal = reasonCtrl.text.trim().isNotEmpty
-                ? reasonCtrl.text.trim()
-                : 'Completed studies';
-
-            controller.markStudentAsLeft(
-              studentId: student.id!,
-              leavingDate: dateCtrl.text,
-              reason: reasonVal,
-              adjustSecurityToRent: adjustVal,
-              refundSecurityAmount: refundVal,
-              settlementNotes: notesCtrl.text.isNotEmpty ? notesCtrl.text : null,
+            return Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                cancelBtn,
+                const SizedBox(width: 12),
+                confirmBtn,
+              ],
             );
           },
         ),
