@@ -20,59 +20,20 @@ class WhatsAppService {
   /// Automatically brings active WhatsApp desktop window into foreground focus,
   /// pastes (Ctrl + V) the receipt slip from clipboard, and sends (Enter).
   static void _simulatePasteAndSend({
-    int delayMs = 2200,
+    int delayMs = 1600,
     bool sendEnter = true,
   }) {
     if (!Platform.isWindows) return;
 
     Future.delayed(Duration(milliseconds: delayMs), () async {
       try {
-        final doSendVal = sendEnter ? '\$true' : '\$false';
+        final enterScript = sendEnter ? 'Start-Sleep -Milliseconds 1200; \$wshell.SendKeys("{ENTER}")' : '';
         final script = '''
-Add-Type -TypeDefinition @"
-using System;
-using System.Runtime.InteropServices;
-using System.Threading;
-
-public class KeySender {
-    [DllImport("user32.dll")]
-    public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
-    [DllImport("user32.dll")]
-    public static extern bool SetForegroundWindow(IntPtr hWnd);
-
-    private const byte VK_CONTROL = 0x11;
-    private const byte VK_V = 0x56;
-    private const byte VK_RETURN = 0x0D;
-    private const uint KEYEVENTF_KEYUP = 0x0002;
-
-    public static void PasteAndSend(bool doSend) {
-        // 1. Send Ctrl + V (Paste image/document from clipboard)
-        keybd_event(VK_CONTROL, 0, 0, UIntPtr.Zero);
-        keybd_event(VK_V, 0, 0, UIntPtr.Zero);
-        Thread.Sleep(80);
-        keybd_event(VK_V, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
-        keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
-
-        if (doSend) {
-            // Wait for WhatsApp picture send preview screen to open
-            Thread.Sleep(1200);
-
-            // 2. Send ENTER (Submit & Send in WhatsApp)
-            keybd_event(VK_RETURN, 0, 0, UIntPtr.Zero);
-            Thread.Sleep(80);
-            keybd_event(VK_RETURN, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
-        }
-    }
-}
-"@
-
-try {
-    \$wshell = New-Object -ComObject WScript.Shell
-    \$wshell.AppActivate("WhatsApp")
-} catch {}
-
-Start-Sleep -Milliseconds 400
-[KeySender]::PasteAndSend($doSendVal)
+\$wshell = New-Object -ComObject WScript.Shell
+try { \$wshell.AppActivate("WhatsApp") } catch {}
+Start-Sleep -Milliseconds 250
+\$wshell.SendKeys("^v")
+$enterScript
 ''';
         await Process.run('powershell', ['-STA', '-NoProfile', '-Command', script]);
       } catch (_) {}
@@ -674,7 +635,7 @@ Start-Sleep -Milliseconds 400
       await openWhatsApp(phone: phone, message: null);
 
       // 6. Native Win32 hardware simulation: Automatically sends Ctrl+V and Enter without user pressing Ctrl+V!
-      _simulatePasteAndSend(delayMs: 3000, sendEnter: true);
+      _simulatePasteAndSend(delayMs: 1600, sendEnter: true);
 
       // 7. Non-intrusive status snackbar
       Get.snackbar(
@@ -738,7 +699,7 @@ Start-Sleep -Milliseconds 400
       await openWhatsApp(phone: phone, message: textMsg);
 
       // 5. Native Win32 hardware simulation: Automatically sends Ctrl+V and Enter without user pressing Ctrl+V!
-      _simulatePasteAndSend(delayMs: 3000, sendEnter: true);
+      _simulatePasteAndSend(delayMs: 1600, sendEnter: true);
 
       // 6. Non-intrusive status snackbar
       Get.snackbar(
