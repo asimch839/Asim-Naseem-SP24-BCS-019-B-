@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:printing/printing.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../constants/app_colors.dart';
 import '../constants/app_strings.dart';
@@ -20,21 +21,56 @@ class WhatsAppService {
   /// Automatically brings active WhatsApp desktop window into foreground focus,
   /// pastes (Ctrl + V) the receipt slip from clipboard, and sends (Enter).
   static void _simulatePasteAndSend({
-    int delayMs = 1600,
+    int delayMs = 2200,
     bool sendEnter = true,
   }) {
     if (!Platform.isWindows) return;
 
     Future.delayed(Duration(milliseconds: delayMs), () async {
       try {
-        final enterScript = sendEnter ? 'Start-Sleep -Milliseconds 1200; \$wshell.SendKeys("{ENTER}")' : '';
         final script = '''
+Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+public class Win32Focus {
+    [DllImport("user32.dll")]
+    public static extern bool SetForegroundWindow(IntPtr hWnd);
+    [DllImport("user32.dll")]
+    public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+}
+"@ -ErrorAction SilentlyContinue
+
 \$wshell = New-Object -ComObject WScript.Shell
-try { \$wshell.AppActivate("WhatsApp") } catch {}
-Start-Sleep -Milliseconds 250
+
+function Focus-WhatsApp {
+    \$proc = Get-Process | Where-Object { (\$_.ProcessName -match "WhatsApp" -or \$_.MainWindowTitle -match "WhatsApp") -and \$_.MainWindowHandle -ne [IntPtr]::Zero } | Select-Object -First 1
+    if (\$proc) {
+        [Win32Focus]::ShowWindow(\$proc.MainWindowHandle, 9)
+        [Win32Focus]::SetForegroundWindow(\$proc.MainWindowHandle)
+    }
+    try { \$wshell.AppActivate("WhatsApp") } catch {}
+}
+
+# 1. Bring WhatsApp to front and paste (Ctrl + V)
+Focus-WhatsApp
+Start-Sleep -Milliseconds 400
 \$wshell.SendKeys("^v")
-$enterScript
+
+# 2. Wait for Image Preview Screen in WhatsApp to appear
+Start-Sleep -Milliseconds 1400
+
+# 3. Focus WhatsApp again and press ENTER to auto-send the picture!
+Focus-WhatsApp
+Start-Sleep -Milliseconds 300
+\$wshell.SendKeys("{ENTER}")
+
+# 4. Fallback pulse after 1 second to ensure send is triggered
+Start-Sleep -Milliseconds 1000
+Focus-WhatsApp
+Start-Sleep -Milliseconds 200
+\$wshell.SendKeys("{ENTER}")
 ''';
+
         await Process.run('powershell', ['-STA', '-NoProfile', '-Command', script]);
       } catch (_) {}
     });
@@ -582,8 +618,8 @@ $enterScript
 
   /// 🖼️ SHARE AS PICTURE (IMAGE / SLIP) ON WHATSAPP:
   /// Converts the receipt to a high-resolution PNG image, puts the image directly
-  /// onto the Windows Clipboard as both Bitmap and FileDrop, opens WhatsApp chat with the student,
-  /// and shows a clear instruction dialog to paste (Ctrl + V) and send!
+  /// onto the Windows Clipboard / Mobile Share Sheet, opens WhatsApp chat with the student,
+  /// and automatically sends the receipt picture to that person!
   static Future<void> shareReceiptImageViaWhatsApp({
     BuildContext? context,
     required ReceiptModel receipt,
@@ -605,39 +641,66 @@ $enterScript
       }
       if (pngBytes == null) throw Exception('Could not render receipt to picture');
 
-      // 3. Save PNG Image to Downloads/Hostel_Receipts
-      Directory? targetDir;
-      try {
-        targetDir = await getDownloadsDirectory();
-      } catch (_) {}
-      targetDir ??= await getApplicationDocumentsDirectory();
-
-      final receiptsFolder = Directory('${targetDir.path}\\Hostel_Receipts');
-      if (!await receiptsFolder.exists()) {
-        await receiptsFolder.create(recursive: true);
-      }
-
+      // 3. Save PNG Image to file
+      final tempDir = await getTemporaryDirectory();
       final cleanNum = receipt.receiptNumber.replaceAll(RegExp(r'[^a-zA-Z0-9_\-]'), '_');
-      final imageFile = File('${receiptsFolder.path}\\Receipt_$cleanNum.png');
+      final imageFile = File('${tempDir.path}/Receipt_$cleanNum.png');
       await imageFile.writeAsBytes(pngBytes);
 
-      // 4. Copy Image directly to Windows Clipboard as both Bitmap and FileDrop
+      // Save a copy to Downloads/Hostel_Receipts on desktop if available
+      try {
+        Directory? targetDir;
+        try {
+          targetDir = await getDownloadsDirectory();
+        } catch (_) {}
+        targetDir ??= await getApplicationDocumentsDirectory();
+
+        final receiptsFolder = Directory('${targetDir.path}\\Hostel_Receipts');
+        if (!await receiptsFolder.exists()) {
+          await receiptsFolder.create(recursive: true);
+        }
+        final desktopImageFile = File('${receiptsFolder.path}\\Receipt_$cleanNum.png');
+        await desktopImageFile.writeAsBytes(pngBytes);
+      } catch (_) {}
+
+      final phone = customPhone ?? receipt.studentPhone;
+      final textMsg = generateReceiptMessage(receipt: receipt, settings: settings);
+
+      // 4. Mobile Platform (Android / iOS)
+      if (Platform.isAndroid || Platform.isIOS) {
+        if (phone != null && phone.trim().isNotEmpty) {
+          await openWhatsApp(phone: phone, message: null);
+          await Future.delayed(const Duration(milliseconds: 600));
+        }
+        await Share.shareXFiles(
+          [XFile(imageFile.path, mimeType: 'image/png')],
+          text: textMsg,
+          subject: 'Receipt ${receipt.receiptNumber}',
+        );
+        return;
+      }
+
+      // 5. Windows Desktop Platform
       if (Platform.isWindows) {
+        // Copy Image directly to Windows Clipboard as both Bitmap and FileDrop
         try {
           final escapedPath = imageFile.path.replaceAll("'", "''");
           final script = "Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing; \$data = New-Object System.Windows.Forms.DataObject; \$img = [System.Drawing.Image]::FromFile('$escapedPath'); \$data.SetImage(\$img); \$files = New-Object System.Collections.Specialized.StringCollection; \$files.Add('$escapedPath'); \$data.SetFileDropList(\$files); [System.Windows.Forms.Clipboard]::SetDataObject(\$data, \$true)";
           await Process.run('powershell', ['-STA', '-NoProfile', '-Command', script]);
         } catch (_) {}
+
+        // Open WhatsApp chat with student
+        await openWhatsApp(phone: phone, message: null);
+
+        // Native Win32 hardware simulation: Automatically pastes Ctrl+V and sends Enter without user intervention!
+        _simulatePasteAndSend(delayMs: 2200, sendEnter: true);
+      } else {
+        await Share.shareXFiles(
+          [XFile(imageFile.path, mimeType: 'image/png')],
+          text: textMsg,
+        );
       }
 
-      // 5. Open WhatsApp chat with student (without text message so picture slip is pasted & shared directly)
-      final phone = customPhone ?? receipt.studentPhone;
-      await openWhatsApp(phone: phone, message: null);
-
-      // 6. Native Win32 hardware simulation: Automatically sends Ctrl+V and Enter without user pressing Ctrl+V!
-      _simulatePasteAndSend(delayMs: 1600, sendEnter: true);
-
-      // 7. Non-intrusive status snackbar
       Get.snackbar(
         'Sending Receipt Picture...',
         'WhatsApp chat opened! Receipt picture is being pasted and sent automatically.',
@@ -653,8 +716,8 @@ $enterScript
   }
 
   /// 📄 SHARE AS PDF DOCUMENT ON WHATSAPP:
-  /// Generates the PDF, saves it to disk, copies the file to Windows clipboard,
-  /// opens WhatsApp chat, and automatically pastes & sends without requiring Ctrl + V!
+  /// Generates the PDF, saves it to disk, copies the file to clipboard,
+  /// opens WhatsApp chat, and automatically sends the PDF document!
   static Future<void> shareReceiptPdfViaWhatsApp({
     BuildContext? context,
     required ReceiptModel receipt,
@@ -668,40 +731,65 @@ $enterScript
           ? await PdfService.generateReceiptPdfThermal(receipt: receipt, settings: settings)
           : await PdfService.generateReceiptPdfA4(receipt: receipt, settings: settings);
 
-      // 2. Save PDF to Downloads or Documents
-      Directory? targetDir;
-      try {
-        targetDir = await getDownloadsDirectory();
-      } catch (_) {}
-      targetDir ??= await getApplicationDocumentsDirectory();
+      // 2. Save PDF to temporary directory
+      final tempDir = await getTemporaryDirectory();
+      final cleanNum = receipt.receiptNumber.replaceAll(RegExp(r'[^a-zA-Z0-9_\-]'), '_');
+      final pdfFile = File('${tempDir.path}/Receipt_$cleanNum.pdf');
+      await pdfFile.writeAsBytes(pdfBytes);
 
-      final receiptsFolder = Directory('${targetDir.path}\\Hostel_Receipts');
-      if (!await receiptsFolder.exists()) {
-        await receiptsFolder.create(recursive: true);
+      try {
+        Directory? targetDir;
+        try {
+          targetDir = await getDownloadsDirectory();
+        } catch (_) {}
+        targetDir ??= await getApplicationDocumentsDirectory();
+
+        final receiptsFolder = Directory('${targetDir.path}\\Hostel_Receipts');
+        if (!await receiptsFolder.exists()) {
+          await receiptsFolder.create(recursive: true);
+        }
+        final desktopPdfFile = File('${receiptsFolder.path}\\Receipt_$cleanNum.pdf');
+        await desktopPdfFile.writeAsBytes(pdfBytes);
+      } catch (_) {}
+
+      final phone = customPhone ?? receipt.studentPhone;
+      final textMsg = generateReceiptMessage(receipt: receipt, settings: settings);
+
+      // 3. Mobile Platform (Android / iOS)
+      if (Platform.isAndroid || Platform.isIOS) {
+        if (phone != null && phone.trim().isNotEmpty) {
+          await openWhatsApp(phone: phone, message: null);
+          await Future.delayed(const Duration(milliseconds: 600));
+        }
+        await Share.shareXFiles(
+          [XFile(pdfFile.path, mimeType: 'application/pdf')],
+          text: textMsg,
+          subject: 'Receipt ${receipt.receiptNumber}',
+        );
+        return;
       }
 
-      final cleanNum = receipt.receiptNumber.replaceAll(RegExp(r'[^a-zA-Z0-9_\-]'), '_');
-      final targetFile = File('${receiptsFolder.path}\\Receipt_$cleanNum.pdf');
-      await targetFile.writeAsBytes(pdfBytes);
-
-      // 3. Put PDF file reference on Windows Clipboard in STA mode (ready for Ctrl+V)
+      // 4. Windows Desktop Platform
       if (Platform.isWindows) {
+        // Put PDF file reference on Windows Clipboard
         try {
-          final escapedPath = targetFile.path.replaceAll("'", "''");
+          final escapedPath = pdfFile.path.replaceAll("'", "''");
           final script = "Add-Type -AssemblyName System.Windows.Forms; \$data = New-Object System.Windows.Forms.DataObject; \$files = New-Object System.Collections.Specialized.StringCollection; \$files.Add('$escapedPath'); \$data.SetFileDropList(\$files); [System.Windows.Forms.Clipboard]::SetDataObject(\$data, \$true)";
           await Process.run('powershell', ['-STA', '-NoProfile', '-Command', script]);
         } catch (_) {}
+
+        // Open WhatsApp chat with student
+        await openWhatsApp(phone: phone, message: textMsg);
+
+        // Native Win32 hardware simulation: Automatically pastes Ctrl+V and sends Enter without user intervention!
+        _simulatePasteAndSend(delayMs: 2200, sendEnter: true);
+      } else {
+        await Share.shareXFiles(
+          [XFile(pdfFile.path, mimeType: 'application/pdf')],
+          text: textMsg,
+        );
       }
 
-      // 4. Open WhatsApp chat with student
-      final phone = customPhone ?? receipt.studentPhone;
-      final textMsg = generateReceiptMessage(receipt: receipt, settings: settings);
-      await openWhatsApp(phone: phone, message: textMsg);
-
-      // 5. Native Win32 hardware simulation: Automatically sends Ctrl+V and Enter without user pressing Ctrl+V!
-      _simulatePasteAndSend(delayMs: 1600, sendEnter: true);
-
-      // 6. Non-intrusive status snackbar
       Get.snackbar(
         'Sending Receipt PDF...',
         'WhatsApp chat opened! Receipt PDF document is being pasted and sent automatically.',
