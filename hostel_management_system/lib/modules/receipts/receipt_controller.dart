@@ -39,15 +39,14 @@ class ReceiptController extends GetxController {
     }
   }
 
-  Future<void> shareReceiptWhatsApp(ReceiptModel receipt) async {
+  Future<void> shareReceiptWhatsApp(ReceiptModel receipt, {bool isThermal = false}) async {
     final settings = await _settingsRepo.getSettings();
-    if (Get.context != null) {
-      WhatsAppService.showShareDialog(
-        context: Get.context!,
-        receipt: receipt,
-        settings: settings,
-      );
-    }
+    await WhatsAppService.shareReceiptDirectWhatsApp(
+      context: Get.context,
+      receipt: receipt,
+      settings: settings,
+      isThermal: isThermal,
+    );
   }
 
   Future<void> previewReceipt(ReceiptModel receipt) async {
@@ -102,7 +101,7 @@ class ReceiptController extends GetxController {
             type: ButtonType.secondary,
             height: 36,
             onPressed: () {
-              WhatsAppService.showShareDialog(
+              WhatsAppService.shareReceiptDirectWhatsApp(
                 context: context,
                 receipt: receipt,
                 settings: settings,
@@ -183,7 +182,7 @@ class ReceiptController extends GetxController {
                           allowSharing: true,
                           pdfFileName: 'Receipt_${receipt.receiptNumber}.pdf',
                           onShared: (context) async {
-                            WhatsAppService.showShareDialog(
+                            WhatsAppService.shareReceiptDirectWhatsApp(
                               context: context,
                               receipt: receipt,
                               settings: settings,

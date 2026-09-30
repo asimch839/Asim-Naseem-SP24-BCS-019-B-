@@ -214,9 +214,20 @@ class StudentView extends GetView<StudentController> {
                                 'Date: ${DateFormatter.formatDate(DateTime.tryParse(payment.paymentDate))} • Method: ${payment.paymentMethod}',
                                 style: AppStyles.caption,
                               ),
-                              trailing: Text(
-                                CurrencyFormatter.format(payment.amount),
-                                style: AppStyles.bodyMedium.copyWith(fontWeight: FontWeight.w700, color: AppColors.success),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    CurrencyFormatter.format(payment.amount),
+                                    style: AppStyles.bodyMedium.copyWith(fontWeight: FontWeight.w700, color: AppColors.success),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  IconButton(
+                                    icon: const Icon(Icons.share_rounded, size: 18, color: AppColors.primary),
+                                    tooltip: 'Share Receipt on WhatsApp',
+                                    onPressed: () => controller.shareReceiptWhatsApp(payment),
+                                  ),
+                                ],
                               ),
                             );
                           },

@@ -3,6 +3,8 @@ import 'package:get/get.dart';
 import '../../data/repositories/student_repository.dart';
 import '../../data/repositories/rent_repository.dart';
 import '../../data/repositories/room_repository.dart';
+import '../../data/repositories/settings_repository.dart';
+import '../../core/services/whatsapp_service.dart';
 import '../../data/models/student_model.dart';
 import '../../data/models/payment_model.dart';
 import '../../data/models/room_allocation_model.dart';
@@ -163,6 +165,25 @@ class StudentController extends GetxController {
       }
     } catch (e) {
       Get.snackbar('Delete Failed', e.toString().replaceAll('Exception: ', ''));
+    }
+  }
+
+  Future<void> shareReceiptWhatsApp(PaymentModel p) async {
+    if (p.id == null) return;
+    try {
+      final receipt = await _rentRepo.getReceiptByPaymentId(p.id!);
+      final settings = await SettingsRepository().getSettings();
+      if (receipt != null) {
+        await WhatsAppService.shareReceiptDirectWhatsApp(
+          context: Get.context,
+          receipt: receipt,
+          settings: settings,
+        );
+      } else {
+        Get.snackbar('Notice', 'Receipt not found for this transaction.');
+      }
+    } catch (e) {
+      Get.snackbar('Error', 'Could not prepare WhatsApp receipt: $e');
     }
   }
 }

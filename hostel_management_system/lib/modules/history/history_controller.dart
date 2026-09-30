@@ -747,9 +747,9 @@ class HistoryController extends GetxController {
     try {
       final receipt = await _rentRepo.getReceiptByPaymentId(p.id!);
       final settings = await _settingsRepo.getSettings();
-      if (receipt != null && Get.context != null) {
-        WhatsAppService.showShareDialog(
-          context: Get.context!,
+      if (receipt != null) {
+        await WhatsAppService.shareReceiptDirectWhatsApp(
+          context: Get.context,
           receipt: receipt,
           settings: settings,
         );

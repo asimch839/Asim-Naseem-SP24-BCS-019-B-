@@ -21,7 +21,7 @@ class WhatsAppService {
   /// Automatically brings active WhatsApp desktop window into foreground focus,
   /// pastes (Ctrl + V) the receipt slip from clipboard, and sends (Enter).
   static void _simulatePasteAndSend({
-    int delayMs = 2800,
+    int delayMs = 600,
     bool sendEnter = true,
   }) {
     if (!Platform.isWindows) return;
@@ -35,55 +35,121 @@ class WhatsAppService {
 Add-Type -TypeDefinition @"
 using System;
 using System.Runtime.InteropServices;
-public class Win32Key {
+
+public class Win32Focus {
+    [DllImport("user32.dll")]
+    public static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+    [DllImport("user32.dll")]
+    public static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+
     [DllImport("user32.dll")]
     public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+
+    public static void BringToFront(IntPtr hWnd) {
+        if (hWnd == IntPtr.Zero) return;
+        ShowWindow(hWnd, 9); // SW_RESTORE
+        ShowWindow(hWnd, 5); // SW_SHOW
+        
+        IntPtr currentForeground = GetForegroundWindow();
+        if (currentForeground != hWnd) {
+            uint foregroundThread = GetWindowThreadProcessId(currentForeground, out _);
+            uint targetThread = GetWindowThreadProcessId(hWnd, out _);
+            if (foregroundThread != targetThread) {
+                AttachThreadInput(foregroundThread, targetThread, true);
+                SetForegroundWindow(hWnd);
+                AttachThreadInput(foregroundThread, targetThread, false);
+            } else {
+                SetForegroundWindow(hWnd);
+            }
+        }
+    }
+
+    public static void SendCtrlV() {
+        keybd_event(0x11, 0, 0, UIntPtr.Zero);
+        keybd_event(0x56, 0, 0, UIntPtr.Zero);
+        System.Threading.Thread.Sleep(60);
+        keybd_event(0x56, 0, 2, UIntPtr.Zero);
+        keybd_event(0x11, 0, 2, UIntPtr.Zero);
+    }
+
+    public static void SendEnter() {
+        keybd_event(0x0D, 0, 0, UIntPtr.Zero);
+        System.Threading.Thread.Sleep(60);
+        keybd_event(0x0D, 0, 2, UIntPtr.Zero);
+    }
 }
 "@ -ErrorAction SilentlyContinue
 
+Add-Type -AssemblyName System.Windows.Forms
+
 $wshell = New-Object -ComObject WScript.Shell
 
-function Activate-WhatsApp {
+function Get-WhatsAppProc {
+    return Get-Process | Where-Object { 
+        $_.ProcessName -eq "WhatsApp" -or 
+        $_.ProcessName -eq "WhatsAppWin32" -or 
+        ($_.MainWindowTitle -and $_.MainWindowTitle -like "*WhatsApp*")
+    } | Select-Object -First 1
+}
+
+function Focus-WhatsApp {
+    $proc = Get-WhatsAppProc
+    if ($proc -and $proc.MainWindowHandle -ne [IntPtr]::Zero) {
+        [Win32Focus]::BringToFront($proc.MainWindowHandle)
+    }
     try { $wshell.AppActivate("WhatsApp") } catch {}
 }
 
-# 1. Bring WhatsApp Desktop into active focus
-Activate-WhatsApp
-Start-Sleep -Milliseconds 600
+# Poll for WhatsApp window for up to 5 seconds
+for ($i = 0; $i -lt 16; $i++) {
+    Start-Sleep -Milliseconds 300
+    $proc = Get-WhatsAppProc
+    if ($proc -and $proc.MainWindowHandle -ne [IntPtr]::Zero) {
+        Focus-WhatsApp
+        Start-Sleep -Milliseconds 400
 
-# 2. Hardware low-level keybd_event simulation for Ctrl + V
-# VK_CONTROL = 0x11, 'V' = 0x56, KEYEVENTF_KEYUP = 0x0002
-[Win32Key]::keybd_event(0x11, 0, 0, [UIntPtr]::Zero)
-[Win32Key]::keybd_event(0x56, 0, 0, [UIntPtr]::Zero)
-Start-Sleep -Milliseconds 100
-[Win32Key]::keybd_event(0x56, 0, 2, [UIntPtr]::Zero)
-[Win32Key]::keybd_event(0x11, 0, 2, [UIntPtr]::Zero)
+        # Pulse 1: Send Ctrl+V
+        [Win32Focus]::SendCtrlV()
+        try { [System.Windows.Forms.SendKeys]::SendWait("^v") } catch {}
+        try { $wshell.SendKeys("^v") } catch {}
 
-try { $wshell.SendKeys("^v") } catch {}
+        # Wait 1s for WhatsApp Image Preview overlay window
+        Start-Sleep -Milliseconds 1000
+        Focus-WhatsApp
 
-# 3. Wait for WhatsApp image preview overlay screen to open
-Start-Sleep -Milliseconds 1800
+        # Pulse 2: Send Ctrl+V safety pulse
+        [Win32Focus]::SendCtrlV()
+        try { [System.Windows.Forms.SendKeys]::SendWait("^v") } catch {}
+        try { $wshell.SendKeys("^v") } catch {}
 
-# 4. Activate WhatsApp again and send Ctrl + Enter & Enter to auto-send!
-Activate-WhatsApp
-Start-Sleep -Milliseconds 300
-[Win32Key]::keybd_event(0x11, 0, 0, [UIntPtr]::Zero)
-[Win32Key]::keybd_event(0x0D, 0, 0, [UIntPtr]::Zero)
-Start-Sleep -Milliseconds 100
-[Win32Key]::keybd_event(0x0D, 0, 2, [UIntPtr]::Zero)
-[Win32Key]::keybd_event(0x11, 0, 2, [UIntPtr]::Zero)
+        # Wait 800ms and send Enter key to auto-send the receipt picture slip!
+        Start-Sleep -Milliseconds 800
+        Focus-WhatsApp
+        [Win32Focus]::SendEnter()
+        try { [System.Windows.Forms.SendKeys]::SendWait("{ENTER}") } catch {}
+        try { $wshell.SendKeys("^{ENTER}") } catch {}
+        try { $wshell.SendKeys("{ENTER}") } catch {}
 
-try { $wshell.SendKeys("^{ENTER}") } catch {}
-try { $wshell.SendKeys("{ENTER}") } catch {}
+        # Backup Enter after 600ms
+        Start-Sleep -Milliseconds 600
+        Focus-WhatsApp
+        [Win32Focus]::SendEnter()
+        try { [System.Windows.Forms.SendKeys]::SendWait("{ENTER}") } catch {}
+        try { $wshell.SendKeys("{ENTER}") } catch {}
 
-# 5. Safety fallback pulse 1.2s later
-Start-Sleep -Milliseconds 1200
-Activate-WhatsApp
-Start-Sleep -Milliseconds 200
-[Win32Key]::keybd_event(0x0D, 0, 0, [UIntPtr]::Zero)
-Start-Sleep -Milliseconds 100
-[Win32Key]::keybd_event(0x0D, 0, 2, [UIntPtr]::Zero)
-try { $wshell.SendKeys("{ENTER}") } catch {}
+        break
+    }
+}
 ''';
 
         await ps1File.writeAsString(scriptContent);
@@ -682,10 +748,11 @@ try { $wshell.SendKeys("{ENTER}") } catch {}
       final phone = customPhone ?? receipt.studentPhone;
       final textMsg = generateReceiptMessage(receipt: receipt, settings: settings);
 
-      // 4. Mobile Platform (Android / iOS) - Shares ONLY picture slip image
+      // 4. Mobile Platform (Android / iOS) - Shares picture slip image & text
       if (Platform.isAndroid || Platform.isIOS) {
         await Share.shareXFiles(
           [XFile(imageFile.path, mimeType: 'image/png')],
+          text: textMsg,
           subject: 'Receipt ${receipt.receiptNumber}',
         );
         return;
@@ -705,12 +772,8 @@ Add-Type -AssemblyName System.Drawing
 \$filePath = '$escapedPath'
 if (Test-Path \$filePath) {
     \$img = [System.Drawing.Image]::FromFile(\$filePath)
-    \$data = New-Object System.Windows.Forms.DataObject
-    \$data.SetImage(\$img)
-    \$files = New-Object System.Collections.Specialized.StringCollection
-    \$files.Add(\$filePath)
-    \$data.SetFileDropList(\$files)
-    [System.Windows.Forms.Clipboard]::SetDataObject(\$data, \$true)
+    [System.Windows.Forms.Clipboard]::SetImage(\$img)
+    \$img.Dispose()
 }
 ''';
 
@@ -718,11 +781,11 @@ if (Test-Path \$filePath) {
           await Process.run('powershell', ['-ExecutionPolicy', 'Bypass', '-File', copyPs1.path]);
         } catch (_) {}
 
-        // Open WhatsApp chat with student WITHOUT text message (so only picture slip is pasted & sent!)
-        await openWhatsApp(phone: phone, message: null);
+        // Launch auto-paste simulation in background
+        _simulatePasteAndSend(delayMs: 600, sendEnter: true);
 
-        // Native Win32 hardware simulation: Automatically pastes Ctrl+V and sends Enter without user intervention!
-        _simulatePasteAndSend(delayMs: 2800, sendEnter: true);
+        // Open WhatsApp chat with student with formatted receipt text pre-filled
+        await openWhatsApp(phone: phone, message: textMsg);
       } else {
         await Share.shareXFiles(
           [XFile(imageFile.path, mimeType: 'image/png')],
@@ -841,6 +904,44 @@ if (Test-Path \$filePath) {
     } catch (e) {
       Get.snackbar('Error', 'Failed to prepare receipt PDF: $e');
     }
+  }
+
+  /// Directly shares receipt to student's WhatsApp chat (Image slip + Auto Send).
+  /// If student's phone number is missing, opens the Share Dialog for manual entry.
+  static Future<void> shareReceiptDirectWhatsApp({
+    BuildContext? context,
+    required ReceiptModel receipt,
+    required HostelSettingsModel settings,
+    bool isThermal = false,
+  }) async {
+    final rawPhone = receipt.studentPhone;
+    final cleanPhone = normalizePhone(rawPhone);
+
+    if (cleanPhone.isEmpty) {
+      if (context != null || Get.context != null) {
+        showShareDialog(
+          context: context ?? Get.context!,
+          receipt: receipt,
+          settings: settings,
+          isThermal: isThermal,
+        );
+      } else {
+        Get.snackbar(
+          'Phone Number Missing',
+          'Student phone number is not available for this receipt.',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+      }
+      return;
+    }
+
+    await shareReceiptImageViaWhatsApp(
+      context: context,
+      receipt: receipt,
+      settings: settings,
+      isThermal: isThermal,
+      customPhone: cleanPhone,
+    );
   }
 
   /// Interactive multi-app Share Modal allowing user to choose Picture, PDF, Email, etc.
