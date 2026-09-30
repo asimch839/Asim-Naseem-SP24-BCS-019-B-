@@ -21,14 +21,17 @@ class WhatsAppService {
   /// Automatically brings active WhatsApp desktop window into foreground focus,
   /// pastes (Ctrl + V) the receipt slip from clipboard, and sends (Enter).
   static void _simulatePasteAndSend({
-    int delayMs = 2500,
+    int delayMs = 2800,
     bool sendEnter = true,
   }) {
     if (!Platform.isWindows) return;
 
     Future.delayed(Duration(milliseconds: delayMs), () async {
       try {
-        final script = '''
+        final tempDir = await getTemporaryDirectory();
+        final ps1File = File('${tempDir.path}\\whatsapp_auto_send.ps1');
+
+        final scriptContent = r'''
 Add-Type -TypeDefinition @"
 using System;
 using System.Runtime.InteropServices;
@@ -38,48 +41,53 @@ public class Win32Key {
 }
 "@ -ErrorAction SilentlyContinue
 
-\$wshell = New-Object -ComObject WScript.Shell
+$wshell = New-Object -ComObject WScript.Shell
 
 function Activate-WhatsApp {
-    try { \$wshell.AppActivate("WhatsApp") } catch {}
+    try { $wshell.AppActivate("WhatsApp") } catch {}
 }
 
 # 1. Bring WhatsApp Desktop into active focus
 Activate-WhatsApp
-Start-Sleep -Milliseconds 400
+Start-Sleep -Milliseconds 600
 
 # 2. Hardware low-level keybd_event simulation for Ctrl + V
 # VK_CONTROL = 0x11, 'V' = 0x56, KEYEVENTF_KEYUP = 0x0002
 [Win32Key]::keybd_event(0x11, 0, 0, [UIntPtr]::Zero)
 [Win32Key]::keybd_event(0x56, 0, 0, [UIntPtr]::Zero)
-Start-Sleep -Milliseconds 80
+Start-Sleep -Milliseconds 100
 [Win32Key]::keybd_event(0x56, 0, 2, [UIntPtr]::Zero)
 [Win32Key]::keybd_event(0x11, 0, 2, [UIntPtr]::Zero)
 
-# Also backup pulse with SendKeys
-try { \$wshell.SendKeys("^v") } catch {}
+try { $wshell.SendKeys("^v") } catch {}
 
-# 3. Wait for WhatsApp image preview overlay dialog to open
-Start-Sleep -Milliseconds 1400
+# 3. Wait for WhatsApp image preview overlay screen to open
+Start-Sleep -Milliseconds 1800
 
-# 4. Activate WhatsApp again and press ENTER (VK_RETURN = 0x0D) to auto-send the receipt picture
+# 4. Activate WhatsApp again and send Ctrl + Enter & Enter to auto-send!
 Activate-WhatsApp
 Start-Sleep -Milliseconds 300
+[Win32Key]::keybd_event(0x11, 0, 0, [UIntPtr]::Zero)
 [Win32Key]::keybd_event(0x0D, 0, 0, [UIntPtr]::Zero)
-Start-Sleep -Milliseconds 80
+Start-Sleep -Milliseconds 100
 [Win32Key]::keybd_event(0x0D, 0, 2, [UIntPtr]::Zero)
-try { \$wshell.SendKeys("{ENTER}") } catch {}
+[Win32Key]::keybd_event(0x11, 0, 2, [UIntPtr]::Zero)
 
-# 5. Safety fallback pulse 1 second later
-Start-Sleep -Milliseconds 1000
+try { $wshell.SendKeys("^{ENTER}") } catch {}
+try { $wshell.SendKeys("{ENTER}") } catch {}
+
+# 5. Safety fallback pulse 1.2s later
+Start-Sleep -Milliseconds 1200
 Activate-WhatsApp
 Start-Sleep -Milliseconds 200
 [Win32Key]::keybd_event(0x0D, 0, 0, [UIntPtr]::Zero)
-Start-Sleep -Milliseconds 80
+Start-Sleep -Milliseconds 100
 [Win32Key]::keybd_event(0x0D, 0, 2, [UIntPtr]::Zero)
+try { $wshell.SendKeys("{ENTER}") } catch {}
 ''';
 
-        await Process.run('powershell', ['-STA', '-NoProfile', '-Command', script]);
+        await ps1File.writeAsString(scriptContent);
+        await Process.run('powershell', ['-ExecutionPolicy', 'Bypass', '-File', ps1File.path]);
       } catch (_) {}
     });
   }
@@ -674,11 +682,10 @@ Start-Sleep -Milliseconds 80
       final phone = customPhone ?? receipt.studentPhone;
       final textMsg = generateReceiptMessage(receipt: receipt, settings: settings);
 
-      // 4. Mobile Platform (Android / iOS)
+      // 4. Mobile Platform (Android / iOS) - Shares ONLY picture slip image
       if (Platform.isAndroid || Platform.isIOS) {
         await Share.shareXFiles(
           [XFile(imageFile.path, mimeType: 'image/png')],
-          text: textMsg,
           subject: 'Receipt ${receipt.receiptNumber}',
         );
         return;
@@ -686,36 +693,39 @@ Start-Sleep -Milliseconds 80
 
       // 5. Windows Desktop Platform
       if (Platform.isWindows) {
-        // Copy Image directly to Windows Clipboard as both Bitmap and FileDrop using raw string template
+        // Copy Image directly to Windows Clipboard using .ps1 file
         try {
+          final tempDir = await getTemporaryDirectory();
+          final copyPs1 = File('${tempDir.path}\\whatsapp_copy_clip.ps1');
+
           final escapedPath = imageFile.path.replaceAll("'", "''");
-          final copyScript = r'''
+          final copyScriptContent = '''
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
-$filePath = 'FILE_PATH_PLACEHOLDER'
-if (Test-Path $filePath) {
-    $img = [System.Drawing.Image]::FromFile($filePath)
-    $data = New-Object System.Windows.Forms.DataObject
-    $data.SetImage($img)
-    $files = New-Object System.Collections.Specialized.StringCollection
-    $files.Add($filePath)
-    $data.SetFileDropList($files)
-    [System.Windows.Forms.Clipboard]::SetDataObject($data, $true)
+\$filePath = '$escapedPath'
+if (Test-Path \$filePath) {
+    \$img = [System.Drawing.Image]::FromFile(\$filePath)
+    \$data = New-Object System.Windows.Forms.DataObject
+    \$data.SetImage(\$img)
+    \$files = New-Object System.Collections.Specialized.StringCollection
+    \$files.Add(\$filePath)
+    \$data.SetFileDropList(\$files)
+    [System.Windows.Forms.Clipboard]::SetDataObject(\$data, \$true)
 }
-'''.replaceAll('FILE_PATH_PLACEHOLDER', escapedPath);
+''';
 
-          await Process.run('powershell', ['-STA', '-NoProfile', '-Command', copyScript]);
+          await copyPs1.writeAsString(copyScriptContent);
+          await Process.run('powershell', ['-ExecutionPolicy', 'Bypass', '-File', copyPs1.path]);
         } catch (_) {}
 
-        // Open WhatsApp chat with student
+        // Open WhatsApp chat with student WITHOUT text message (so only picture slip is pasted & sent!)
         await openWhatsApp(phone: phone, message: null);
 
         // Native Win32 hardware simulation: Automatically pastes Ctrl+V and sends Enter without user intervention!
-        _simulatePasteAndSend(delayMs: 2500, sendEnter: true);
+        _simulatePasteAndSend(delayMs: 2800, sendEnter: true);
       } else {
         await Share.shareXFiles(
           [XFile(imageFile.path, mimeType: 'image/png')],
-          text: textMsg,
         );
       }
 
@@ -785,29 +795,33 @@ if (Test-Path $filePath) {
 
       // 4. Windows Desktop Platform
       if (Platform.isWindows) {
-        // Put PDF file reference on Windows Clipboard
+        // Put PDF file reference on Windows Clipboard using .ps1 file
         try {
-          final escapedPath = pdfFile.path.replaceAll("'", "''");
-          final copyScript = r'''
-Add-Type -AssemblyName System.Windows.Forms
-$filePath = 'FILE_PATH_PLACEHOLDER'
-if (Test-Path $filePath) {
-    $data = New-Object System.Windows.Forms.DataObject
-    $files = New-Object System.Collections.Specialized.StringCollection
-    $files.Add($filePath)
-    $data.SetFileDropList($files)
-    [System.Windows.Forms.Clipboard]::SetDataObject($data, $true)
-}
-'''.replaceAll('FILE_PATH_PLACEHOLDER', escapedPath);
+          final tempDir = await getTemporaryDirectory();
+          final copyPs1 = File('${tempDir.path}\\whatsapp_copy_pdf.ps1');
 
-          await Process.run('powershell', ['-STA', '-NoProfile', '-Command', copyScript]);
+          final escapedPath = pdfFile.path.replaceAll("'", "''");
+          final copyScriptContent = '''
+Add-Type -AssemblyName System.Windows.Forms
+\$filePath = '$escapedPath'
+if (Test-Path \$filePath) {
+    \$data = New-Object System.Windows.Forms.DataObject
+    \$files = New-Object System.Collections.Specialized.StringCollection
+    \$files.Add(\$filePath)
+    \$data.SetFileDropList(\$files)
+    [System.Windows.Forms.Clipboard]::SetDataObject(\$data, \$true)
+}
+''';
+
+          await copyPs1.writeAsString(copyScriptContent);
+          await Process.run('powershell', ['-ExecutionPolicy', 'Bypass', '-File', copyPs1.path]);
         } catch (_) {}
 
         // Open WhatsApp chat with student
         await openWhatsApp(phone: phone, message: textMsg);
 
         // Native Win32 hardware simulation: Automatically pastes Ctrl+V and sends Enter without user intervention!
-        _simulatePasteAndSend(delayMs: 2500, sendEnter: true);
+        _simulatePasteAndSend(delayMs: 2800, sendEnter: true);
       } else {
         await Share.shareXFiles(
           [XFile(pdfFile.path, mimeType: 'application/pdf')],

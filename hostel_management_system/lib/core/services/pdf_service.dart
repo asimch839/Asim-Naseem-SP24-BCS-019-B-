@@ -10,9 +10,9 @@ import '../utils/currency_formatter.dart';
 class PdfService {
   static Future<pw.ThemeData> _getPdfTheme() async {
     try {
-      final font = await PdfGoogleFonts.robotoRegular();
-      final boldFont = await PdfGoogleFonts.robotoBold();
-      final italicFont = await PdfGoogleFonts.robotoItalic();
+      final font = await PdfGoogleFonts.robotoRegular().timeout(const Duration(milliseconds: 1500));
+      final boldFont = await PdfGoogleFonts.robotoBold().timeout(const Duration(milliseconds: 1500));
+      final italicFont = await PdfGoogleFonts.robotoItalic().timeout(const Duration(milliseconds: 1500));
       return pw.ThemeData.withFont(
         base: font,
         bold: boldFont,
