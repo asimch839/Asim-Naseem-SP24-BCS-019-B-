@@ -453,18 +453,55 @@ class RentRepository {
     final db = await _dbHelper.database;
     final query = '''
       SELECT rc.*, s.full_name as student_name, s.student_id_code, s.phone as student_phone,
+             s.security_deposit as student_security_deposit,
              r.room_number, b.bed_number, rr.rent_amount
       FROM ${DbTables.receipts} rc
-      INNER JOIN ${DbTables.payments} p ON rc.payment_id = p.id
-      INNER JOIN ${DbTables.rentRecords} rr ON p.rent_record_id = rr.id
-      INNER JOIN ${DbTables.students} s ON rc.student_id = s.id
-      INNER JOIN ${DbTables.rooms} r ON rr.room_id = r.id
-      INNER JOIN ${DbTables.beds} b ON rr.bed_id = b.id
+      LEFT JOIN ${DbTables.payments} p ON rc.payment_id = p.id
+      LEFT JOIN ${DbTables.rentRecords} rr ON p.rent_record_id = rr.id
+      LEFT JOIN ${DbTables.students} s ON rc.student_id = s.id
+      LEFT JOIN ${DbTables.rooms} r ON rr.room_id = r.id
+      LEFT JOIN ${DbTables.beds} b ON rr.bed_id = b.id
       WHERE rc.payment_id = ?
       LIMIT 1
     ''';
     final results = await db.rawQuery(query, [paymentId]);
-    if (results.isEmpty) return null;
-    return ReceiptModel.fromMap(results.first);
+    if (results.isNotEmpty) {
+      return ReceiptModel.fromMap(results.first);
+    }
+
+    // Fallback: Construct receipt from payment if no entry in receipts table
+    final pQuery = '''
+      SELECT p.*, s.full_name as student_name, s.student_id_code, s.phone as student_phone,
+             s.security_deposit as student_security_deposit,
+             r.room_number, b.bed_number, rr.rent_amount, rr.rent_month, rr.remaining_amount
+      FROM ${DbTables.payments} p
+      LEFT JOIN ${DbTables.students} s ON p.student_id = s.id
+      LEFT JOIN ${DbTables.rentRecords} rr ON p.rent_record_id = rr.id
+      LEFT JOIN ${DbTables.rooms} r ON rr.room_id = r.id
+      LEFT JOIN ${DbTables.beds} b ON rr.bed_id = b.id
+      WHERE p.id = ?
+      LIMIT 1
+    ''';
+    final pResults = await db.rawQuery(pQuery, [paymentId]);
+    if (pResults.isEmpty) return null;
+
+    final map = pResults.first;
+    final nowStr = DateTime.now().toIso8601String();
+    return ReceiptModel(
+      paymentId: map['id'] as int,
+      studentId: map['student_id'] as int,
+      studentName: map['student_name'] as String?,
+      studentIdCode: map['student_id_code'] as String?,
+      studentPhone: map['student_phone'] as String?,
+      roomNumber: map['room_number'] as String?,
+      bedNumber: map['bed_number'] as String?,
+      rentMonth: (map['rent_month'] as String?) ?? DateFormatter.formatMonthYear(DateTime.now()),
+      amountPaid: (map['amount'] as num?)?.toDouble() ?? 0.0,
+      paymentDate: map['payment_date'] as String,
+      paymentMethod: (map['payment_method'] as String?) ?? 'Cash',
+      receiptNumber: (map['receipt_number'] as String?) ?? 'RCP-${map['id']}',
+      remainingAmount: (map['remaining_amount'] as num?)?.toDouble() ?? 0.0,
+      createdAt: nowStr,
+    );
   }
 }

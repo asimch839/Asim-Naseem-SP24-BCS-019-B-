@@ -931,6 +931,7 @@ class StudentView extends GetView<StudentController> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(s.fullName, style: AppStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600)),
                         Text(s.university, style: AppStyles.caption),
@@ -941,28 +942,33 @@ class StudentView extends GetView<StudentController> {
                     Text(s.bedNumber ?? '-', style: AppStyles.bodySmall),
                     Text(CurrencyFormatter.format(s.monthlyRent), style: AppStyles.bodySmall.copyWith(fontWeight: FontWeight.w600, color: AppColors.primary)),
                     Text(CurrencyFormatter.format(s.securityDeposit), style: AppStyles.bodySmall.copyWith(fontWeight: FontWeight.w600, color: AppColors.accent)),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        StatusBadge(status: s.currentRentStatus ?? (s.isActive ? 'Pending' : 'N/A')),
-                        if (s.currentRentRemaining != null && s.currentRentRemaining! > 0)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 2),
-                            child: Text(
-                              'Due: ${CurrencyFormatter.format(s.currentRentRemaining!)}',
-                              style: AppStyles.caption.copyWith(color: AppColors.danger, fontWeight: FontWeight.w600, fontSize: 11),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          StatusBadge(status: s.currentRentStatus ?? (s.isActive ? 'Pending' : 'N/A')),
+                          if (s.currentRentRemaining != null && s.currentRentRemaining! > 0)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Text(
+                                'Due: ${CurrencyFormatter.format(s.currentRentRemaining!)}',
+                                style: AppStyles.caption.copyWith(color: AppColors.danger, fontWeight: FontWeight.w600, fontSize: 11),
+                              ),
                             ),
-                          ),
-                        if (s.securityDeposit > 0)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 2),
-                            child: Text(
-                              '(Rent: ${CurrencyFormatter.format(s.monthlyRent)} + Sec: ${CurrencyFormatter.format(s.securityDeposit)})',
-                              style: AppStyles.caption.copyWith(color: AppColors.textSecondary, fontSize: 10),
+                          if (s.securityDeposit > 0)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Text(
+                                '(Rent: ${CurrencyFormatter.format(s.monthlyRent)} + Sec: ${CurrencyFormatter.format(s.securityDeposit)})',
+                                style: AppStyles.caption.copyWith(color: AppColors.textSecondary, fontSize: 10),
+                              ),
                             ),
-                          ),
-                      ],
+                        ],
+                      ),
                     ),
                     StatusBadge(status: s.status),
                     Row(

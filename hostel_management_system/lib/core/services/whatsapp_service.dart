@@ -15,13 +15,14 @@ import '../../data/models/receipt_model.dart';
 import '../../data/models/rent_record_model.dart';
 import '../../data/models/hostel_settings_model.dart';
 import '../../widgets/custom_text_field.dart';
+import '../../data/repositories/student_repository.dart';
 import 'pdf_service.dart';
 
 class WhatsAppService {
   /// Automatically brings active WhatsApp desktop window into foreground focus,
   /// pastes (Ctrl + V) the receipt slip from clipboard, and sends (Enter).
   static void _simulatePasteAndSend({
-    int delayMs = 600,
+    int delayMs = 2200,
     bool sendEnter = true,
   }) {
     if (!Platform.isWindows) return;
@@ -36,7 +37,34 @@ Add-Type -TypeDefinition @"
 using System;
 using System.Runtime.InteropServices;
 
-public class Win32Focus {
+public class Win32Input {
+    [StructLayout(LayoutKind.Sequential)]
+    struct MOUSEINPUT {
+        public int dx; public int dy; public uint mouseData; public uint dwFlags; public uint time; public IntPtr dwExtraInfo;
+    }
+    [StructLayout(LayoutKind.Sequential)]
+    struct KEYBDINPUT {
+        public ushort wVk; public ushort wScan; public uint dwFlags; public uint time; public IntPtr dwExtraInfo;
+    }
+    [StructLayout(LayoutKind.Sequential)]
+    struct HARDWAREINPUT {
+        public uint uMsg; public ushort wParamL; public ushort wParamH;
+    }
+    [StructLayout(LayoutKind.Explicit)]
+    struct INPUTUNION {
+        [FieldOffset(0)] public MOUSEINPUT mi;
+        [FieldOffset(0)] public KEYBDINPUT ki;
+        [FieldOffset(0)] public HARDWAREINPUT hi;
+    }
+    [StructLayout(LayoutKind.Sequential)]
+    struct INPUT {
+        public uint type;
+        public INPUTUNION u;
+    }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
+
     [DllImport("user32.dll")]
     public static extern bool SetForegroundWindow(IntPtr hWnd);
 
@@ -51,9 +79,6 @@ public class Win32Focus {
 
     [DllImport("user32.dll")]
     public static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
-
-    [DllImport("user32.dll")]
-    public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
 
     public static void BringToFront(IntPtr hWnd) {
         if (hWnd == IntPtr.Zero) return;
@@ -75,81 +100,72 @@ public class Win32Focus {
     }
 
     public static void SendCtrlV() {
-        keybd_event(0x11, 0, 0, UIntPtr.Zero);
-        keybd_event(0x56, 0, 0, UIntPtr.Zero);
-        System.Threading.Thread.Sleep(60);
-        keybd_event(0x56, 0, 2, UIntPtr.Zero);
-        keybd_event(0x11, 0, 2, UIntPtr.Zero);
+        INPUT[] inputs = new INPUT[4];
+        inputs[0].type = 1; inputs[0].u.ki.wVk = 0x11; // Ctrl down
+        inputs[1].type = 1; inputs[1].u.ki.wVk = 0x56; // V down
+        inputs[2].type = 1; inputs[2].u.ki.wVk = 0x56; inputs[2].u.ki.dwFlags = 2; // V up
+        inputs[3].type = 1; inputs[3].u.ki.wVk = 0x11; inputs[3].u.ki.dwFlags = 2; // Ctrl up
+        SendInput(4, inputs, Marshal.SizeOf(typeof(INPUT)));
     }
 
     public static void SendEnter() {
-        keybd_event(0x0D, 0, 0, UIntPtr.Zero);
-        System.Threading.Thread.Sleep(60);
-        keybd_event(0x0D, 0, 2, UIntPtr.Zero);
+        INPUT[] inputs = new INPUT[2];
+        inputs[0].type = 1; inputs[0].u.ki.wVk = 0x0D; // Enter down
+        inputs[1].type = 1; inputs[1].u.ki.wVk = 0x0D; inputs[1].u.ki.dwFlags = 2; // Enter up
+        SendInput(2, inputs, Marshal.SizeOf(typeof(INPUT)));
+    }
+
+    public static void SendCtrlEnter() {
+        INPUT[] inputs = new INPUT[4];
+        inputs[0].type = 1; inputs[0].u.ki.wVk = 0x11; // Ctrl down
+        inputs[1].type = 1; inputs[1].u.ki.wVk = 0x0D; // Enter down
+        inputs[2].type = 1; inputs[2].u.ki.wVk = 0x0D; inputs[2].u.ki.dwFlags = 2; // Enter up
+        inputs[3].type = 1; inputs[3].u.ki.wVk = 0x11; inputs[3].u.ki.dwFlags = 2; // Ctrl up
+        SendInput(4, inputs, Marshal.SizeOf(typeof(INPUT)));
     }
 }
 "@ -ErrorAction SilentlyContinue
 
-Add-Type -AssemblyName System.Windows.Forms
-
 $wshell = New-Object -ComObject WScript.Shell
 
 function Get-WhatsAppProc {
-    return Get-Process | Where-Object { 
-        $_.ProcessName -eq "WhatsApp" -or 
-        $_.ProcessName -eq "WhatsAppWin32" -or 
+    $procs = Get-Process | Where-Object { 
+        $_.ProcessName -like "*WhatsApp*" -or 
         ($_.MainWindowTitle -and $_.MainWindowTitle -like "*WhatsApp*")
-    } | Select-Object -First 1
+    }
+    $withWindow = $procs | Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero } | Select-Object -First 1
+    if ($withWindow) { return $withWindow }
+    return $procs | Select-Object -First 1
 }
 
 function Focus-WhatsApp {
-    $proc = Get-WhatsAppProc
-    if ($proc -and $proc.MainWindowHandle -ne [IntPtr]::Zero) {
-        [Win32Focus]::BringToFront($proc.MainWindowHandle)
-    }
     try { $wshell.AppActivate("WhatsApp") } catch {}
-}
-
-# Poll for WhatsApp window for up to 5 seconds
-for ($i = 0; $i -lt 16; $i++) {
-    Start-Sleep -Milliseconds 300
     $proc = Get-WhatsAppProc
     if ($proc -and $proc.MainWindowHandle -ne [IntPtr]::Zero) {
-        Focus-WhatsApp
-        Start-Sleep -Milliseconds 400
-
-        # Pulse 1: Send Ctrl+V
-        [Win32Focus]::SendCtrlV()
-        try { [System.Windows.Forms.SendKeys]::SendWait("^v") } catch {}
-        try { $wshell.SendKeys("^v") } catch {}
-
-        # Wait 1s for WhatsApp Image Preview overlay window
-        Start-Sleep -Milliseconds 1000
-        Focus-WhatsApp
-
-        # Pulse 2: Send Ctrl+V safety pulse
-        [Win32Focus]::SendCtrlV()
-        try { [System.Windows.Forms.SendKeys]::SendWait("^v") } catch {}
-        try { $wshell.SendKeys("^v") } catch {}
-
-        # Wait 800ms and send Enter key to auto-send the receipt picture slip!
-        Start-Sleep -Milliseconds 800
-        Focus-WhatsApp
-        [Win32Focus]::SendEnter()
-        try { [System.Windows.Forms.SendKeys]::SendWait("{ENTER}") } catch {}
-        try { $wshell.SendKeys("^{ENTER}") } catch {}
-        try { $wshell.SendKeys("{ENTER}") } catch {}
-
-        # Backup Enter after 600ms
-        Start-Sleep -Milliseconds 600
-        Focus-WhatsApp
-        [Win32Focus]::SendEnter()
-        try { [System.Windows.Forms.SendKeys]::SendWait("{ENTER}") } catch {}
-        try { $wshell.SendKeys("{ENTER}") } catch {}
-
-        break
+        [Win32Input]::BringToFront($proc.MainWindowHandle)
     }
 }
+
+# 1. Bring WhatsApp into foreground
+Focus-WhatsApp
+Start-Sleep -Milliseconds 400
+
+# 2. Paste image slip (Send Ctrl+V via Native SendInput)
+[Win32Input]::SendCtrlV()
+
+# 3. Wait for WhatsApp Image Preview overlay screen to pop up
+Start-Sleep -Milliseconds 1300
+Focus-WhatsApp
+
+# 4. Send Enter & Ctrl+Enter to auto-send the receipt image!
+[Win32Input]::SendEnter()
+[Win32Input]::SendCtrlEnter()
+
+# 5. Backup Enter pulse after 600ms
+Start-Sleep -Milliseconds 600
+Focus-WhatsApp
+[Win32Input]::SendEnter()
+[Win32Input]::SendCtrlEnter()
 ''';
 
         await ps1File.writeAsString(scriptContent);
@@ -750,6 +766,7 @@ for ($i = 0; $i -lt 16; $i++) {
 
       // 4. Mobile Platform (Android / iOS) - Shares picture slip image & text
       if (Platform.isAndroid || Platform.isIOS) {
+        // ignore: deprecated_member_use
         await Share.shareXFiles(
           [XFile(imageFile.path, mimeType: 'image/png')],
           text: textMsg,
@@ -781,12 +798,13 @@ if (Test-Path \$filePath) {
           await Process.run('powershell', ['-ExecutionPolicy', 'Bypass', '-File', copyPs1.path]);
         } catch (_) {}
 
-        // Launch auto-paste simulation in background
-        _simulatePasteAndSend(delayMs: 600, sendEnter: true);
+        // Launch auto-paste simulation in background after WhatsApp finishes loading
+        _simulatePasteAndSend(delayMs: 2200, sendEnter: true);
 
         // Open WhatsApp chat with student with clean chat box (so clipboard image is preserved)
         await openWhatsApp(phone: phone);
       } else {
+        // ignore: deprecated_member_use
         await Share.shareXFiles(
           [XFile(imageFile.path, mimeType: 'image/png')],
         );
@@ -848,6 +866,7 @@ if (Test-Path \$filePath) {
 
       // 3. Mobile Platform (Android / iOS)
       if (Platform.isAndroid || Platform.isIOS) {
+        // ignore: deprecated_member_use
         await Share.shareXFiles(
           [XFile(pdfFile.path, mimeType: 'application/pdf')],
           text: textMsg,
@@ -886,6 +905,7 @@ if (Test-Path \$filePath) {
         // Native Win32 hardware simulation: Automatically pastes Ctrl+V and sends Enter without user intervention!
         _simulatePasteAndSend(delayMs: 2800, sendEnter: true);
       } else {
+        // ignore: deprecated_member_use
         await Share.shareXFiles(
           [XFile(pdfFile.path, mimeType: 'application/pdf')],
           text: textMsg,
@@ -914,8 +934,15 @@ if (Test-Path \$filePath) {
     required HostelSettingsModel settings,
     bool isThermal = false,
   }) async {
-    final rawPhone = receipt.studentPhone;
-    final cleanPhone = normalizePhone(rawPhone);
+    String cleanPhone = normalizePhone(receipt.studentPhone);
+    if (cleanPhone.isEmpty) {
+      try {
+        final student = await StudentRepository().getStudentById(receipt.studentId);
+        if (student != null && student.phone.isNotEmpty) {
+          cleanPhone = normalizePhone(student.phone);
+        }
+      } catch (_) {}
+    }
 
     if (cleanPhone.isEmpty) {
       if (context != null || Get.context != null) {
@@ -936,7 +963,7 @@ if (Test-Path \$filePath) {
     }
 
     await shareReceiptImageViaWhatsApp(
-      context: context,
+      context: (context != null && context.mounted) ? context : null,
       receipt: receipt,
       settings: settings,
       isThermal: isThermal,
