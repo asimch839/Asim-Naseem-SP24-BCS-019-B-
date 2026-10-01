@@ -784,8 +784,8 @@ if (Test-Path \$filePath) {
         // Launch auto-paste simulation in background
         _simulatePasteAndSend(delayMs: 600, sendEnter: true);
 
-        // Open WhatsApp chat with student with formatted receipt text pre-filled
-        await openWhatsApp(phone: phone, message: textMsg);
+        // Open WhatsApp chat with student with clean chat box (so clipboard image is preserved)
+        await openWhatsApp(phone: phone);
       } else {
         await Share.shareXFiles(
           [XFile(imageFile.path, mimeType: 'image/png')],
@@ -880,8 +880,8 @@ if (Test-Path \$filePath) {
           await Process.run('powershell', ['-ExecutionPolicy', 'Bypass', '-File', copyPs1.path]);
         } catch (_) {}
 
-        // Open WhatsApp chat with student
-        await openWhatsApp(phone: phone, message: textMsg);
+        // Open WhatsApp chat with student with clean chat box (so clipboard PDF reference is preserved)
+        await openWhatsApp(phone: phone);
 
         // Native Win32 hardware simulation: Automatically pastes Ctrl+V and sends Enter without user intervention!
         _simulatePasteAndSend(delayMs: 2800, sendEnter: true);
