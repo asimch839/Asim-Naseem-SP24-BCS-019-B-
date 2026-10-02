@@ -22,7 +22,7 @@ class WhatsAppService {
   /// Automatically brings active WhatsApp desktop window into foreground focus,
   /// pastes (Ctrl + V) the receipt slip from clipboard, and sends (Enter).
   static void _simulatePasteAndSend({
-    int delayMs = 2200,
+    int delayMs = 3500,
     bool sendEnter = true,
   }) {
     if (!Platform.isWindows) return;
@@ -80,11 +80,14 @@ public class Win32Input {
     [DllImport("user32.dll")]
     public static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
 
+    [DllImport("user32.dll")]
+    static extern short GetAsyncKeyState(int vKey);
+
     public static void BringToFront(IntPtr hWnd) {
         if (hWnd == IntPtr.Zero) return;
         ShowWindow(hWnd, 9); // SW_RESTORE
         ShowWindow(hWnd, 5); // SW_SHOW
-        
+
         IntPtr currentForeground = GetForegroundWindow();
         if (currentForeground != hWnd) {
             uint foregroundThread = GetWindowThreadProcessId(currentForeground, out _);
@@ -99,7 +102,22 @@ public class Win32Input {
         }
     }
 
+    // Release any stuck modifier keys (Alt, Ctrl, Shift, Win) before sending new input
+    public static void ReleaseAllModifiers() {
+        ushort[] modifiers = { 0x10, 0x11, 0x12, 0x5B, 0x5C }; // Shift, Ctrl, Alt, LWin, RWin
+        foreach (ushort vk in modifiers) {
+            if ((GetAsyncKeyState(vk) & 0x8000) != 0) {
+                INPUT[] inputs = new INPUT[1];
+                inputs[0].type = 1;
+                inputs[0].u.ki.wVk = vk;
+                inputs[0].u.ki.dwFlags = 2; // KEYEVENTF_KEYUP
+                SendInput(1, inputs, Marshal.SizeOf(typeof(INPUT)));
+            }
+        }
+    }
+
     public static void SendCtrlV() {
+        ReleaseAllModifiers();
         INPUT[] inputs = new INPUT[4];
         inputs[0].type = 1; inputs[0].u.ki.wVk = 0x11; // Ctrl down
         inputs[1].type = 1; inputs[1].u.ki.wVk = 0x56; // V down
@@ -109,6 +127,7 @@ public class Win32Input {
     }
 
     public static void SendEnter() {
+        ReleaseAllModifiers();
         INPUT[] inputs = new INPUT[2];
         inputs[0].type = 1; inputs[0].u.ki.wVk = 0x0D; // Enter down
         inputs[1].type = 1; inputs[1].u.ki.wVk = 0x0D; inputs[1].u.ki.dwFlags = 2; // Enter up
@@ -116,6 +135,7 @@ public class Win32Input {
     }
 
     public static void SendCtrlEnter() {
+        ReleaseAllModifiers();
         INPUT[] inputs = new INPUT[4];
         inputs[0].type = 1; inputs[0].u.ki.wVk = 0x11; // Ctrl down
         inputs[1].type = 1; inputs[1].u.ki.wVk = 0x0D; // Enter down
@@ -129,8 +149,8 @@ public class Win32Input {
 $wshell = New-Object -ComObject WScript.Shell
 
 function Get-WhatsAppProc {
-    $procs = Get-Process | Where-Object { 
-        $_.ProcessName -like "*WhatsApp*" -or 
+    $procs = Get-Process | Where-Object {
+        $_.ProcessName -like "*WhatsApp*" -or
         ($_.MainWindowTitle -and $_.MainWindowTitle -like "*WhatsApp*")
     }
     $withWindow = $procs | Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero } | Select-Object -First 1
@@ -139,37 +159,81 @@ function Get-WhatsAppProc {
 }
 
 function Focus-WhatsApp {
-    try { $wshell.AppActivate("WhatsApp") } catch {}
+    $focused = $false
+    try { $focused = $wshell.AppActivate("WhatsApp") } catch {}
     $proc = Get-WhatsAppProc
     if ($proc -and $proc.MainWindowHandle -ne [IntPtr]::Zero) {
         [Win32Input]::BringToFront($proc.MainWindowHandle)
+        $focused = $true
     }
+    return $focused
 }
 
-# 1. Bring WhatsApp into foreground
-Focus-WhatsApp
-Start-Sleep -Milliseconds 400
+# 1. Wait for WhatsApp window to appear and become focusable (retry up to ~12 seconds)
+$maxRetries = 24
+$retryCount = 0
+$whatsAppReady = $false
+while ($retryCount -lt $maxRetries) {
+    $proc = Get-WhatsAppProc
+    if ($proc -and $proc.MainWindowHandle -ne [IntPtr]::Zero) {
+        $whatsAppReady = Focus-WhatsApp
+        if ($whatsAppReady) { break }
+    }
+    Start-Sleep -Milliseconds 500
+    $retryCount++
+}
 
-# 2. Paste image slip (Send Ctrl+V via Native SendInput)
+if (-not $whatsAppReady) {
+    # Final attempt: just try to activate by title
+    try { $wshell.AppActivate("WhatsApp") } catch {}
+}
+
+# 2. Give WhatsApp chat extra time to fully load the conversation
+Start-Sleep -Milliseconds 1800
+
+# 3. Re-focus WhatsApp and click on the message input area via Tab key
+Focus-WhatsApp
+Start-Sleep -Milliseconds 300
+
+# 4. Paste image slip (Send Ctrl+V via Native SendInput) — Attempt 1
 [Win32Input]::SendCtrlV()
 
-# 3. Wait for WhatsApp Image Preview overlay screen to pop up
-Start-Sleep -Milliseconds 1300
+# 5. Wait for WhatsApp Image Preview overlay screen to pop up
+Start-Sleep -Milliseconds 2000
 Focus-WhatsApp
+Start-Sleep -Milliseconds 500
 
-# 4. Send Enter & Ctrl+Enter to auto-send the receipt image!
+# 6. Retry paste if first attempt didn't trigger the preview
+[Win32Input]::SendCtrlV()
+Start-Sleep -Milliseconds 2000
+Focus-WhatsApp
+Start-Sleep -Milliseconds 300
+
+# 7. Send Enter & Ctrl+Enter to auto-send the receipt image!
 [Win32Input]::SendEnter()
+Start-Sleep -Milliseconds 200
 [Win32Input]::SendCtrlEnter()
 
-# 5. Backup Enter pulse after 600ms
-Start-Sleep -Milliseconds 600
+# 8. Backup Enter pulse after 800ms in case first send didn't register
+Start-Sleep -Milliseconds 800
 Focus-WhatsApp
 [Win32Input]::SendEnter()
+Start-Sleep -Milliseconds 200
 [Win32Input]::SendCtrlEnter()
+
+# 9. Final safety pulse after 1 second
+Start-Sleep -Milliseconds 1000
+Focus-WhatsApp
+[Win32Input]::SendEnter()
 ''';
 
         await ps1File.writeAsString(scriptContent);
-        await Process.run('powershell', ['-ExecutionPolicy', 'Bypass', '-File', ps1File.path]);
+        // Use Process.start so PowerShell runs in background without blocking the app
+        await Process.start(
+          'powershell',
+          ['-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', ps1File.path],
+          mode: ProcessStartMode.detached,
+        );
       } catch (_) {}
     });
   }
@@ -798,11 +862,11 @@ if (Test-Path \$filePath) {
           await Process.run('powershell', ['-ExecutionPolicy', 'Bypass', '-File', copyPs1.path]);
         } catch (_) {}
 
-        // Launch auto-paste simulation in background after WhatsApp finishes loading
-        _simulatePasteAndSend(delayMs: 2200, sendEnter: true);
-
-        // Open WhatsApp chat with student with clean chat box (so clipboard image is preserved)
+        // Open WhatsApp chat with student first (so chat loads while we wait)
         await openWhatsApp(phone: phone);
+
+        // Launch auto-paste simulation in background after WhatsApp finishes loading
+        _simulatePasteAndSend(delayMs: 4000, sendEnter: true);
       } else {
         // ignore: deprecated_member_use
         await Share.shareXFiles(
@@ -903,7 +967,7 @@ if (Test-Path \$filePath) {
         await openWhatsApp(phone: phone);
 
         // Native Win32 hardware simulation: Automatically pastes Ctrl+V and sends Enter without user intervention!
-        _simulatePasteAndSend(delayMs: 2800, sendEnter: true);
+        _simulatePasteAndSend(delayMs: 4500, sendEnter: true);
       } else {
         // ignore: deprecated_member_use
         await Share.shareXFiles(
