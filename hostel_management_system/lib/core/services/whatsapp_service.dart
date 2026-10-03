@@ -31,6 +31,10 @@ class WhatsAppService {
       try {
         final tempDir = await getTemporaryDirectory();
         final ps1File = File('${tempDir.path}\\whatsapp_auto_send.ps1');
+        // DEBUG: write a log file in the temp directory
+        final logFile = File('${tempDir.path}\\whatsapp_auto_send_log.txt');
+        await logFile.writeAsString('[${DateTime.now()}] Starting WhatsApp automation\n', mode: FileMode.append);
+        debugPrint('Temp directory for WhatsApp automation: ${tempDir.path}');
 
         final scriptContent = r'''
 Add-Type -TypeDefinition @"
@@ -189,11 +193,13 @@ if (-not $whatsAppReady) {
 }
 
 # 2. Give WhatsApp chat extra time to fully load the conversation
-Start-Sleep -Milliseconds 1800
+Start-Sleep -Milliseconds 2500
 
 # 3. Re-focus WhatsApp and click on the message input area via Tab key
 Focus-WhatsApp
 Start-Sleep -Milliseconds 300
+[System.Windows.Forms.SendKeys]::SendWait('{TAB}')
+Start-Sleep -Milliseconds 200
 
 # 4. Paste image slip (Send Ctrl+V via Native SendInput) — Attempt 1
 [Win32Input]::SendCtrlV()
