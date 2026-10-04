@@ -330,8 +330,11 @@ class RentRepository {
 
       // 7. Return Full Joined Receipt Model
       final fullReceipt = await getReceiptById(receiptId, txn);
-      final effectiveSecurity = securityAmount > 0 ? securityAmount : (rentRecord.studentSecurityDeposit ?? 0.0);
-      return fullReceipt?.copyWith(securityDeposit: effectiveSecurity) ?? ReceiptModel(
+      final effectiveSecurity = securityAmount;
+      return fullReceipt?.copyWith(
+        securityDeposit: effectiveSecurity,
+        studentSecurityDeposit: rentRecord.studentSecurityDeposit ?? 0.0,
+      ) ?? ReceiptModel(
         id: receiptId,
         receiptNumber: receiptNumber,
         paymentId: paymentId,
@@ -349,6 +352,7 @@ class RentRepository {
         bedNumber: rentRecord.bedNumber,
         rentAmount: paymentAmount,
         securityDeposit: effectiveSecurity,
+        studentSecurityDeposit: rentRecord.studentSecurityDeposit ?? 0.0,
       );
     });
   }
@@ -358,7 +362,7 @@ class RentRepository {
     final query = '''
       SELECT rc.*, s.full_name as student_name, s.student_id_code, s.phone as student_phone,
              s.security_deposit as student_security_deposit,
-             r.room_number, b.bed_number, rr.rent_amount
+             r.room_number, b.bed_number, rr.rent_amount, p.notes as payment_notes
       FROM ${DbTables.receipts} rc
       INNER JOIN ${DbTables.payments} p ON rc.payment_id = p.id
       INNER JOIN ${DbTables.rentRecords} rr ON p.rent_record_id = rr.id
@@ -454,7 +458,7 @@ class RentRepository {
     final query = '''
       SELECT rc.*, s.full_name as student_name, s.student_id_code, s.phone as student_phone,
              s.security_deposit as student_security_deposit,
-             r.room_number, b.bed_number, rr.rent_amount
+             r.room_number, b.bed_number, rr.rent_amount, p.notes as payment_notes
       FROM ${DbTables.receipts} rc
       LEFT JOIN ${DbTables.payments} p ON rc.payment_id = p.id
       LEFT JOIN ${DbTables.rentRecords} rr ON p.rent_record_id = rr.id

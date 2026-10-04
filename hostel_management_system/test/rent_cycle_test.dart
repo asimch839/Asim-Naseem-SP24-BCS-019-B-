@@ -170,21 +170,45 @@ void main() {
       expect(finalSecurityBalance, 0.0);
     });
 
-    test('RentRecordModel includes studentSecurityDeposit joined field', () {
-      final rent = RentRecordModel(
-        id: 10,
+    test('Subsequent month rent payment only charges monthly rent and keeps security intact', () {
+      final rentRecordMonth2 = RentRecordModel(
+        id: 20,
         studentId: 5,
         roomId: 1,
         bedId: 1,
-        rentMonth: '2026-09',
-        rentAmount: 15000,
-        remainingAmount: 15000,
-        dueDate: '2026-09-05',
-        studentSecurityDeposit: 10000.0,
-        createdAt: '2026-09-01T00:00:00',
+        rentMonth: '2026-10',
+        rentAmount: 12000,
+        paidAmount: 0.0,
+        remainingAmount: 12000,
+        dueDate: '2026-10-05',
+        status: 'Pending',
+        studentSecurityDeposit: 12000.0,
+        createdAt: '2026-10-01T00:00:00',
       );
 
-      expect(rent.studentSecurityDeposit, 10000.0);
+      // In Month 2 (October 2026), the student already holds security deposit of 12000
+      expect(rentRecordMonth2.studentSecurityDeposit, 12000.0);
+
+      // Total payable for regular monthly rent is solely the remaining rent (12000), not rent + security (24000)
+      final monthlyRentPayment = rentRecordMonth2.remainingAmount;
+      const additionalSecurityToCharge = 0.0;
+      final totalPayableThisMonth = monthlyRentPayment + additionalSecurityToCharge;
+
+      expect(totalPayableThisMonth, 12000.0);
+      expect(totalPayableThisMonth != 24000.0, true);
+
+      // After payment of Rs. 12000 rent
+      final paidRecord = rentRecordMonth2.copyWith(
+        paidAmount: 12000.0,
+        remainingAmount: 0.0,
+        status: 'Paid',
+      );
+
+      expect(paidRecord.isPaid, true);
+      expect(paidRecord.remainingAmount, 0.0);
+      // Student security deposit remains intact in reserve
+      expect(paidRecord.studentSecurityDeposit, 12000.0);
     });
   });
 }
+

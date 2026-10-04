@@ -31,216 +31,137 @@ class WhatsAppService {
       try {
         final tempDir = await getTemporaryDirectory();
         final ps1File = File('${tempDir.path}\\whatsapp_auto_send.ps1');
-        // DEBUG: write a log file in the temp directory
         final logFile = File('${tempDir.path}\\whatsapp_auto_send_log.txt');
         await logFile.writeAsString('[${DateTime.now()}] Starting WhatsApp automation\n', mode: FileMode.append);
         debugPrint('Temp directory for WhatsApp automation: ${tempDir.path}');
 
         final scriptContent = r'''
-Add-Type -TypeDefinition @"
+$log = "$env:TEMP\whatsapp_auto_send_log.txt"
+function Log($msg) { Add-Content -Path $log -Value "[$(Get-Date -Format 'HH:mm:ss')] $msg" -ErrorAction SilentlyContinue }
+
+Log "=== WhatsApp Auto-Send Started ==="
+
+# 1. Compile Native Hardware Keyboard Simulation (using Win32 keybd_event + MapVirtualKey)
+try {
+    Add-Type -TypeDefinition @"
 using System;
+using System.Threading;
 using System.Runtime.InteropServices;
 
-public class Win32Input {
-    [StructLayout(LayoutKind.Sequential)]
-    struct MOUSEINPUT {
-        public int dx; public int dy; public uint mouseData; public uint dwFlags; public uint time; public IntPtr dwExtraInfo;
-    }
-    [StructLayout(LayoutKind.Sequential)]
-    struct KEYBDINPUT {
-        public ushort wVk; public ushort wScan; public uint dwFlags; public uint time; public IntPtr dwExtraInfo;
-    }
-    [StructLayout(LayoutKind.Sequential)]
-    struct HARDWAREINPUT {
-        public uint uMsg; public ushort wParamL; public ushort wParamH;
-    }
-    [StructLayout(LayoutKind.Explicit)]
-    struct INPUTUNION {
-        [FieldOffset(0)] public MOUSEINPUT mi;
-        [FieldOffset(0)] public KEYBDINPUT ki;
-        [FieldOffset(0)] public HARDWAREINPUT hi;
-    }
-    [StructLayout(LayoutKind.Sequential)]
-    struct INPUT {
-        public uint type;
-        public INPUTUNION u;
-    }
-
-    [DllImport("user32.dll", SetLastError = true)]
-    static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
-
+public class HardwareKeySim {
     [DllImport("user32.dll")]
-    public static extern bool SetForegroundWindow(IntPtr hWnd);
-
+    public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
     [DllImport("user32.dll")]
-    public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+    public static extern uint MapVirtualKey(uint uCode, uint uMapType);
 
-    [DllImport("user32.dll")]
-    public static extern IntPtr GetForegroundWindow();
+    public const byte VK_CONTROL = 0x11;
+    public const byte VK_V = 0x56;
+    public const byte VK_RETURN = 0x0D;
+    public const uint KEYEVENTF_KEYUP = 0x0002;
 
-    [DllImport("user32.dll")]
-    public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+    public static void SendPaste() {
+        byte scanCtrl = (byte)MapVirtualKey(VK_CONTROL, 0);
+        byte scanV = (byte)MapVirtualKey(VK_V, 0);
 
-    [DllImport("user32.dll")]
-    public static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
-
-    [DllImport("user32.dll")]
-    static extern short GetAsyncKeyState(int vKey);
-
-    public static void BringToFront(IntPtr hWnd) {
-        if (hWnd == IntPtr.Zero) return;
-        ShowWindow(hWnd, 9); // SW_RESTORE
-        ShowWindow(hWnd, 5); // SW_SHOW
-
-        IntPtr currentForeground = GetForegroundWindow();
-        if (currentForeground != hWnd) {
-            uint foregroundThread = GetWindowThreadProcessId(currentForeground, out _);
-            uint targetThread = GetWindowThreadProcessId(hWnd, out _);
-            if (foregroundThread != targetThread) {
-                AttachThreadInput(foregroundThread, targetThread, true);
-                SetForegroundWindow(hWnd);
-                AttachThreadInput(foregroundThread, targetThread, false);
-            } else {
-                SetForegroundWindow(hWnd);
-            }
-        }
-    }
-
-    // Release any stuck modifier keys (Alt, Ctrl, Shift, Win) before sending new input
-    public static void ReleaseAllModifiers() {
-        ushort[] modifiers = { 0x10, 0x11, 0x12, 0x5B, 0x5C }; // Shift, Ctrl, Alt, LWin, RWin
-        foreach (ushort vk in modifiers) {
-            if ((GetAsyncKeyState(vk) & 0x8000) != 0) {
-                INPUT[] inputs = new INPUT[1];
-                inputs[0].type = 1;
-                inputs[0].u.ki.wVk = vk;
-                inputs[0].u.ki.dwFlags = 2; // KEYEVENTF_KEYUP
-                SendInput(1, inputs, Marshal.SizeOf(typeof(INPUT)));
-            }
-        }
-    }
-
-    public static void SendCtrlV() {
-        ReleaseAllModifiers();
-        INPUT[] inputs = new INPUT[4];
-        inputs[0].type = 1; inputs[0].u.ki.wVk = 0x11; // Ctrl down
-        inputs[1].type = 1; inputs[1].u.ki.wVk = 0x56; // V down
-        inputs[2].type = 1; inputs[2].u.ki.wVk = 0x56; inputs[2].u.ki.dwFlags = 2; // V up
-        inputs[3].type = 1; inputs[3].u.ki.wVk = 0x11; inputs[3].u.ki.dwFlags = 2; // Ctrl up
-        SendInput(4, inputs, Marshal.SizeOf(typeof(INPUT)));
+        keybd_event(VK_CONTROL, scanCtrl, 0, UIntPtr.Zero);
+        Thread.Sleep(50);
+        keybd_event(VK_V, scanV, 0, UIntPtr.Zero);
+        Thread.Sleep(70);
+        keybd_event(VK_V, scanV, KEYEVENTF_KEYUP, UIntPtr.Zero);
+        Thread.Sleep(50);
+        keybd_event(VK_CONTROL, scanCtrl, KEYEVENTF_KEYUP, UIntPtr.Zero);
     }
 
     public static void SendEnter() {
-        ReleaseAllModifiers();
-        INPUT[] inputs = new INPUT[2];
-        inputs[0].type = 1; inputs[0].u.ki.wVk = 0x0D; // Enter down
-        inputs[1].type = 1; inputs[1].u.ki.wVk = 0x0D; inputs[1].u.ki.dwFlags = 2; // Enter up
-        SendInput(2, inputs, Marshal.SizeOf(typeof(INPUT)));
-    }
+        byte scanEnter = (byte)MapVirtualKey(VK_RETURN, 0);
 
-    public static void SendCtrlEnter() {
-        ReleaseAllModifiers();
-        INPUT[] inputs = new INPUT[4];
-        inputs[0].type = 1; inputs[0].u.ki.wVk = 0x11; // Ctrl down
-        inputs[1].type = 1; inputs[1].u.ki.wVk = 0x0D; // Enter down
-        inputs[2].type = 1; inputs[2].u.ki.wVk = 0x0D; inputs[2].u.ki.dwFlags = 2; // Enter up
-        inputs[3].type = 1; inputs[3].u.ki.wVk = 0x11; inputs[3].u.ki.dwFlags = 2; // Ctrl up
-        SendInput(4, inputs, Marshal.SizeOf(typeof(INPUT)));
+        keybd_event(VK_RETURN, scanEnter, 0, UIntPtr.Zero);
+        Thread.Sleep(70);
+        keybd_event(VK_RETURN, scanEnter, KEYEVENTF_KEYUP, UIntPtr.Zero);
     }
 }
 "@ -ErrorAction SilentlyContinue
+    Log "HardwareKeySim compiled OK"
+} catch {
+    Log "HardwareKeySim compile error: $_"
+}
 
+# 2. Ensure WhatsApp is brought to front
 $wshell = New-Object -ComObject WScript.Shell
+try {
+    # whatsapp:// activates WhatsApp Desktop instantly without losing the opened chat
+    Start-Process "whatsapp://"
+    Log "whatsapp:// launched to bring window to front"
+} catch {}
 
-function Get-WhatsAppProc {
-    $procs = Get-Process | Where-Object {
-        $_.ProcessName -like "*WhatsApp*" -or
-        ($_.MainWindowTitle -and $_.MainWindowTitle -like "*WhatsApp*")
-    }
-    $withWindow = $procs | Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero } | Select-Object -First 1
-    if ($withWindow) { return $withWindow }
-    return $procs | Select-Object -First 1
+$activated = $false
+for ($i = 0; $i -lt 8; $i++) {
+    try {
+        $activated = $wshell.AppActivate("WhatsApp")
+        if ($activated) {
+            Log "AppActivate focused WhatsApp on try $($i + 1)"
+            break
+        }
+    } catch {}
+    Start-Sleep -Milliseconds 300
 }
 
-function Focus-WhatsApp {
-    $focused = $false
-    try { $focused = $wshell.AppActivate("WhatsApp") } catch {}
-    $proc = Get-WhatsAppProc
-    if ($proc -and $proc.MainWindowHandle -ne [IntPtr]::Zero) {
-        [Win32Input]::BringToFront($proc.MainWindowHandle)
-        $focused = $true
-    }
-    return $focused
+# 3. Allow focus to settle in the active chat input field
+Start-Sleep -Milliseconds 600
+
+# 4. Inject Ctrl+V (Hardware level paste)
+Log "Simulating Hardware Ctrl+V..."
+try {
+    [HardwareKeySim]::SendPaste()
+    Log "Ctrl+V injected successfully"
+} catch {
+    Log "Paste simulation error: $_"
 }
 
-# 1. Wait for WhatsApp window to appear and become focusable (retry up to ~12 seconds)
-$maxRetries = 24
-$retryCount = 0
-$whatsAppReady = $false
-while ($retryCount -lt $maxRetries) {
-    $proc = Get-WhatsAppProc
-    if ($proc -and $proc.MainWindowHandle -ne [IntPtr]::Zero) {
-        $whatsAppReady = Focus-WhatsApp
-        if ($whatsAppReady) { break }
-    }
-    Start-Sleep -Milliseconds 500
-    $retryCount++
-}
+# 5. Wait for WhatsApp image preview screen to appear (1500ms)
+Start-Sleep -Milliseconds 1500
 
-if (-not $whatsAppReady) {
-    # Final attempt: just try to activate by title
-    try { $wshell.AppActivate("WhatsApp") } catch {}
-}
-
-# 2. Give WhatsApp chat extra time to fully load the conversation
-Start-Sleep -Milliseconds 2500
-
-# 3. Re-focus WhatsApp and click on the message input area via Tab key
-Focus-WhatsApp
-Start-Sleep -Milliseconds 300
-[System.Windows.Forms.SendKeys]::SendWait('{TAB}')
+# Re-focus WhatsApp to make sure image send preview receives the Enter key
+try { [void]$wshell.AppActivate("WhatsApp") } catch {}
 Start-Sleep -Milliseconds 200
 
-# 4. Paste image slip (Send Ctrl+V via Native SendInput) — Attempt 1
-[Win32Input]::SendCtrlV()
+# 6. Inject Enter (Hardware level send)
+Log "Simulating Hardware Enter..."
+try {
+    [HardwareKeySim]::SendEnter()
+    Log "Enter injected successfully"
+} catch {
+    Log "Enter simulation error: $_"
+}
 
-# 5. Wait for WhatsApp Image Preview overlay screen to pop up
-Start-Sleep -Milliseconds 2000
-Focus-WhatsApp
-Start-Sleep -Milliseconds 500
+# 7. Backup Enter attempt after 600ms
+Start-Sleep -Milliseconds 600
+try {
+    [HardwareKeySim]::SendEnter()
+    Log "Backup Enter injected"
+} catch {}
 
-# 6. Retry paste if first attempt didn't trigger the preview
-[Win32Input]::SendCtrlV()
-Start-Sleep -Milliseconds 2000
-Focus-WhatsApp
-Start-Sleep -Milliseconds 300
-
-# 7. Send Enter & Ctrl+Enter to auto-send the receipt image!
-[Win32Input]::SendEnter()
-Start-Sleep -Milliseconds 200
-[Win32Input]::SendCtrlEnter()
-
-# 8. Backup Enter pulse after 800ms in case first send didn't register
-Start-Sleep -Milliseconds 800
-Focus-WhatsApp
-[Win32Input]::SendEnter()
-Start-Sleep -Milliseconds 200
-[Win32Input]::SendCtrlEnter()
-
-# 9. Final safety pulse after 1 second
-Start-Sleep -Milliseconds 1000
-Focus-WhatsApp
-[Win32Input]::SendEnter()
+Log "=== WhatsApp Auto-Send Finished DONE ==="
 ''';
 
         await ps1File.writeAsString(scriptContent);
-        // Use Process.start so PowerShell runs in background without blocking the app
-        await Process.start(
-          'powershell',
-          ['-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', ps1File.path],
-          mode: ProcessStartMode.detached,
+        // Execute with Process.run (NO detached mode which causes powershell.exe to terminate immediately)
+        final res = await Process.run(
+          'powershell.exe',
+          ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', ps1File.path],
         );
-      } catch (_) {}
+        debugPrint('WhatsApp auto send exit code: ${res.exitCode}');
+        if (res.exitCode != 0) {
+          debugPrint('WhatsApp auto send stderr: ${res.stderr}');
+        }
+      } catch (e, st) {
+        debugPrint('WhatsApp automation error: $e\n$st');
+        try {
+          final tempDir = await getTemporaryDirectory();
+          final logFile = File('${tempDir.path}\\whatsapp_auto_send_log.txt');
+          await logFile.writeAsString('[${DateTime.now()}] Dart Error: $e\n', mode: FileMode.append);
+        } catch (_) {}
+      }
     });
   }
 
@@ -973,7 +894,7 @@ if (Test-Path \$filePath) {
         await openWhatsApp(phone: phone);
 
         // Native Win32 hardware simulation: Automatically pastes Ctrl+V and sends Enter without user intervention!
-        _simulatePasteAndSend(delayMs: 4500, sendEnter: true);
+        _simulatePasteAndSend(delayMs: 4000, sendEnter: true);
       } else {
         // ignore: deprecated_member_use
         await Share.shareXFiles(

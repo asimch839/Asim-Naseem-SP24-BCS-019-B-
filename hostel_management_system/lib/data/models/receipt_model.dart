@@ -19,6 +19,7 @@ class ReceiptModel {
   final String? bedNumber;
   final double? rentAmount;
   final double? securityDeposit;
+  final double? studentSecurityDeposit;
 
   ReceiptModel({
     this.id,
@@ -39,6 +40,7 @@ class ReceiptModel {
     this.bedNumber,
     this.rentAmount,
     this.securityDeposit,
+    this.studentSecurityDeposit,
   });
 
   Map<String, dynamic> toMap() {
@@ -76,7 +78,20 @@ class ReceiptModel {
       roomNumber: map['room_number'] as String?,
       bedNumber: map['bed_number'] as String?,
       rentAmount: (map['rent_amount'] as num?)?.toDouble(),
-      securityDeposit: (map['student_security_deposit'] as num?)?.toDouble() ?? (map['security_deposit'] as num?)?.toDouble(),
+      studentSecurityDeposit: (map['student_security_deposit'] as num?)?.toDouble(),
+      securityDeposit: () {
+        if (map['security_deposit_paid'] != null) {
+          return (map['security_deposit_paid'] as num).toDouble();
+        }
+        final notes = map['notes'] as String? ?? map['payment_notes'] as String?;
+        if (notes != null && notes.toLowerCase().contains('security deposit')) {
+          final match = RegExp(r'Includes Rs\.?\s*(\d+(\.\d+)?) security deposit', caseSensitive: false).firstMatch(notes);
+          if (match != null) {
+            return double.tryParse(match.group(1) ?? '0') ?? 0.0;
+          }
+        }
+        return (map['security_deposit'] as num?)?.toDouble() ?? 0.0;
+      }(),
     );
   }
 
@@ -99,6 +114,7 @@ class ReceiptModel {
     String? bedNumber,
     double? rentAmount,
     double? securityDeposit,
+    double? studentSecurityDeposit,
   }) {
     return ReceiptModel(
       id: id ?? this.id,
@@ -119,6 +135,7 @@ class ReceiptModel {
       bedNumber: bedNumber ?? this.bedNumber,
       rentAmount: rentAmount ?? this.rentAmount,
       securityDeposit: securityDeposit ?? this.securityDeposit,
+      studentSecurityDeposit: studentSecurityDeposit ?? this.studentSecurityDeposit,
     );
   }
 }

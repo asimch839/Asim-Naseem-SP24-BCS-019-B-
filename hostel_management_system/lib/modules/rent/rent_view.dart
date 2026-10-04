@@ -115,10 +115,6 @@ class RentView extends GetView<RentController> {
   void _showRecordPaymentDialog(RentRecordModel rent) {
     final formKey = GlobalKey<FormState>();
     final amountCtrl = TextEditingController(text: rent.remainingAmount.toStringAsFixed(0));
-    final hasPendingSecurity = (rent.studentSecurityDeposit != null && rent.studentSecurityDeposit! > 0) &&
-        (rent.paidAmount == 0 || rent.isPending);
-    final initialSecurity = hasPendingSecurity ? (rent.studentSecurityDeposit ?? 0.0).toStringAsFixed(0) : '0';
-    final securityAmountCtrl = TextEditingController(text: initialSecurity);
     final dateCtrl = TextEditingController(text: DateFormatter.toIsoDate(DateTime.now()));
     final selectedMethod = AppStrings.paymentMethodCash.obs;
     final notesCtrl = TextEditingController();
@@ -126,13 +122,9 @@ class RentView extends GetView<RentController> {
 
     // Reactive computation of total payable amount
     final rentAmountRx = (rent.remainingAmount).obs;
-    final securityAmountRx = (double.tryParse(initialSecurity) ?? 0.0).obs;
 
     amountCtrl.addListener(() {
       rentAmountRx.value = double.tryParse(amountCtrl.text) ?? 0.0;
-    });
-    securityAmountCtrl.addListener(() {
-      securityAmountRx.value = double.tryParse(securityAmountCtrl.text) ?? 0.0;
     });
 
     CustomDialog.show(
@@ -229,7 +221,6 @@ class RentView extends GetView<RentController> {
                         ? (rent.studentSecurityDeposit ?? 0.0)
                         : rent.remainingAmount;
                     amountCtrl.text = maxUsable.toStringAsFixed(0);
-                    securityAmountCtrl.text = '0';
                   },
                 ),
               ),
@@ -244,28 +235,20 @@ class RentView extends GetView<RentController> {
                   keyboardType: TextInputType.number,
                   validator: (v) {
                     final p = double.tryParse(v ?? '');
-                    if (p == null || p < 0) return 'Enter valid amount';
-                    if (p > rent.remainingAmount) return 'Cannot exceed balance';
+                    if (p == null || p <= 0) return 'Enter valid rent amount';
+                    if (p > rent.remainingAmount) return 'Cannot exceed remaining balance';
                     if (selectedMethod.value == AppStrings.paymentMethodSecurityDeposit) {
                       final available = rent.studentSecurityDeposit ?? 0.0;
-                      if (p > available) return 'Exceeds available security ($available)';
+                      if (p > available) return 'Exceeds available security (${CurrencyFormatter.format(available)})';
                     }
-                    final sec = double.tryParse(securityAmountCtrl.text) ?? 0.0;
-                    if (p <= 0 && sec <= 0) return 'Enter rent or security amount';
                     return null;
                   },
                 );
 
-                final securityAmountField = CustomTextField(
-                  label: 'Security Deposit (PKR)',
-                  hint: '0 if not paying security',
-                  controller: securityAmountCtrl,
-                  keyboardType: TextInputType.number,
-                  validator: (v) {
-                    final s = double.tryParse(v ?? '0');
-                    if (s == null || s < 0) return 'Enter valid deposit';
-                    return null;
-                  },
+                final dateField = CustomTextField(
+                  label: 'Payment Date (YYYY-MM-DD) *',
+                  controller: dateCtrl,
+                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
                 );
 
                 if (isCompact) {
@@ -273,7 +256,7 @@ class RentView extends GetView<RentController> {
                     children: [
                       rentAmountField,
                       const SizedBox(height: 12),
-                      securityAmountField,
+                      dateField,
                     ],
                   );
                 }
@@ -282,7 +265,7 @@ class RentView extends GetView<RentController> {
                   children: [
                     Expanded(child: rentAmountField),
                     const SizedBox(width: 14),
-                    Expanded(child: securityAmountField),
+                    Expanded(child: dateField),
                   ],
                 );
               },
@@ -293,11 +276,29 @@ class RentView extends GetView<RentController> {
               builder: (context, dialogConstraints) {
                 final isCompact = dialogConstraints.maxWidth < 450;
 
-                final dateField = CustomTextField(
-                  label: 'Payment Date (YYYY-MM-DD) *',
-                  controller: dateCtrl,
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
-                );
+                final methodField = Obx(() => Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Payment Method *', style: AppStyles.bodySmall.copyWith(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 6),
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedMethod.value,
+                      decoration: InputDecoration(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      items: [
+                        AppStrings.paymentMethodCash,
+                        AppStrings.paymentMethodBank,
+                        AppStrings.paymentMethodSecurityDeposit,
+                        AppStrings.paymentMethodOther,
+                      ].map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+                      onChanged: (v) {
+                        if (v != null) selectedMethod.value = v;
+                      },
+                    ),
+                  ],
+                ));
 
                 final payableBox = Obx(() => Container(
                   padding: const EdgeInsets.all(12),
@@ -312,7 +313,7 @@ class RentView extends GetView<RentController> {
                       Text('Total Amount Payable:', style: AppStyles.caption.copyWith(fontWeight: FontWeight.w600)),
                       const SizedBox(height: 2),
                       Text(
-                        CurrencyFormatter.format(rentAmountRx.value + securityAmountRx.value),
+                        CurrencyFormatter.format(rentAmountRx.value),
                         style: AppStyles.bodyMedium.copyWith(fontWeight: FontWeight.w700, color: AppColors.primary),
                       ),
                     ],
@@ -323,7 +324,7 @@ class RentView extends GetView<RentController> {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      dateField,
+                      methodField,
                       const SizedBox(height: 12),
                       payableBox,
                     ],
@@ -331,39 +332,15 @@ class RentView extends GetView<RentController> {
                 }
 
                 return Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Expanded(child: dateField),
+                    Expanded(child: methodField),
                     const SizedBox(width: 14),
                     Expanded(child: payableBox),
                   ],
                 );
               },
             ),
-            const SizedBox(height: 14),
-
-            Obx(() => Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Payment Method *', style: AppStyles.bodySmall.copyWith(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 6),
-                DropdownButtonFormField<String>(
-                  initialValue: selectedMethod.value,
-                  decoration: InputDecoration(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  items: [
-                    AppStrings.paymentMethodCash,
-                    AppStrings.paymentMethodBank,
-                    AppStrings.paymentMethodSecurityDeposit,
-                    AppStrings.paymentMethodOther,
-                  ].map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
-                  onChanged: (v) {
-                    if (v != null) selectedMethod.value = v;
-                  },
-                ),
-              ],
-            )),
             const SizedBox(height: 14),
 
             CustomTextField(
@@ -392,12 +369,11 @@ class RentView extends GetView<RentController> {
               isProcessing.value = true;
               try {
                 final rentAmt = double.tryParse(amountCtrl.text) ?? 0.0;
-                final secAmt = double.tryParse(securityAmountCtrl.text) ?? 0.0;
 
                 final receipt = await controller.recordPayment(
                   rentRecordId: rent.id!,
                   amount: rentAmt,
-                  securityAmount: secAmt,
+                  securityAmount: 0.0,
                   paymentDate: dateCtrl.text,
                   paymentMethod: selectedMethod.value,
                   notes: notesCtrl.text.isNotEmpty ? notesCtrl.text : null,
