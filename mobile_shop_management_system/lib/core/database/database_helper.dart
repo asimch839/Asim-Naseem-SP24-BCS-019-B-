@@ -28,7 +28,7 @@ class DatabaseHelper {
 
   Future<Database> get database async {
     if (_database != null) return _database!;
-    _database = await _initDB('mobile_shop_lab_v1.db');
+    _database = await _initDB('mobile_shop_lab_v2.db');
     return _database!;
   }
 
@@ -368,69 +368,9 @@ class DatabaseHelper {
     // Business Settings
     batch.insert('business_settings', {'id': 1, ...SampleData.settings.toMap()});
 
-    // Users
+    // Default Admin User
     for (var u in SampleData.users) {
       batch.insert('users', u.toMap());
-    }
-
-    // Customers
-    for (var c in SampleData.customers) {
-      batch.insert('customers', c.toMap());
-    }
-
-    // Suppliers
-    for (var s in SampleData.suppliers) {
-      batch.insert('suppliers', s.toMap());
-    }
-
-    // Products
-    for (var p in SampleData.products) {
-      batch.insert('products', p.toMap());
-    }
-
-    // Phone Items
-    for (var ph in SampleData.phoneItems) {
-      batch.insert('phone_items', ph.toMap());
-    }
-
-    // Sales
-    for (var s in SampleData.sales) {
-      batch.insert('sales', s.toMap());
-    }
-
-    // Purchases
-    for (var p in SampleData.purchases) {
-      batch.insert('purchases', p.toMap());
-    }
-
-    // Repair Jobs
-    for (var r in SampleData.repairJobs) {
-      batch.insert('repair_jobs', r.toMap());
-    }
-
-    // Payments
-    for (var pay in SampleData.paymentRecords) {
-      batch.insert('payment_records', pay.toMap());
-    }
-
-    // Expenses
-    for (var exp in SampleData.expenses) {
-      batch.insert('expenses', exp.toMap());
-    }
-
-    // Stock Movements
-    for (var sm in SampleData.stockMovements) {
-      batch.insert('stock_movements', sm.toMap());
-    }
-
-    // Warranties
-    for (var w in SampleData.warranties) {
-      batch.insert('warranties', w.toMap());
-    }
-
-    // Audit Logs
-    for (var a in SampleData.auditLogs) {
-      batch.insert('audit_logs', a.toMap());
     }
 
     await batch.commit(noResult: true);

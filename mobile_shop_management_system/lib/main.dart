@@ -31,6 +31,7 @@ import 'ui/screens/warranty_screen.dart';
 import 'ui/screens/reports_screen.dart';
 import 'ui/screens/backup_restore_screen.dart';
 import 'ui/screens/settings_screen.dart';
+import 'ui/screens/login_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -60,7 +61,7 @@ class MobileShopLabApp extends StatelessWidget {
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
             themeMode: app.isDarkMode ? ThemeMode.dark : ThemeMode.light,
-            home: const MainShell(),
+            home: const LoginScreen(),
           );
         },
       ),

@@ -117,10 +117,11 @@ class _RepairLabScreenState extends State<RepairLabScreen> {
                   width: 200,
                   child: DropdownButtonFormField<RepairStatus?>(
                     value: _selectedStatus,
+                    isExpanded: true,
                     decoration: const InputDecoration(labelText: 'Status Filter'),
                     items: [
-                      const DropdownMenuItem(value: null, child: Text('All Statuses (12)')),
-                      ...RepairStatus.values.map((s) => DropdownMenuItem(value: s, child: Text(s.displayName))),
+                      const DropdownMenuItem(value: null, child: Text('All Statuses', overflow: TextOverflow.ellipsis)),
+                      ...RepairStatus.values.map((s) => DropdownMenuItem(value: s, child: Text(s.displayName, overflow: TextOverflow.ellipsis))),
                     ],
                     onChanged: (s) => setState(() => _selectedStatus = s),
                   ),
@@ -130,12 +131,13 @@ class _RepairLabScreenState extends State<RepairLabScreen> {
                   width: 200,
                   child: DropdownButtonFormField<String>(
                     value: _selectedTechnician,
+                    isExpanded: true,
                     decoration: const InputDecoration(labelText: 'Technician'),
-                    items: const [
-                      DropdownMenuItem(value: 'All', child: Text('All Technicians')),
-                      DropdownMenuItem(value: 'Tariq Mehmood', child: Text('Tariq Mehmood (Senior)')),
-                      DropdownMenuItem(value: 'Hamza Ali', child: Text('Hamza Ali (Junior)')),
-                      DropdownMenuItem(value: 'Muhammad Asim', child: Text('Muhammad Asim (Owner)')),
+                    items: [
+                      const DropdownMenuItem(value: 'All', child: Text('All Technicians', overflow: TextOverflow.ellipsis)),
+                      ...app.allUsers.map((u) {
+                        return DropdownMenuItem(value: u.name, child: Text('${u.name} (${u.role.displayName})', overflow: TextOverflow.ellipsis));
+                      }),
                     ],
                     onChanged: (v) => setState(() => _selectedTechnician = v!),
                   ),

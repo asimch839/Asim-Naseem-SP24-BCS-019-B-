@@ -10,6 +10,7 @@ import '../../core/utils/formatters.dart';
 import '../../core/theme/app_theme.dart';
 import '../widgets/stat_card.dart';
 import '../widgets/custom_dialogs.dart';
+import '../widgets/revenue_chart.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -179,6 +180,10 @@ class DashboardScreen extends StatelessWidget {
               },
             ),
 
+            const SizedBox(height: 24),
+            RevenueChart(sales: led.sales, isDark: isDark),
+            const SizedBox(height: 24),
+
             const SizedBox(height: 14),
 
             // Secondary KPI Row
@@ -293,9 +298,26 @@ class DashboardScreen extends StatelessWidget {
 
                           // Live Repair Jobs List
                           if (rep.repairs.isEmpty)
-                            const Padding(
-                              padding: EdgeInsets.all(24),
-                              child: Center(child: Text('No repair jobs recorded yet.')),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+                              child: Center(
+                                child: Column(
+                                  children: [
+                                    Icon(Icons.build_circle_outlined, size: 48, color: AppTheme.purpleRepair.withOpacity(0.5)),
+                                    const SizedBox(height: 16),
+                                    const Text('No repair jobs recorded', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                    const SizedBox(height: 8),
+                                    const Text('Start adding repair jobs to see them tracked here.', style: TextStyle(color: Colors.grey, fontSize: 13), textAlign: TextAlign.center),
+                                    const SizedBox(height: 16),
+                                    ElevatedButton.icon(
+                                      icon: const Icon(Icons.add_rounded, size: 16),
+                                      label: const Text('Add New Repair'),
+                                      style: ElevatedButton.styleFrom(backgroundColor: AppTheme.purpleRepair),
+                                      onPressed: () => AppDialogs.showNewRepairDialog(context),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             )
                           else
                             ...rep.repairs.take(4).map((job) {
@@ -458,40 +480,56 @@ class DashboardScreen extends StatelessWidget {
                                 ],
                               ),
                               const Divider(),
-                              ...led.sales.take(3).map((s) {
-                                return Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 6),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            '${s.invoiceNumber} • ${s.customerName}',
-                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
-                                          ),
-                                          Text(
-                                            '${s.items.length} item(s) • ${s.paymentMethod}',
-                                            style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
-                                          ),
-                                        ],
-                                      ),
-                                      Column(
-                                        crossAxisAlignment: CrossAxisAlignment.end,
-                                        children: [
-                                          Text(
-                                            AppFormatters.currency(s.grandTotal),
-                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                          ),
-                                          if (s.dueAmount > 0)
-                                            Text('Due: ${AppFormatters.currency(s.dueAmount)}', style: const TextStyle(fontSize: 10, color: AppTheme.dangerRed, fontWeight: FontWeight.bold)),
-                                        ],
-                                      ),
-                                    ],
+                              if (led.sales.isEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 30),
+                                  child: Center(
+                                    child: Column(
+                                      children: [
+                                        Icon(Icons.receipt_long_outlined, size: 40, color: AppTheme.primaryBlue.withOpacity(0.5)),
+                                        const SizedBox(height: 12),
+                                        const Text('No recent sales', style: TextStyle(fontWeight: FontWeight.bold)),
+                                        const SizedBox(height: 8),
+                                        TextButton(onPressed: () => app.setNavIndex(1), child: const Text('Go to POS')),
+                                      ],
+                                    ),
                                   ),
-                                );
-                              }),
+                                )
+                              else
+                                ...led.sales.take(3).map((s) {
+                                  return Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 6),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              '${s.invoiceNumber} • ${s.customerName}',
+                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
+                                            ),
+                                            Text(
+                                              '${s.items.length} item(s) • ${s.paymentMethod}',
+                                              style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                                            ),
+                                          ],
+                                        ),
+                                        Column(
+                                          crossAxisAlignment: CrossAxisAlignment.end,
+                                          children: [
+                                            Text(
+                                              AppFormatters.currency(s.grandTotal),
+                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                            ),
+                                            if (s.dueAmount > 0)
+                                              Text('Due: ${AppFormatters.currency(s.dueAmount)}', style: const TextStyle(fontSize: 10, color: AppTheme.dangerRed, fontWeight: FontWeight.bold)),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }),
                             ],
                           ),
                         ),

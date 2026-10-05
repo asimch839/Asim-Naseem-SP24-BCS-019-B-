@@ -15,6 +15,16 @@ class SuppliersScreen extends StatefulWidget {
 
 class _SuppliersScreenState extends State<SuppliersScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
+  final ScrollController _verticalController = ScrollController();
+  final ScrollController _horizontalController = ScrollController();
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    _verticalController.dispose();
+    _horizontalController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -88,12 +98,20 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
               child: Card(
                 child: suppliers.isEmpty
                     ? const Center(child: Text('No suppliers found.'))
-                    : SingleChildScrollView(
-                        scrollDirection: Axis.vertical,
+                    : Scrollbar(
+                        controller: _verticalController,
+                        thumbVisibility: true,
                         child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: DataTable(
-                            columns: const [
+                          controller: _verticalController,
+                          scrollDirection: Axis.vertical,
+                          child: Scrollbar(
+                            controller: _horizontalController,
+                            thumbVisibility: true,
+                            child: SingleChildScrollView(
+                              controller: _horizontalController,
+                              scrollDirection: Axis.horizontal,
+                              child: DataTable(
+                                columns: const [
                               DataColumn(label: Text('Company / Business')),
                               DataColumn(label: Text('Contact Person')),
                               DataColumn(label: Text('Phone')),
@@ -162,6 +180,8 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                           ),
                         ),
                       ),
+                    ),
+                  ),
               ),
             ),
           ],

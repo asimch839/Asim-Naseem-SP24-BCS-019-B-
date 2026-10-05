@@ -279,6 +279,27 @@ class AppSidebar extends StatelessWidget {
               ],
             ),
           ),
+          // Devnix Branding
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.only(bottom: 12),
+            color: isDark ? const Color(0xFF090E17) : const Color(0xFF16202E),
+            child: const Column(
+              children: [
+                Text(
+                  'Software Developed by Devnix Limited',
+                  style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.w500),
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 2),
+                Text(
+                  '0300-7720839',
+                  style: TextStyle(color: Colors.white38, fontSize: 9),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

@@ -170,7 +170,7 @@ class AppDialogs {
 
     bool obscurePin = true;
     String paymentMethod = 'Cash';
-    String assignedTech = 'Tariq Mehmood';
+    String? assignedTech;
     DateTime expectedDelivery = DateTime.now().add(const Duration(days: 1));
 
     final formKey = GlobalKey<FormState>();
@@ -324,12 +324,11 @@ class AppDialogs {
                               child: DropdownButtonFormField<String>(
                                 value: assignedTech,
                                 decoration: const InputDecoration(labelText: 'Assign Technician'),
-                                items: const [
-                                  DropdownMenuItem(value: 'Tariq Mehmood', child: Text('Tariq Mehmood (Senior Tech)')),
-                                  DropdownMenuItem(value: 'Hamza Ali', child: Text('Hamza Ali (Junior Tech)')),
-                                  DropdownMenuItem(value: 'Muhammad Asim', child: Text('Muhammad Asim (Owner)')),
-                                ],
-                                onChanged: (v) => setState(() => assignedTech = v!),
+                                items: app.allUsers.map((u) {
+                                  return DropdownMenuItem(value: u.name, child: Text('${u.name} (${u.role.displayName})'));
+                                }).toList(),
+                                onChanged: (v) => setState(() => assignedTech = v),
+                                validator: (v) => v == null || v.isEmpty ? 'Please assign a technician' : null,
                               ),
                             ),
                           ],
@@ -425,7 +424,7 @@ class AppDialogs {
                         remainingDue: (est - adv).clamp(0.0, double.infinity),
                         paymentMethod: paymentMethod,
                         status: RepairStatus.received,
-                        technicianName: assignedTech,
+                        technicianName: assignedTech ?? '',
                         expectedDeliveryDate: expectedDelivery,
                         history: [
                           RepairStatusHistory(

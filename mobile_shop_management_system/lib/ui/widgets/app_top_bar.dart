@@ -96,52 +96,55 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
           const SizedBox(width: 16),
 
           // Quick Action Buttons
-          if (app.currentUser.role.canMakeSales)
-            ElevatedButton.icon(
-              onPressed: () => app.setNavIndex(1), // POS
-              icon: const Icon(Icons.shopping_cart_checkout_rounded, size: 16),
-              label: const Text('New Sale (F1)'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryBlue,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                textStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  if (app.currentUser.role.canMakeSales)
+                    ElevatedButton.icon(
+                      onPressed: () => app.setNavIndex(1), // POS
+                      icon: const Icon(Icons.shopping_cart_checkout_rounded, size: 16),
+                      label: const Text('New Sale (F1)'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryBlue,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        textStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  const SizedBox(width: 8),
+                  if (app.currentUser.role.canManageRepairs)
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        AppDialogs.showNewRepairDialog(context);
+                      },
+                      icon: const Icon(Icons.build_rounded, size: 16),
+                      label: const Text('New Repair (F4)'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.purpleRepair,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        textStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  const SizedBox(width: 8),
+                  if (app.currentUser.role.canReceivePayments)
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        AppDialogs.showReceivePaymentDialog(context);
+                      },
+                      icon: const Icon(Icons.account_balance_wallet_rounded, size: 16, color: AppTheme.successGreen),
+                      label: const Text('Receive Payment (F6)'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                ],
               ),
             ),
-
-          const SizedBox(width: 8),
-
-          if (app.currentUser.role.canManageRepairs)
-            ElevatedButton.icon(
-              onPressed: () {
-                AppDialogs.showNewRepairDialog(context);
-              },
-              icon: const Icon(Icons.build_rounded, size: 16),
-              label: const Text('New Repair (F4)'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.purpleRepair,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                textStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
-              ),
-            ),
-
-          const SizedBox(width: 8),
-
-          if (app.currentUser.role.canReceivePayments)
-            OutlinedButton.icon(
-              onPressed: () {
-                AppDialogs.showReceivePaymentDialog(context);
-              },
-              icon: const Icon(Icons.account_balance_wallet_rounded, size: 16, color: AppTheme.successGreen),
-              label: const Text('Receive Payment (F6)'),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-              ),
-            ),
-
-          const Spacer(),
+          ),
 
           // Active Role Switcher
           Container(

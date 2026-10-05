@@ -218,6 +218,8 @@ class PrintService {
                   ),
                 ],
               ),
+              pw.SizedBox(height: 16),
+              pw.Center(child: pw.Text('Software Developed by Devnix Limited | 0300-7720839', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600))),
             ],
           );
         },
@@ -295,7 +297,7 @@ class PrintService {
                 _thermalSummaryRow('Due Balance:', AppFormatters.currency(sale.dueAmount), isBold: true),
               pw.SizedBox(height: 6),
               pw.Text('Thank you for your visit!', style: const pw.TextStyle(fontSize: 7.5), textAlign: pw.TextAlign.center),
-              pw.Text('Software by Antigravity POS', style: const pw.TextStyle(fontSize: 6, color: PdfColors.grey600), textAlign: pw.TextAlign.center),
+              pw.Text('Software Developed by Devnix Limited | 0300-7720839', style: const pw.TextStyle(fontSize: 6, color: PdfColors.grey600), textAlign: pw.TextAlign.center),
             ],
           );
         },
@@ -525,6 +527,8 @@ class PrintService {
                   ),
                 ],
               ),
+              pw.SizedBox(height: 16),
+              pw.Center(child: pw.Text('Software Developed by Devnix Limited | 0300-7720839', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600))),
             ],
           );
         },
@@ -600,6 +604,8 @@ class PrintService {
                   ),
                 ],
               ),
+              pw.SizedBox(height: 16),
+              pw.Center(child: pw.Text('Software Developed by Devnix Limited | 0300-7720839', style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey600))),
             ],
           );
         },

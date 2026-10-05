@@ -103,7 +103,27 @@ class _CustomersScreenState extends State<CustomersScreen> {
             Expanded(
               child: Card(
                 child: customers.isEmpty
-                    ? const Center(child: Text('No customers found.'))
+                    ? Padding(
+                        padding: const EdgeInsets.all(40),
+                        child: Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.people_outline_rounded, size: 64, color: AppTheme.primaryBlue.withOpacity(0.5)),
+                              const SizedBox(height: 16),
+                              const Text('No customers found', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                              const SizedBox(height: 8),
+                              const Text('You have not added any customers yet. Add your first customer to start tracking sales and dues.', style: TextStyle(color: Colors.grey, fontSize: 14), textAlign: TextAlign.center),
+                              const SizedBox(height: 24),
+                              ElevatedButton.icon(
+                                icon: const Icon(Icons.person_add_rounded, size: 16),
+                                label: const Text('Add New Customer'),
+                                onPressed: () => AppDialogs.showNewCustomerDialog(context),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
                     : SingleChildScrollView(
                         scrollDirection: Axis.vertical,
                         child: SingleChildScrollView(

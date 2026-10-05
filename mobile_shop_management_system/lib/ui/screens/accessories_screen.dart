@@ -94,11 +94,12 @@ class _AccessoriesScreenState extends State<AccessoriesScreen> {
                   width: 200,
                   child: DropdownButtonFormField<String>(
                     value: _selectedSubtype,
+                    isExpanded: true,
                     decoration: const InputDecoration(labelText: 'Classification'),
                     items: const [
-                      DropdownMenuItem(value: 'All', child: Text('All Accessories & Parts')),
-                      DropdownMenuItem(value: 'Accessories', child: Text('Accessories Only')),
-                      DropdownMenuItem(value: 'Repair Parts', child: Text('Repair Lab Parts Only')),
+                      DropdownMenuItem(value: 'All', child: Text('All Accessories & Parts', overflow: TextOverflow.ellipsis)),
+                      DropdownMenuItem(value: 'Accessories', child: Text('Accessories Only', overflow: TextOverflow.ellipsis)),
+                      DropdownMenuItem(value: 'Repair Parts', child: Text('Repair Lab Parts Only', overflow: TextOverflow.ellipsis)),
                     ],
                     onChanged: (v) => setState(() => _selectedSubtype = v!),
                   ),

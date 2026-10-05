@@ -18,6 +18,8 @@ class SalesScreen extends StatefulWidget {
 class _SalesScreenState extends State<SalesScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
   String _selectedMethod = 'All';
+  String _selectedDateRange = 'All Time';
+  DateTimeRange? _customDateRange;
 
   @override
   Widget build(BuildContext context) {
@@ -26,8 +28,23 @@ class _SalesScreenState extends State<SalesScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final q = _searchCtrl.text.trim().toLowerCase();
+    
+    // Filter sales
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    
     final sales = led.sales.where((s) {
       if (_selectedMethod != 'All' && s.paymentMethod != _selectedMethod) return false;
+      
+      // Date Filter
+      final saleDate = DateTime(s.saleDate.year, s.saleDate.month, s.saleDate.day);
+      if (_selectedDateRange == 'Today' && saleDate != today) return false;
+      if (_selectedDateRange == 'Last 7 Days' && saleDate.isBefore(today.subtract(const Duration(days: 7)))) return false;
+      if (_selectedDateRange == 'This Month' && (s.saleDate.year != now.year || s.saleDate.month != now.month)) return false;
+      if (_selectedDateRange == 'Custom' && _customDateRange != null) {
+        if (saleDate.isBefore(_customDateRange!.start) || saleDate.isAfter(_customDateRange!.end)) return false;
+      }
+
       if (q.isNotEmpty) {
         final matches = s.invoiceNumber.toLowerCase().contains(q) ||
             s.customerName.toLowerCase().contains(q) ||
@@ -109,6 +126,7 @@ class _SalesScreenState extends State<SalesScreen> {
                   width: 200,
                   child: DropdownButtonFormField<String>(
                     value: _selectedMethod,
+                    isExpanded: true,
                     decoration: const InputDecoration(labelText: 'Payment Mode'),
                     items: const [
                       DropdownMenuItem(value: 'All', child: Text('All Payment Modes')),
@@ -121,6 +139,42 @@ class _SalesScreenState extends State<SalesScreen> {
                     ],
                     onChanged: (val) {
                       if (val != null) setState(() => _selectedMethod = val);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                SizedBox(
+                  width: 200,
+                  child: DropdownButtonFormField<String>(
+                    value: _selectedDateRange,
+                    isExpanded: true,
+                    decoration: const InputDecoration(labelText: 'Time Filter'),
+                    items: const [
+                      DropdownMenuItem(value: 'All Time', child: Text('All Time')),
+                      DropdownMenuItem(value: 'Today', child: Text('Today')),
+                      DropdownMenuItem(value: 'Last 7 Days', child: Text('Last 7 Days')),
+                      DropdownMenuItem(value: 'This Month', child: Text('This Month')),
+                      DropdownMenuItem(value: 'Custom', child: Text('Custom Date Range')),
+                    ],
+                    onChanged: (val) async {
+                      if (val == 'Custom') {
+                        final res = await showDateRangePicker(
+                          context: context,
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime.now(),
+                          initialDateRange: _customDateRange ?? DateTimeRange(start: DateTime.now().subtract(const Duration(days: 7)), end: DateTime.now()),
+                        );
+                        if (res != null) {
+                          setState(() {
+                            _customDateRange = res;
+                            _selectedDateRange = 'Custom';
+                          });
+                        }
+                      } else {
+                        setState(() {
+                          _selectedDateRange = val!;
+                        });
+                      }
                     },
                   ),
                 ),
