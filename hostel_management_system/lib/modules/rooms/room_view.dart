@@ -489,9 +489,7 @@ class RoomView extends GetView<RoomController> {
                                                 if (bed.studentName != null)
                                                   Text(
                                                     'Occupant: ${bed.studentName} (${bed.studentIdCode})',
-                                                    style: AppStyles.caption.copyWith(color: AppColors.primary),
-                                                    overflow: TextOverflow.ellipsis,
-                                                  )
+                                                    style: AppStyles.caption.copyWith(color: AppColors.primary),)
                                                 else
                                                   Text('No student assigned', style: AppStyles.caption),
                                               ],

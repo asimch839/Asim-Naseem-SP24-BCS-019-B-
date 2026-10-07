@@ -23,6 +23,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late TextEditingController _repPrefixCtrl;
   late TextEditingController _footerCtrl;
   late TextEditingController _termsCtrl;
+  late TextEditingController _adminUsernameCtrl;
+  late TextEditingController _adminPasswordCtrl;
 
   String _receiptFormat = 'a4';
   bool _isDark = false;
@@ -46,6 +48,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _repPrefixCtrl = TextEditingController(text: s.repairPrefix);
       _footerCtrl = TextEditingController(text: s.invoiceFooter);
       _termsCtrl = TextEditingController(text: s.termsAndConditions);
+      _adminUsernameCtrl = TextEditingController(text: s.adminUsername);
+      _adminPasswordCtrl = TextEditingController(text: s.adminPassword);
       _receiptFormat = s.receiptFormat;
       _isDark = s.isDarkMode;
       _autoBackup = s.autoBackupEnabled;
@@ -185,6 +189,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
             const SizedBox(height: 20),
 
+            // Admin Credentials Card
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.security_rounded, color: AppTheme.primaryBlue, size: 20),
+                        SizedBox(width: 8),
+                        Text('ADMIN LOGIN CREDENTIALS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      ],
+                    ),
+                    const Divider(height: 20),
+                    Row(
+                      children: [
+                        Expanded(child: TextField(controller: _adminUsernameCtrl, decoration: const InputDecoration(labelText: 'Admin Username'))),
+                        const SizedBox(width: 12),
+                        Expanded(child: TextField(controller: _adminPasswordCtrl, obscureText: true, decoration: const InputDecoration(labelText: 'Admin Password'))),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
             // Appearance & Keyboard Shortcuts
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -292,6 +325,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       receiptFormat: _receiptFormat,
       invoiceFooter: _footerCtrl.text.trim(),
       termsAndConditions: _termsCtrl.text.trim(),
+      adminUsername: _adminUsernameCtrl.text.trim(),
+      adminPassword: _adminPasswordCtrl.text.trim(),
       isDarkMode: _isDark,
       autoBackupEnabled: _autoBackup,
     );

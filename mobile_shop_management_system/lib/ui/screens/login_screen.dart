@@ -33,9 +33,10 @@ class _LoginScreenState extends State<LoginScreen> {
     
     final app = context.read<AppProvider>();
     final users = app.allUsers;
+    final settings = app.settings;
     
     bool success = false;
-    if (_usernameCtrl.text == 'admin' && _passwordCtrl.text == 'admin') {
+    if (_usernameCtrl.text == settings.adminUsername && _passwordCtrl.text == settings.adminPassword) {
       success = true;
     } else {
        final u = users.where((u) => u.username == _usernameCtrl.text).firstOrNull;

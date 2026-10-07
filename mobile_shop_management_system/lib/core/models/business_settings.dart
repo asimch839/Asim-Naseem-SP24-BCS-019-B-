@@ -17,6 +17,8 @@ class BusinessSettings {
   final bool isDarkMode;
   final bool autoBackupEnabled;
   final int defaultWarrantyDays;
+  final String adminUsername;
+  final String adminPassword;
 
   BusinessSettings({
     this.shopName = 'Al-Madina Mobile & Repairing Lab',
@@ -38,6 +40,8 @@ class BusinessSettings {
     this.isDarkMode = false,
     this.autoBackupEnabled = true,
     this.defaultWarrantyDays = 365,
+    this.adminUsername = 'admin',
+    this.adminPassword = 'admin@123',
   });
 
   BusinessSettings copyWith({
@@ -59,6 +63,8 @@ class BusinessSettings {
     bool? isDarkMode,
     bool? autoBackupEnabled,
     int? defaultWarrantyDays,
+    String? adminUsername,
+    String? adminPassword,
   }) {
     return BusinessSettings(
       shopName: shopName ?? this.shopName,
@@ -79,6 +85,8 @@ class BusinessSettings {
       isDarkMode: isDarkMode ?? this.isDarkMode,
       autoBackupEnabled: autoBackupEnabled ?? this.autoBackupEnabled,
       defaultWarrantyDays: defaultWarrantyDays ?? this.defaultWarrantyDays,
+      adminUsername: adminUsername ?? this.adminUsername,
+      adminPassword: adminPassword ?? this.adminPassword,
     );
   }
 
@@ -102,6 +110,8 @@ class BusinessSettings {
       'is_dark_mode': isDarkMode ? 1 : 0,
       'auto_backup_enabled': autoBackupEnabled ? 1 : 0,
       'default_warranty_days': defaultWarrantyDays,
+      'admin_username': adminUsername,
+      'admin_password': adminPassword,
     };
   }
 
@@ -127,6 +137,8 @@ class BusinessSettings {
       isDarkMode: (map['is_dark_mode'] as int?) == 1,
       autoBackupEnabled: (map['auto_backup_enabled'] as int?) == 1,
       defaultWarrantyDays: (map['default_warranty_days'] as num?)?.toInt() ?? 365,
+      adminUsername: (map['admin_username'] as String?) ?? 'admin',
+      adminPassword: (map['admin_password'] as String?) ?? 'admin@123',
     );
   }
 }
