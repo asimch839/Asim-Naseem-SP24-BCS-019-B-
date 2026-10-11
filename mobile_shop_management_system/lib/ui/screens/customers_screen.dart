@@ -58,7 +58,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                 ),
                 ElevatedButton.icon(
                   icon: const Icon(Icons.person_add_rounded, size: 16),
-                  label: const Text('+ Add New Customer (F3)'),
+                  label: const Text('+ Add New Customer'),
                   onPressed: () => AppDialogs.showNewCustomerDialog(context),
                 ),
               ],

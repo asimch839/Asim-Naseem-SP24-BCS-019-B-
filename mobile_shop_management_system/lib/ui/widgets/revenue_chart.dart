@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../core/models/sale.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/theme/app_theme.dart';
 
 class RevenueChart extends StatelessWidget {
   final List<Sale> sales;
@@ -42,6 +43,7 @@ class RevenueChart extends StatelessWidget {
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+        boxShadow: isDark ? null : AppTheme.cardShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

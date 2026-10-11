@@ -108,6 +108,21 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool _isSidebarCollapsed = false;
+  bool get isSidebarCollapsed => _isSidebarCollapsed;
+
+  void toggleSidebar() {
+    _isSidebarCollapsed = !_isSidebarCollapsed;
+    notifyListeners();
+  }
+
+  void setSidebarCollapsed(bool collapsed) {
+    if (_isSidebarCollapsed != collapsed) {
+      _isSidebarCollapsed = collapsed;
+      notifyListeners();
+    }
+  }
+
   Future<void> toggleDarkMode() async {
     _settings = _settings.copyWith(isDarkMode: !_settings.isDarkMode);
     await DatabaseHelper.instance.updateSettings(_settings);

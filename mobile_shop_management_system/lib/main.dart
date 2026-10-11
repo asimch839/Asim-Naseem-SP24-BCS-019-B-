@@ -173,27 +173,33 @@ class _MainShellState extends State<MainShell> {
 
     final currentIndex = app.currentNavIndex.clamp(0, _screens.length - 1);
 
-    return Scaffold(
-      body: Row(
-        children: [
-          // Sidebar
-          const AppSidebar(),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        // Desktop stability guard: Prevent root shell from popping and exiting
+      },
+      child: Scaffold(
+        body: Row(
+          children: [
+            // Sidebar
+            const AppSidebar(),
 
-          // Main Area (Top Bar + Active Screen)
-          Expanded(
-            child: Column(
-              children: [
-                const AppTopBar(),
-                Expanded(
-                  child: IndexedStack(
-                    index: currentIndex,
-                    children: _screens,
+            // Main Area (Top Bar + Active Screen)
+            Expanded(
+              child: Column(
+                children: [
+                  const AppTopBar(),
+                  Expanded(
+                    child: IndexedStack(
+                      index: currentIndex,
+                      children: _screens,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

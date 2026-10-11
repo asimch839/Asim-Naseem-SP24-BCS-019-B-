@@ -215,7 +215,7 @@ class _PosScreenState extends State<PosScreen> {
                         ),
                       ),
                       IconButton(
-                        tooltip: 'Add New Customer (F3)',
+                        tooltip: 'Add New Customer',
                         icon: const Icon(Icons.person_add_alt_1_rounded, size: 20, color: AppTheme.primaryBlue),
                         onPressed: () async {
                           final newCust = await AppDialogs.showNewCustomerDialog(context);

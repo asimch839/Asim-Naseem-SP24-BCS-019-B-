@@ -56,6 +56,18 @@ class DatabaseHelper {
       dbPath,
       version: 1,
       onCreate: _createDB,
+      onOpen: (db) async {
+        try {
+          final info = await db.rawQuery('PRAGMA table_info(business_settings)');
+          final cols = info.map((r) => r['name'] as String?).toSet();
+          if (!cols.contains('admin_username')) {
+            await db.execute("ALTER TABLE business_settings ADD COLUMN admin_username TEXT DEFAULT 'admin'");
+          }
+          if (!cols.contains('admin_password')) {
+            await db.execute("ALTER TABLE business_settings ADD COLUMN admin_password TEXT DEFAULT 'admin@123'");
+          }
+        } catch (_) {}
+      },
     );
   }
 
@@ -354,7 +366,9 @@ class DatabaseHelper {
         receipt_format TEXT NOT NULL DEFAULT 'a4',
         is_dark_mode INTEGER NOT NULL DEFAULT 0,
         auto_backup_enabled INTEGER NOT NULL DEFAULT 1,
-        default_warranty_days INTEGER NOT NULL DEFAULT 365
+        default_warranty_days INTEGER NOT NULL DEFAULT 365,
+        admin_username TEXT NOT NULL DEFAULT 'admin',
+        admin_password TEXT NOT NULL DEFAULT 'admin@123'
       )
     ''');
 

@@ -5,7 +5,6 @@ import '../../core/providers/ledger_provider.dart';
 import '../../core/providers/repair_provider.dart';
 import '../../core/providers/inventory_provider.dart';
 import '../../core/models/repair_job.dart';
-import '../../core/models/user.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/theme/app_theme.dart';
 import '../widgets/stat_card.dart';
@@ -27,7 +26,6 @@ class DashboardScreen extends StatelessWidget {
     // Financial Metrics
     final totalSalesToday = led.sales.fold(0.0, (s, sale) => s + sale.grandTotal);
     final totalCashReceivedToday = led.sales.fold(0.0, (s, sale) => s + sale.paidAmount);
-    final totalPurchases = led.purchases.fold(0.0, (s, p) => s + p.totalAmount);
     final totalExpenses = led.expenses.fold(0.0, (s, e) => s + e.amount);
 
     final productProfit = led.sales.fold(0.0, (s, sale) => s + sale.totalProfit);
@@ -55,20 +53,20 @@ class DashboardScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Welcome Header & Quick Action Row
+            // Executive Dashboard Header (Hostel System Style)
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Welcome back, ${app.currentUser.name}!',
-                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -0.4),
+                    const Text(
+                      'Executive Dashboard',
+                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -0.4),
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      '${app.settings.shopName} • Today is ${AppFormatters.date(DateTime.now())}',
+                      'Welcome back, ${app.currentUser.name} • ${app.settings.shopName.isNotEmpty ? app.settings.shopName : "Mobile Shop"} live overview',
                       style: TextStyle(
                         fontSize: 13,
                         color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
@@ -76,31 +74,138 @@ class DashboardScreen extends StatelessWidget {
                     ),
                   ],
                 ),
-                Wrap(
-                  spacing: 10,
+                Row(
                   children: [
-                    if (app.currentUser.role.canMakeSales)
-                      ElevatedButton.icon(
-                        icon: const Icon(Icons.point_of_sale_rounded, size: 16),
-                        label: const Text('New Sale (F1)'),
-                        onPressed: () => app.setNavIndex(1),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF0F172A) : Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                        boxShadow: isDark ? null : AppTheme.cardShadow,
                       ),
-                    if (app.currentUser.role.canManageRepairs)
-                      ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(backgroundColor: AppTheme.purpleRepair),
-                        icon: const Icon(Icons.build_circle_rounded, size: 16),
-                        label: const Text('New Repair (F4)'),
-                        onPressed: () => AppDialogs.showNewRepairDialog(context),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: AppTheme.successGreen,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          const Text(
+                            'System Online',
+                            style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppTheme.successGreen),
+                          ),
+                        ],
                       ),
-                    if (app.currentUser.role.canReceivePayments)
-                      OutlinedButton.icon(
-                        icon: const Icon(Icons.account_balance_wallet_rounded, size: 16, color: AppTheme.successGreen),
-                        label: const Text('Receive Payment (F6)'),
-                        onPressed: () => AppDialogs.showReceivePaymentDialog(context),
-                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      icon: const Icon(Icons.refresh_rounded, color: AppTheme.primaryBlue),
+                      tooltip: 'Refresh Dashboard',
+                      onPressed: () {
+                        app.reloadAll();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Dashboard data refreshed!'), duration: Duration(seconds: 1)),
+                        );
+                      },
+                    ),
                   ],
                 ),
               ],
+            ),
+
+            const SizedBox(height: 16),
+
+            // Quick Actions Bar (Hostel System Style)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                boxShadow: isDark ? null : AppTheme.cardShadow,
+              ),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  const Text('Quick Actions:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  if (app.currentUser.role.canMakeSales)
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.shopping_cart_checkout_rounded, size: 14),
+                      label: const Text('New Sale'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryBlue,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      onPressed: () => app.setNavIndex(1),
+                    ),
+                  if (app.currentUser.role.canManageRepairs)
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.purpleRepair,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      icon: const Icon(Icons.build_rounded, size: 14),
+                      label: const Text('New Repair Job'),
+                      onPressed: () => AppDialogs.showNewRepairDialog(context),
+                    ),
+                  if (app.currentUser.role.canReceivePayments)
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      icon: const Icon(Icons.account_balance_wallet_rounded, size: 14, color: AppTheme.successGreen),
+                      label: const Text('Receive Payment'),
+                      onPressed: () => AppDialogs.showReceivePaymentDialog(context),
+                    ),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    icon: const Icon(Icons.phone_android_rounded, size: 14, color: AppTheme.primaryBlue),
+                    label: const Text('Add Phone (IMEI)'),
+                    onPressed: () => app.setNavIndex(5),
+                  ),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    icon: const Icon(Icons.person_add_rounded, size: 14, color: AppTheme.accentTeal),
+                    label: const Text('Add Customer'),
+                    onPressed: () => AppDialogs.showNewCustomerDialog(context),
+                  ),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    icon: const Icon(Icons.shopping_bag_rounded, size: 14, color: Color(0xFFF59E0B)),
+                    label: const Text('Record Purchase'),
+                    onPressed: () => app.setNavIndex(3),
+                  ),
+                ],
+              ),
             ),
 
             const SizedBox(height: 20),
@@ -303,7 +408,7 @@ class DashboardScreen extends StatelessWidget {
                               child: Center(
                                 child: Column(
                                   children: [
-                                    Icon(Icons.build_circle_outlined, size: 48, color: AppTheme.purpleRepair.withOpacity(0.5)),
+                                    Icon(Icons.build_circle_outlined, size: 48, color: AppTheme.purpleRepair.withValues(alpha: 0.5)),
                                     const SizedBox(height: 16),
                                     const Text('No repair jobs recorded', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                                     const SizedBox(height: 8),
@@ -336,7 +441,7 @@ class DashboardScreen extends StatelessWidget {
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                       decoration: BoxDecoration(
-                                        color: AppTheme.purpleRepair.withOpacity(0.12),
+                                        color: AppTheme.purpleRepair.withValues(alpha: 0.12),
                                         borderRadius: BorderRadius.circular(6),
                                       ),
                                       child: Text(
@@ -486,7 +591,7 @@ class DashboardScreen extends StatelessWidget {
                                   child: Center(
                                     child: Column(
                                       children: [
-                                        Icon(Icons.receipt_long_outlined, size: 40, color: AppTheme.primaryBlue.withOpacity(0.5)),
+                                        Icon(Icons.receipt_long_outlined, size: 40, color: AppTheme.primaryBlue.withValues(alpha: 0.5)),
                                         const SizedBox(height: 12),
                                         const Text('No recent sales', style: TextStyle(fontWeight: FontWeight.bold)),
                                         const SizedBox(height: 8),
@@ -569,9 +674,9 @@ class DashboardScreen extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 6),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,

@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/providers/app_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/models/user.dart';
+import '../../core/database/database_helper.dart';
+import '../../core/database/sample_data.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -30,6 +33,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _isDark = false;
   bool _autoBackup = true;
   bool _initialized = false;
+  bool _obscureAdminPassword = true;
 
   @override
   void didChangeDependencies() {
@@ -58,6 +62,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   @override
+  void dispose() {
+    _shopNameCtrl.dispose();
+    _taglineCtrl.dispose();
+    _addressCtrl.dispose();
+    _phoneCtrl.dispose();
+    _altPhoneCtrl.dispose();
+    _emailCtrl.dispose();
+    _ntnCtrl.dispose();
+    _currencyCtrl.dispose();
+    _invPrefixCtrl.dispose();
+    _repPrefixCtrl.dispose();
+    _footerCtrl.dispose();
+    _termsCtrl.dispose();
+    _adminUsernameCtrl.dispose();
+    _adminPasswordCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final app = context.watch<AppProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -77,7 +100,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   children: [
                     const Text('Business Branding & System Settings', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 2),
-                    Text('Configure shop identity, invoice templates, repair numbering, and keyboard shortcuts', style: TextStyle(color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B), fontSize: 13)),
+                    Text('Configure shop identity, invoice templates, repair numbering, and system preferences', style: TextStyle(color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B), fontSize: 13)),
                   ],
                 ),
                 ElevatedButton.icon(
@@ -196,20 +219,72 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Row(
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Icon(Icons.security_rounded, color: AppTheme.primaryBlue, size: 20),
-                        SizedBox(width: 8),
-                        Text('ADMIN LOGIN CREDENTIALS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        const Row(
+                          children: [
+                            Icon(Icons.security_rounded, color: AppTheme.primaryBlue, size: 20),
+                            SizedBox(width: 8),
+                            Text('ADMIN LOGIN CREDENTIALS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                          ],
+                        ),
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.lock_reset_rounded, size: 16),
+                          label: const Text('Update Credentials'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primaryBlue,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                            textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                          ),
+                          onPressed: () => _updateCredentialsOnly(context, app),
+                        ),
                       ],
                     ),
                     const Divider(height: 20),
                     Row(
                       children: [
-                        Expanded(child: TextField(controller: _adminUsernameCtrl, decoration: const InputDecoration(labelText: 'Admin Username'))),
+                        Expanded(
+                          child: TextField(
+                            controller: _adminUsernameCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Admin Username *',
+                              prefixIcon: Icon(Icons.person_outline_rounded, size: 20),
+                              hintText: 'Enter login username',
+                            ),
+                          ),
+                        ),
                         const SizedBox(width: 12),
-                        Expanded(child: TextField(controller: _adminPasswordCtrl, obscureText: true, decoration: const InputDecoration(labelText: 'Admin Password'))),
+                        Expanded(
+                          child: TextField(
+                            controller: _adminPasswordCtrl,
+                            obscureText: _obscureAdminPassword,
+                            decoration: InputDecoration(
+                              labelText: 'Admin Password *',
+                              prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20),
+                              hintText: 'Enter login password',
+                              suffixIcon: IconButton(
+                                icon: Icon(_obscureAdminPassword ? Icons.visibility_off_rounded : Icons.visibility_rounded),
+                                tooltip: _obscureAdminPassword ? 'Show password' : 'Hide password',
+                                onPressed: () {
+                                  setState(() {
+                                    _obscureAdminPassword = !_obscureAdminPassword;
+                                  });
+                                },
+                              ),
+                            ),
+                          ),
+                        ),
                       ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'These credentials are used to sign in to the software. You can change and update them at any time.',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                      ),
                     ),
                   ],
                 ),
@@ -218,74 +293,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
             const SizedBox(height: 20),
 
-            // Appearance & Keyboard Shortcuts
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Row(
-                            children: [
-                              Icon(Icons.palette_rounded, color: AppTheme.primaryBlue, size: 20),
-                              SizedBox(width: 8),
-                              Text('APPEARANCE & BACKUP', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                            ],
-                          ),
-                          const Divider(height: 20),
-                          SwitchListTile(
-                            title: const Text('Dark Mode Theme'),
-                            subtitle: const Text('Switch between modern dark slate and crisp daylight themes'),
-                            value: _isDark,
-                            onChanged: (v) {
-                              setState(() => _isDark = v);
-                              app.toggleDarkMode();
-                            },
-                          ),
-                          SwitchListTile(
-                            title: const Text('Automated Local Backup'),
-                            subtitle: const Text('Creates safety backup snapshot before restore or database updates'),
-                            value: _autoBackup,
-                            onChanged: (v) => setState(() => _autoBackup = v),
-                          ),
-                        ],
-                      ),
+            // Appearance & System Preferences Card
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.palette_rounded, color: AppTheme.primaryBlue, size: 20),
+                        SizedBox(width: 8),
+                        Text('APPEARANCE & BACKUP', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      ],
                     ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Row(
-                            children: [
-                              Icon(Icons.keyboard_rounded, color: AppTheme.primaryBlue, size: 20),
-                              SizedBox(width: 8),
-                              Text('WINDOWS KEYBOARD SHORTCUTS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                            ],
-                          ),
-                          const Divider(height: 20),
-                          _shortcutItem('F1', 'New Sale / Open POS Screen'),
-                          _shortcutItem('F2 or Ctrl+F', 'Universal Multi-Entity Search (IMEI, Customer, Job)'),
-                          _shortcutItem('F3', 'Quick Add New Customer Modal'),
-                          _shortcutItem('F4', 'New Mobile Repair Job Modal'),
-                          _shortcutItem('F5', 'Refresh & Reload Entire Database'),
-                          _shortcutItem('F6', 'Receive Customer Due Payment Modal'),
-                          _shortcutItem('Esc', 'Close any Active Dialog or Modal'),
-                        ],
-                      ),
+                    const Divider(height: 20),
+                    SwitchListTile(
+                      title: const Text('Dark Mode Theme'),
+                      subtitle: const Text('Switch between modern dark slate and crisp daylight themes'),
+                      value: _isDark,
+                      onChanged: (v) {
+                        setState(() => _isDark = v);
+                        app.toggleDarkMode();
+                      },
                     ),
-                  ),
+                    SwitchListTile(
+                      title: const Text('Automated Local Backup'),
+                      subtitle: const Text('Creates safety backup snapshot before restore or database updates'),
+                      value: _autoBackup,
+                      onChanged: (v) => setState(() => _autoBackup = v),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ],
         ),
@@ -293,24 +333,75 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _shortcutItem(String keyName, String desc) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3.5),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-            decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(4), border: Border.all(color: const Color(0xFFCBD5E1))),
-            child: Text(keyName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: AppTheme.darkNavy)),
-          ),
-          const SizedBox(width: 10),
-          Expanded(child: Text(desc, style: const TextStyle(fontSize: 12))),
-        ],
-      ),
+  Future<void> _updateCredentialsOnly(BuildContext context, AppProvider app) async {
+    final username = _adminUsernameCtrl.text.trim();
+    final password = _adminPasswordCtrl.text.trim();
+
+    if (username.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Admin username and password cannot be empty!'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final updated = app.settings.copyWith(
+      adminUsername: username,
+      adminPassword: password,
     );
+
+    await app.updateSettings(updated);
+
+    try {
+      final db = DatabaseHelper.instance;
+      final users = await db.getAllUsers();
+      final adminUser = users.firstWhere(
+        (u) => u.role == UserRole.owner || u.role == UserRole.admin || u.username == app.settings.adminUsername,
+        orElse: () => users.isNotEmpty ? users.first : SampleData.users.first,
+      );
+      final updatedAdminUser = AppUser(
+        id: adminUser.id,
+        name: adminUser.name,
+        username: username,
+        phone: adminUser.phone,
+        role: adminUser.role,
+        isActive: adminUser.isActive,
+        createdAt: adminUser.createdAt,
+      );
+      await db.insertUser(updatedAdminUser);
+      if (app.currentUser.id == adminUser.id) {
+        app.switchUser(updatedAdminUser);
+      }
+    } catch (e) {
+      debugPrint('Error syncing admin user: $e');
+    }
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Admin credentials updated successfully! You can now use these to sign in.'),
+          backgroundColor: AppTheme.successGreen,
+        ),
+      );
+    }
   }
 
   Future<void> _saveSettings(BuildContext context, AppProvider app) async {
+    final username = _adminUsernameCtrl.text.trim();
+    final password = _adminPasswordCtrl.text.trim();
+
+    if (username.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Admin username and password cannot be empty!'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     final updated = app.settings.copyWith(
       shopName: _shopNameCtrl.text.trim(),
       tagline: _taglineCtrl.text.trim(),
@@ -325,13 +416,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
       receiptFormat: _receiptFormat,
       invoiceFooter: _footerCtrl.text.trim(),
       termsAndConditions: _termsCtrl.text.trim(),
-      adminUsername: _adminUsernameCtrl.text.trim(),
-      adminPassword: _adminPasswordCtrl.text.trim(),
+      adminUsername: username,
+      adminPassword: password,
       isDarkMode: _isDark,
       autoBackupEnabled: _autoBackup,
     );
 
     await app.updateSettings(updated);
+
+    try {
+      final db = DatabaseHelper.instance;
+      final users = await db.getAllUsers();
+      final adminUser = users.firstWhere(
+        (u) => u.role == UserRole.owner || u.role == UserRole.admin || u.username == app.settings.adminUsername,
+        orElse: () => users.isNotEmpty ? users.first : SampleData.users.first,
+      );
+      final updatedAdminUser = AppUser(
+        id: adminUser.id,
+        name: adminUser.name,
+        username: username,
+        phone: adminUser.phone,
+        role: adminUser.role,
+        isActive: adminUser.isActive,
+        createdAt: adminUser.createdAt,
+      );
+      await db.insertUser(updatedAdminUser);
+      if (app.currentUser.id == adminUser.id) {
+        app.switchUser(updatedAdminUser);
+      }
+    } catch (e) {
+      debugPrint('Error syncing admin user: $e');
+    }
+
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Shop branding and system settings saved successfully!')),

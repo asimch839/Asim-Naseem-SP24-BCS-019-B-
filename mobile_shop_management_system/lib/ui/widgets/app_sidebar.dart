@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/providers/app_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../screens/login_screen.dart';
 
 class NavItemData {
   final int index;
@@ -25,8 +26,9 @@ class AppSidebar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppProvider>();
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isCollapsed = app.isSidebarCollapsed;
+    final sidebarWidth = isCollapsed ? 72.0 : 250.0;
 
     final lowStockCount = app.lowStockProducts.length + app.outOfStockProducts.length;
     final pendingRepairsCount = app.pendingRepairs.length;
@@ -70,13 +72,15 @@ class AppSidebar extends StatelessWidget {
       const NavItemData(index: 16, title: 'Settings', icon: Icons.settings_rounded),
     ];
 
-    return Container(
-      width: 250,
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeInOut,
+      width: sidebarWidth,
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF0F172A) : const Color(0xFF1E293B),
+        color: AppTheme.sidebarBg,
         border: Border(
           right: BorderSide(
-            color: isDark ? const Color(0xFF1E293B) : const Color(0xFF334155),
+            color: isDark ? const Color(0xFF1E293B) : const Color(0xFF1E293B),
             width: 1,
           ),
         ),
@@ -85,223 +89,313 @@ class AppSidebar extends StatelessWidget {
         children: [
           // Branding Header
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-            decoration: BoxDecoration(
-              border: Border(
-                bottom: BorderSide(
-                  color: isDark ? const Color(0xFF1E293B) : const Color(0xFF334155),
-                  width: 1,
-                ),
-              ),
+            padding: EdgeInsets.symmetric(
+              horizontal: isCollapsed ? 12 : 16,
+              vertical: 18,
+            ),
+            decoration: const BoxDecoration(
+              border: Border(bottom: BorderSide(color: Color(0xFF1E293B))),
             ),
             child: Row(
+              mainAxisAlignment: isCollapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
               children: [
                 Container(
-                  width: 38,
-                  height: 38,
+                  width: 36,
+                  height: 36,
                   decoration: BoxDecoration(
-                    color: AppTheme.primaryBlue,
                     borderRadius: BorderRadius.circular(8),
+                    color: AppTheme.primaryBlue,
                     boxShadow: [
                       BoxShadow(
-                        color: AppTheme.primaryBlue.withOpacity(0.4),
-                        blurRadius: 8,
+                        color: Colors.black.withValues(alpha: 0.15),
+                        blurRadius: 6,
                         offset: const Offset(0, 2),
                       ),
                     ],
                   ),
                   child: const Icon(
-                    Icons.phonelink_setup_rounded,
+                    Icons.phone_android_rounded,
                     color: Colors.white,
-                    size: 22,
+                    size: 20,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        app.settings.shopName.isNotEmpty ? app.settings.shopName : 'Mobile Shop Lab',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: -0.2,
+                if (!isCollapsed) ...[
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          app.settings.shopName.isNotEmpty ? app.settings.shopName : 'Mobile Shop Lab',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: -0.2,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'POS & Repair Lab System',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.65),
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w500,
+                        const SizedBox(height: 2),
+                        const Text(
+                          'POS & Repair Lab System',
+                          style: TextStyle(
+                            color: Color(0xFF94A3B8),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
 
-          // Navigation List
+          // Navigation Links List
           Expanded(
             child: ListView.builder(
-              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+              padding: EdgeInsets.symmetric(
+                vertical: 8,
+                horizontal: isCollapsed ? 6 : 8,
+              ),
               itemCount: items.length,
               itemBuilder: (context, index) {
                 final item = items[index];
                 final isActive = app.currentNavIndex == item.index;
 
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 2),
+                final itemWidget = Padding(
+                  padding: const EdgeInsets.only(bottom: 3),
                   child: Material(
-                    color: isActive ? AppTheme.primaryBlue : Colors.transparent,
-                    borderRadius: BorderRadius.circular(7),
+                    color: isActive ? AppTheme.sidebarActive : Colors.transparent,
+                    borderRadius: BorderRadius.circular(8),
                     child: InkWell(
                       onTap: () => app.setNavIndex(item.index),
-                      borderRadius: BorderRadius.circular(7),
-                      hoverColor: Colors.white.withOpacity(0.06),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9.5),
+                      borderRadius: BorderRadius.circular(8),
+                      hoverColor: const Color(0xFF1E293B),
+                      child: Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isCollapsed ? 12 : 14,
+                          vertical: 9.5,
+                        ),
                         child: Row(
+                          mainAxisAlignment: isCollapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
                           children: [
-                            Icon(
-                              item.icon,
-                              size: 19,
-                              color: isActive ? Colors.white : const Color(0xFF94A3B8),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                item.title,
-                                style: TextStyle(
-                                  color: isActive ? Colors.white : const Color(0xFFCBD5E1),
-                                  fontSize: 13,
-                                  fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                            Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                Icon(
+                                  item.icon,
+                                  size: 19,
+                                  color: isActive ? Colors.white : const Color(0xFF94A3B8),
                                 ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                                if (isCollapsed && item.badgeText != null)
+                                  Positioned(
+                                    right: -6,
+                                    top: -4,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(3),
+                                      decoration: BoxDecoration(
+                                        color: item.badgeColor ?? AppTheme.dangerRed,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      constraints: const BoxConstraints(minWidth: 8, minHeight: 8),
+                                    ),
+                                  ),
+                              ],
                             ),
-                            if (item.badgeText != null)
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: item.badgeColor ?? AppTheme.primaryBlue,
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
+                            if (!isCollapsed) ...[
+                              const SizedBox(width: 12),
+                              Expanded(
                                 child: Text(
-                                  item.badgeText!,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
+                                  item.title,
+                                  style: TextStyle(
+                                    color: isActive ? Colors.white : const Color(0xFFCBD5E1),
+                                    fontSize: 12.5,
+                                    fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (item.badgeText != null)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: item.badgeColor ?? AppTheme.primaryBlue,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Text(
+                                    item.badgeText!,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                    ),
                                   ),
                                 ),
-                              ),
+                            ],
                           ],
                         ),
                       ),
                     ),
                   ),
                 );
+
+                if (isCollapsed) {
+                  return Tooltip(
+                    message: item.title,
+                    waitDuration: const Duration(milliseconds: 250),
+                    child: itemWidget,
+                  );
+                }
+                return itemWidget;
               },
             ),
           ),
 
-          // User Footer
+          // User Profile & Sign Out Bottom Box (Hostel System Style)
           Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF090E17) : const Color(0xFF16202E),
-              border: Border(
-                top: BorderSide(
-                  color: isDark ? const Color(0xFF1E293B) : const Color(0xFF334155),
-                  width: 1,
-                ),
-              ),
+            padding: EdgeInsets.all(isCollapsed ? 10 : 12),
+            decoration: const BoxDecoration(
+              color: Color(0xFF0B1120),
+              border: Border(top: BorderSide(color: Color(0xFF1E293B))),
             ),
             child: Row(
+              mainAxisAlignment: isCollapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
               children: [
                 CircleAvatar(
-                  radius: 17,
-                  backgroundColor: AppTheme.primaryBlue.withOpacity(0.2),
+                  radius: 16,
+                  backgroundColor: AppTheme.sidebarActive.withValues(alpha: 0.25),
                   child: Text(
-                    app.currentUser.name.isNotEmpty ? app.currentUser.name[0] : 'U',
+                    app.currentUser.name.isNotEmpty ? app.currentUser.name[0].toUpperCase() : 'A',
                     style: const TextStyle(
-                      color: AppTheme.primaryBlue,
+                      color: Colors.white,
                       fontWeight: FontWeight.bold,
-                      fontSize: 13,
+                      fontSize: 12.5,
                     ),
                   ),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        app.currentUser.name,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
+                if (!isCollapsed) ...[
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          app.currentUser.name,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Text(
-                        app.currentUser.role.displayName,
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.6),
-                          fontSize: 10.5,
+                        Text(
+                          app.currentUser.role.displayName,
+                          style: const TextStyle(
+                            color: AppTheme.accentTealLight,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                IconButton(
-                  tooltip: 'Settings',
-                  icon: const Icon(Icons.settings_outlined, size: 18, color: Color(0xFF94A3B8)),
-                  onPressed: () => app.setNavIndex(16),
-                ),
+                  IconButton(
+                    icon: const Icon(Icons.logout_rounded, color: Color(0xFF94A3B8), size: 18),
+                    tooltip: 'Sign Out',
+                    onPressed: () => _handleLogout(context),
+                  ),
+                ],
               ],
             ),
           ),
-          // Devnix Branding
+
+          // Software House Branding Footer (Hostel System Style)
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.only(bottom: 12),
-            color: isDark ? const Color(0xFF090E17) : const Color(0xFF16202E),
-            child: const Column(
-              children: [
-                Text(
-                  'Software Developed by Devnix Limited',
-                  style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.w500),
-                  textAlign: TextAlign.center,
-                ),
-                SizedBox(height: 2),
-                Text(
-                  '0300-7720839',
-                  style: TextStyle(color: Colors.white38, fontSize: 9),
-                  textAlign: TextAlign.center,
-                ),
-              ],
+            padding: EdgeInsets.symmetric(vertical: 8, horizontal: isCollapsed ? 6 : 10),
+            decoration: const BoxDecoration(
+              color: Color(0xFF090E1A),
+              border: Border(top: BorderSide(color: Color(0xFF1E293B))),
             ),
+            child: isCollapsed
+                ? const Tooltip(
+                    message: 'Software Developed by Devnix Limited\nContact: 0300-7720839',
+                    child: Center(
+                      child: Icon(Icons.code_rounded, size: 16, color: AppTheme.accentTealLight),
+                    ),
+                  )
+                : const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.code_rounded, size: 13, color: AppTheme.accentTealLight),
+                      SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          'Devnix Limited • 0300-7720839',
+                          style: TextStyle(
+                            color: Color(0xFF94A3B8),
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.2,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _handleLogout(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: const Row(
+          children: [
+            Icon(Icons.logout_rounded, color: AppTheme.dangerRed, size: 22),
+            SizedBox(width: 8),
+            Text('Sign Out?'),
+          ],
+        ),
+        content: const Text('Are you sure you want to log out from the system?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.dangerRed,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Log Out'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
+    }
   }
 }

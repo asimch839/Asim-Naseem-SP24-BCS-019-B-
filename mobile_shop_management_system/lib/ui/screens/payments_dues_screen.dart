@@ -75,7 +75,7 @@ class _PaymentsDuesScreenState extends State<PaymentsDuesScreen> with SingleTick
                     ),
                     ElevatedButton.icon(
                       icon: const Icon(Icons.account_balance_wallet_rounded, size: 16),
-                      label: const Text('Receive Payment (F6)'),
+                      label: const Text('Receive Payment'),
                       style: ElevatedButton.styleFrom(backgroundColor: AppTheme.successGreen),
                       onPressed: () => AppDialogs.showReceivePaymentDialog(context),
                     ),

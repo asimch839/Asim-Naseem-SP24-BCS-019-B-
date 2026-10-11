@@ -21,7 +21,14 @@ class AppDialogs {
     final result = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        title: Row(
+          children: [
+            Icon(Icons.help_outline_rounded, color: confirmColor, size: 22),
+            const SizedBox(width: 8),
+            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          ],
+        ),
         content: Text(message, style: const TextStyle(fontSize: 14)),
         actions: [
           TextButton(
@@ -29,7 +36,11 @@ class AppDialogs {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: confirmColor),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: confirmColor,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
             onPressed: () => Navigator.pop(ctx, true),
             child: Text(confirmLabel),
           ),

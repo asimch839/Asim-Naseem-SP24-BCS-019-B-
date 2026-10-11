@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/providers/repair_provider.dart';
@@ -9,6 +10,7 @@ import '../../core/services/print_service.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/theme/app_theme.dart';
 import '../widgets/custom_dialogs.dart';
+import '../widgets/interactive_scroll_view.dart';
 
 class RepairLabScreen extends StatefulWidget {
   const RepairLabScreen({super.key});
@@ -19,9 +21,24 @@ class RepairLabScreen extends StatefulWidget {
 
 class _RepairLabScreenState extends State<RepairLabScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
+  final ScrollController _kanbanHorizontalController = ScrollController();
+  final ScrollController _screenVerticalController = ScrollController();
+  final ScrollController _tableVerticalController = ScrollController();
+  final ScrollController _tableHorizontalController = ScrollController();
+
   bool _isKanbanView = true;
   RepairStatus? _selectedStatus;
   String _selectedTechnician = 'All';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    _kanbanHorizontalController.dispose();
+    _screenVerticalController.dispose();
+    _tableVerticalController.dispose();
+    _tableHorizontalController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -48,113 +65,279 @@ class _RepairLabScreenState extends State<RepairLabScreen> {
     }).toList();
 
     return Scaffold(
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Top Bar
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isSmallHeight = constraints.maxHeight < 680;
+
+          final content = Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: isSmallHeight ? MainAxisSize.min : MainAxisSize.max,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                // Top Bar
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Mobile Repairing Lab', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 2),
-                    Text('Hardware diagnostics, parts consumption, job cards, and workflow tracking', style: TextStyle(color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B), fontSize: 13)),
-                  ],
-                ),
-                Wrap(
-                  spacing: 10,
-                  children: [
-                    // View Toggle
-                    SegmentedButton<bool>(
-                      segments: const [
-                        ButtonSegment(value: true, label: Text('Workflow Board'), icon: Icon(Icons.view_kanban_rounded, size: 16)),
-                        ButtonSegment(value: false, label: Text('Table List'), icon: Icon(Icons.table_rows_rounded, size: 16)),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Mobile Repairing Lab', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 2),
+                        Text('Hardware diagnostics, parts consumption, job cards, and workflow tracking', style: TextStyle(color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B), fontSize: 13)),
                       ],
-                      selected: {_isKanbanView},
-                      onSelectionChanged: (set) => setState(() => _isKanbanView = set.first),
                     ),
-                    ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(backgroundColor: AppTheme.purpleRepair),
-                      icon: const Icon(Icons.build_rounded, size: 16),
-                      label: const Text('+ New Repair Job (F4)'),
-                      onPressed: () => AppDialogs.showNewRepairDialog(context),
+                    Wrap(
+                      spacing: 10,
+                      children: [
+                        // View Toggle
+                        SegmentedButton<bool>(
+                          segments: const [
+                            ButtonSegment(value: true, label: Text('Workflow Board'), icon: Icon(Icons.view_kanban_rounded, size: 16)),
+                            ButtonSegment(value: false, label: Text('Table List'), icon: Icon(Icons.table_rows_rounded, size: 16)),
+                          ],
+                          selected: {_isKanbanView},
+                          onSelectionChanged: (set) => setState(() => _isKanbanView = set.first),
+                        ),
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(backgroundColor: AppTheme.purpleRepair),
+                          icon: const Icon(Icons.build_rounded, size: 16),
+                          label: const Text('+ New Repair Job'),
+                          onPressed: () => AppDialogs.showNewRepairDialog(context),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
 
-            const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-            // Filter Bar
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _searchCtrl,
-                    decoration: InputDecoration(
-                      hintText: 'Search Job ID (#REP-1001), Customer, IMEI, or Device Model...',
-                      prefixIcon: const Icon(Icons.search_rounded),
-                      suffixIcon: _searchCtrl.text.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear_rounded),
-                              onPressed: () {
-                                _searchCtrl.clear();
-                                setState(() {});
-                              },
-                            )
-                          : null,
+                // Filter Bar
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _searchCtrl,
+                        decoration: InputDecoration(
+                          hintText: 'Search Job ID (#REP-1001), Customer, IMEI, or Device Model...',
+                          prefixIcon: const Icon(Icons.search_rounded),
+                          suffixIcon: _searchCtrl.text.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear_rounded),
+                                  onPressed: () {
+                                    _searchCtrl.clear();
+                                    setState(() {});
+                                  },
+                                )
+                              : null,
+                        ),
+                        onChanged: (_) => setState(() {}),
+                      ),
                     ),
-                    onChanged: (_) => setState(() {}),
-                  ),
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      width: 200,
+                      child: DropdownButtonFormField<RepairStatus?>(
+                        value: _selectedStatus,
+                        isExpanded: true,
+                        decoration: const InputDecoration(labelText: 'Status Filter'),
+                        items: [
+                          const DropdownMenuItem(value: null, child: Text('All Statuses', overflow: TextOverflow.ellipsis)),
+                          ...RepairStatus.values.map((s) => DropdownMenuItem(value: s, child: Text(s.displayName, overflow: TextOverflow.ellipsis))),
+                        ],
+                        onChanged: (s) => setState(() => _selectedStatus = s),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      width: 200,
+                      child: DropdownButtonFormField<String>(
+                        value: _selectedTechnician,
+                        isExpanded: true,
+                        decoration: const InputDecoration(labelText: 'Technician'),
+                        items: [
+                          const DropdownMenuItem(value: 'All', child: Text('All Technicians', overflow: TextOverflow.ellipsis)),
+                          ...app.allUsers.map((u) {
+                            return DropdownMenuItem(value: u.name, child: Text('${u.name} (${u.role.displayName})', overflow: TextOverflow.ellipsis));
+                          }),
+                        ],
+                        onChanged: (v) => setState(() => _selectedTechnician = v!),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                SizedBox(
-                  width: 200,
-                  child: DropdownButtonFormField<RepairStatus?>(
-                    value: _selectedStatus,
-                    isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'Status Filter'),
-                    items: [
-                      const DropdownMenuItem(value: null, child: Text('All Statuses', overflow: TextOverflow.ellipsis)),
-                      ...RepairStatus.values.map((s) => DropdownMenuItem(value: s, child: Text(s.displayName, overflow: TextOverflow.ellipsis))),
-                    ],
-                    onChanged: (s) => setState(() => _selectedStatus = s),
+
+                const SizedBox(height: 14),
+
+                // Main Display: Kanban Board or Table
+                if (isSmallHeight)
+                  SizedBox(
+                    height: 560,
+                    child: _isKanbanView
+                        ? _buildKanbanBoard(context, rep, inv, app, isDark)
+                        : _buildTableView(context, filtered, inv, rep, app, isDark),
+                  )
+                else
+                  Expanded(
+                    child: _isKanbanView
+                        ? _buildKanbanBoard(context, rep, inv, app, isDark)
+                        : _buildTableView(context, filtered, inv, rep, app, isDark),
                   ),
-                ),
-                const SizedBox(width: 12),
-                SizedBox(
-                  width: 200,
-                  child: DropdownButtonFormField<String>(
-                    value: _selectedTechnician,
-                    isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'Technician'),
-                    items: [
-                      const DropdownMenuItem(value: 'All', child: Text('All Technicians', overflow: TextOverflow.ellipsis)),
-                      ...app.allUsers.map((u) {
-                        return DropdownMenuItem(value: u.name, child: Text('${u.name} (${u.role.displayName})', overflow: TextOverflow.ellipsis));
-                      }),
-                    ],
-                    onChanged: (v) => setState(() => _selectedTechnician = v!),
-                  ),
-                ),
               ],
             ),
+          );
 
-            const SizedBox(height: 16),
+          if (isSmallHeight) {
+            return Scrollbar(
+              controller: _screenVerticalController,
+              thumbVisibility: true,
+              interactive: true,
+              child: SingleChildScrollView(
+                controller: _screenVerticalController,
+                scrollDirection: Axis.vertical,
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: content,
+              ),
+            );
+          }
 
-            // Main Display: Kanban Board or Table
-            Expanded(
-              child: _isKanbanView
-                  ? _buildKanbanBoard(context, rep, inv, app, isDark)
-                  : _buildTableView(context, filtered, inv, rep, app, isDark),
-            ),
-          ],
+          return content;
+        },
+      ),
+    );
+  }
+
+  // Quick Phase Navigation Toolbar for Kanban
+  Widget _buildStageNavigationToolbar(RepairProvider rep, bool isDark) {
+    final stages = [
+      {'name': 'Received Intake', 'count': rep.receivedJobs.length, 'color': const Color(0xFF3B82F6), 'index': 0},
+      {'name': 'Under Inspection', 'count': rep.inspectionJobs.length, 'color': const Color(0xFF6366F1), 'index': 1},
+      {'name': 'In Progress & Repairing', 'count': rep.inProgressJobs.length, 'color': const Color(0xFFD97706), 'index': 2},
+      {'name': 'Waiting for Parts', 'count': rep.waitingForPartsJobs.length, 'color': const Color(0xFFEA580C), 'index': 3},
+      {'name': 'Ready for Delivery', 'count': rep.readyJobs.length, 'color': const Color(0xFF059669), 'index': 4},
+      {'name': 'Delivered to Customer', 'count': rep.deliveredJobs.length, 'color': const Color(0xFF16A34A), 'index': 5},
+    ];
+
+    void scrollToStage(int index) {
+      if (!_kanbanHorizontalController.hasClients) return;
+      // Each column is 290px wide + 14px margin = 304px
+      final target = (index * 304.0)
+          .clamp(0.0, _kanbanHorizontalController.position.maxScrollExtent);
+      _kanbanHorizontalController.animateTo(
+        target,
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeInOut,
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
         ),
+      ),
+      child: Row(
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back_ios_rounded, size: 14),
+                tooltip: 'Scroll Left (◀)',
+                onPressed: () {
+                  if (_kanbanHorizontalController.hasClients) {
+                    final target = (_kanbanHorizontalController.offset - 304.0)
+                        .clamp(0.0, _kanbanHorizontalController.position.maxScrollExtent);
+                    _kanbanHorizontalController.animateTo(
+                      target,
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.easeOut,
+                    );
+                  }
+                },
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+              ),
+              IconButton(
+                icon: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+                tooltip: 'Scroll Right (▶)',
+                onPressed: () {
+                  if (_kanbanHorizontalController.hasClients) {
+                    final target = (_kanbanHorizontalController.offset + 304.0)
+                        .clamp(0.0, _kanbanHorizontalController.position.maxScrollExtent);
+                    _kanbanHorizontalController.animateTo(
+                      target,
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.easeOut,
+                    );
+                  }
+                },
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+              ),
+            ],
+          ),
+          const SizedBox(width: 8),
+          const Text(
+            'Jump to Stage:',
+            style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Colors.grey),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Row(
+                children: stages.map((s) {
+                  final color = s['color'] as Color;
+                  final count = s['count'] as int;
+                  final idx = s['index'] as int;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: InkWell(
+                      onTap: () => scrollToStage(idx),
+                      borderRadius: BorderRadius.circular(6),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: color.withValues(alpha: 0.28)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(width: 6, height: 6, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+                            const SizedBox(width: 6),
+                            Text(
+                              '${s['name']}',
+                              style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: isDark ? Colors.white : const Color(0xFF1E293B)),
+                            ),
+                            const SizedBox(width: 5),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: color,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                '$count',
+                                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -167,15 +350,61 @@ class _RepairLabScreenState extends State<RepairLabScreen> {
     AppProvider app,
     bool isDark,
   ) {
-    return ListView(
-      scrollDirection: Axis.horizontal,
+    final scrollBehavior = ScrollConfiguration.of(context).copyWith(
+      dragDevices: {
+        PointerDeviceKind.touch,
+        PointerDeviceKind.mouse,
+        PointerDeviceKind.trackpad,
+        PointerDeviceKind.stylus,
+      },
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildKanbanColumn('Received Intake', rep.receivedJobs, const Color(0xFF3B82F6), const Color(0xFFDBEAFE), context, rep, inv, app, isDark),
-        _buildKanbanColumn('Under Inspection', rep.inspectionJobs, const Color(0xFF6366F1), const Color(0xFFE0E7FF), context, rep, inv, app, isDark),
-        _buildKanbanColumn('In Progress & Repairing', rep.inProgressJobs, const Color(0xFFD97706), const Color(0xFFFEF3C7), context, rep, inv, app, isDark),
-        _buildKanbanColumn('Waiting for Parts / Customer', rep.waitingForPartsJobs, const Color(0xFFEA580C), const Color(0xFFFFEDD5), context, rep, inv, app, isDark),
-        _buildKanbanColumn('Ready for Delivery', rep.readyJobs, const Color(0xFF059669), const Color(0xFFD1FAE5), context, rep, inv, app, isDark),
-        _buildKanbanColumn('Delivered to Customer', rep.deliveredJobs, const Color(0xFF16A34A), const Color(0xFFDCFCE7), context, rep, inv, app, isDark),
+        // Quick Stage Jump Toolbar
+        _buildStageNavigationToolbar(rep, isDark),
+        const SizedBox(height: 10),
+        // Kanban Columns with Horizontal Scrollbar & Mouse Wheel / Drag Support
+        Expanded(
+          child: ScrollConfiguration(
+            behavior: scrollBehavior,
+            child: Listener(
+              onPointerSignal: (pointerSignal) {
+                if (pointerSignal is PointerScrollEvent &&
+                    _kanbanHorizontalController.hasClients) {
+                  // Allow standard vertical mouse wheel or horizontal tilt wheel to scroll horizontally
+                  final delta = pointerSignal.scrollDelta.dx != 0
+                      ? pointerSignal.scrollDelta.dx
+                      : pointerSignal.scrollDelta.dy;
+                  final target = (_kanbanHorizontalController.offset + delta)
+                      .clamp(0.0, _kanbanHorizontalController.position.maxScrollExtent);
+                  _kanbanHorizontalController.jumpTo(target);
+                }
+              },
+              child: Scrollbar(
+                controller: _kanbanHorizontalController,
+                thumbVisibility: true,
+                trackVisibility: true,
+                interactive: true,
+                child: ListView(
+                  controller: _kanbanHorizontalController,
+                  scrollDirection: Axis.horizontal,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.only(bottom: 12),
+                  children: [
+                    _buildKanbanColumn('Received Intake', rep.receivedJobs, const Color(0xFF3B82F6), const Color(0xFFDBEAFE), context, rep, inv, app, isDark),
+                    _buildKanbanColumn('Under Inspection', rep.inspectionJobs, const Color(0xFF6366F1), const Color(0xFFE0E7FF), context, rep, inv, app, isDark),
+                    _buildKanbanColumn('In Progress & Repairing', rep.inProgressJobs, const Color(0xFFD97706), const Color(0xFFFEF3C7), context, rep, inv, app, isDark),
+                    _buildKanbanColumn('Waiting for Parts / Customer', rep.waitingForPartsJobs, const Color(0xFFEA580C), const Color(0xFFFFEDD5), context, rep, inv, app, isDark),
+                    _buildKanbanColumn('Ready for Delivery', rep.readyJobs, const Color(0xFF059669), const Color(0xFFD1FAE5), context, rep, inv, app, isDark),
+                    _buildKanbanColumn('Delivered to Customer', rep.deliveredJobs, const Color(0xFF16A34A), const Color(0xFFDCFCE7), context, rep, inv, app, isDark),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -227,17 +456,21 @@ class _RepairLabScreenState extends State<RepairLabScreen> {
             ),
           ),
 
-          // Cards List
+          // Cards List with Vertical Scrollbar
           Expanded(
             child: jobs.isEmpty
                 ? const Center(child: Text('No jobs in this phase', style: TextStyle(fontSize: 11.5, color: Colors.grey)))
-                : ListView.builder(
-                    padding: const EdgeInsets.all(8),
-                    itemCount: jobs.length,
-                    itemBuilder: (context, idx) {
-                      final job = jobs[idx];
-                      return _buildJobCard(context, job, rep, inv, app, isDark);
-                    },
+                : Scrollbar(
+                    thumbVisibility: true,
+                    interactive: true,
+                    child: ListView.builder(
+                      padding: const EdgeInsets.all(8),
+                      itemCount: jobs.length,
+                      itemBuilder: (context, idx) {
+                        final job = jobs[idx];
+                        return _buildJobCard(context, job, rep, inv, app, isDark);
+                      },
+                    ),
                   ),
           ),
         ],
@@ -330,94 +563,93 @@ class _RepairLabScreenState extends State<RepairLabScreen> {
     return Card(
       child: jobs.isEmpty
           ? const Center(child: Text('No repair jobs found.'))
-          : SingleChildScrollView(
-              scrollDirection: Axis.vertical,
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: DataTable(
-                  columns: const [
-                    DataColumn(label: Text('Job ID')),
-                    DataColumn(label: Text('Customer')),
-                    DataColumn(label: Text('Device & IMEI')),
-                    DataColumn(label: Text('Reported Problem')),
-                    DataColumn(label: Text('Technician')),
-                    DataColumn(label: Text('Status')),
-                    DataColumn(label: Text('Final Cost')),
-                    DataColumn(label: Text('Remaining Due')),
-                    DataColumn(label: Text('Actions')),
-                  ],
-                  rows: jobs.map((job) {
-                    return DataRow(
-                      cells: [
-                        DataCell(
-                          Text(job.jobId, style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.purpleRepair)),
-                          onTap: () => _showJobDetailsDialog(context, job, rep, inv, app),
+          : InteractiveBiDirectionalScrollView(
+              verticalController: _tableVerticalController,
+              horizontalController: _tableHorizontalController,
+              minWidth: 1100,
+              child: DataTable(
+                columns: const [
+                  DataColumn(label: Text('Job ID')),
+                  DataColumn(label: Text('Customer')),
+                  DataColumn(label: Text('Device & IMEI')),
+                  DataColumn(label: Text('Reported Problem')),
+                  DataColumn(label: Text('Technician')),
+                  DataColumn(label: Text('Status')),
+                  DataColumn(label: Text('Final Cost')),
+                  DataColumn(label: Text('Remaining Due')),
+                  DataColumn(label: Text('Actions')),
+                ],
+                rows: jobs.map((job) {
+                  return DataRow(
+                    cells: [
+                      DataCell(
+                        Text(job.jobId, style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.purpleRepair)),
+                        onTap: () => _showJobDetailsDialog(context, job, rep, inv, app),
+                      ),
+                      DataCell(
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(job.customerName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                            Text(job.customerPhone, style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B))),
+                          ],
                         ),
-                        DataCell(
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(job.customerName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                              Text(job.customerPhone, style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B))),
-                            ],
+                      ),
+                      DataCell(
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text('${job.deviceBrand} ${job.deviceModel}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                            if (job.imei.isNotEmpty)
+                              Text('IMEI: ${job.imei}', style: const TextStyle(fontSize: 11, color: AppTheme.primaryBlue)),
+                          ],
+                        ),
+                      ),
+                      DataCell(
+                        SizedBox(
+                          width: 170,
+                          child: Text(job.reportedProblem, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
+                        ),
+                      ),
+                      DataCell(Text(job.technicianName)),
+                      DataCell(
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppTheme.purpleRepair.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(4),
                           ),
+                          child: Text(job.status.displayName, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.purpleRepair)),
                         ),
-                        DataCell(
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text('${job.deviceBrand} ${job.deviceModel}', style: const TextStyle(fontWeight: FontWeight.w600)),
-                              if (job.imei.isNotEmpty)
-                                Text('IMEI: ${job.imei}', style: const TextStyle(fontSize: 11, color: AppTheme.primaryBlue)),
-                            ],
-                          ),
-                        ),
-                        DataCell(
-                          SizedBox(
-                            width: 170,
-                            child: Text(job.reportedProblem, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
-                          ),
-                        ),
-                        DataCell(Text(job.technicianName)),
-                        DataCell(
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: AppTheme.purpleRepair.withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(4),
+                      ),
+                      DataCell(Text(AppFormatters.currency(job.finalTotal > 0 ? job.finalTotal : job.estimatedCost), style: const TextStyle(fontWeight: FontWeight.bold))),
+                      DataCell(
+                        job.remainingDue > 0
+                            ? Text(AppFormatters.currency(job.remainingDue), style: const TextStyle(color: AppTheme.dangerRed, fontWeight: FontWeight.bold))
+                            : const Text('Fully Cleared', style: TextStyle(color: AppTheme.successGreen, fontSize: 11, fontWeight: FontWeight.bold)),
+                      ),
+                      DataCell(
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              tooltip: 'Job Card Details & Status Update',
+                              icon: const Icon(Icons.edit_note_rounded, size: 20, color: AppTheme.primaryBlue),
+                              onPressed: () => _showJobDetailsDialog(context, job, rep, inv, app),
                             ),
-                            child: Text(job.status.displayName, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.purpleRepair)),
-                          ),
+                            IconButton(
+                              tooltip: 'Print Job Card',
+                              icon: const Icon(Icons.print_rounded, size: 18),
+                              onPressed: () => PrintService.printRepairJobCard(job: job, settings: app.settings),
+                            ),
+                          ],
                         ),
-                        DataCell(Text(AppFormatters.currency(job.finalTotal > 0 ? job.finalTotal : job.estimatedCost), style: const TextStyle(fontWeight: FontWeight.bold))),
-                        DataCell(
-                          job.remainingDue > 0
-                              ? Text(AppFormatters.currency(job.remainingDue), style: const TextStyle(color: AppTheme.dangerRed, fontWeight: FontWeight.bold))
-                              : const Text('Fully Cleared', style: TextStyle(color: AppTheme.successGreen, fontSize: 11, fontWeight: FontWeight.bold)),
-                        ),
-                        DataCell(
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                tooltip: 'Job Card Details & Status Update',
-                                icon: const Icon(Icons.edit_note_rounded, size: 20, color: AppTheme.primaryBlue),
-                                onPressed: () => _showJobDetailsDialog(context, job, rep, inv, app),
-                              ),
-                              IconButton(
-                                tooltip: 'Print Job Card',
-                                icon: const Icon(Icons.print_rounded, size: 18),
-                                onPressed: () => PrintService.printRepairJobCard(job: job, settings: app.settings),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    );
-                  }).toList(),
-                ),
+                      ),
+                    ],
+                  );
+                }).toList(),
               ),
             ),
     );

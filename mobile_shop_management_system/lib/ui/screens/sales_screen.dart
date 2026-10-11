@@ -89,7 +89,7 @@ class _SalesScreenState extends State<SalesScreen> {
                     ),
                     ElevatedButton.icon(
                       icon: const Icon(Icons.add_shopping_cart_rounded, size: 16),
-                      label: const Text('New Sale (F1)'),
+                      label: const Text('New Sale'),
                       onPressed: () => app.setNavIndex(1),
                     ),
                   ],

@@ -30,20 +30,17 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     await Future.delayed(const Duration(milliseconds: 800));
+    if (!mounted) return;
     
     final app = context.read<AppProvider>();
-    final users = app.allUsers;
     final settings = app.settings;
     
+    final enteredUsername = _usernameCtrl.text.trim();
+    final enteredPassword = _passwordCtrl.text.trim();
+
     bool success = false;
-    if (_usernameCtrl.text == settings.adminUsername && _passwordCtrl.text == settings.adminPassword) {
+    if (enteredUsername == settings.adminUsername && enteredPassword == settings.adminPassword) {
       success = true;
-    } else {
-       final u = users.where((u) => u.username == _usernameCtrl.text).firstOrNull;
-       // Assuming password validation is mock for now
-       if (u != null) {
-          success = true; 
-       }
     }
 
     if (!mounted) return;
@@ -65,19 +62,20 @@ class _LoginScreenState extends State<LoginScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
       body: Center(
         child: SingleChildScrollView(
           child: Container(
-            width: 400,
-            padding: const EdgeInsets.all(40),
+            width: 420,
+            padding: const EdgeInsets.all(36),
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF1E293B) : Colors.white,
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 20,
+                  color: Colors.black.withValues(alpha: 0.06),
+                  blurRadius: 24,
                   offset: const Offset(0, 10),
                 )
               ],
@@ -85,17 +83,25 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.phone_android_rounded, size: 60, color: AppTheme.primaryBlue),
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryBlue.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(Icons.phone_android_rounded, size: 36, color: AppTheme.primaryBlue),
+                ),
                 const SizedBox(height: 16),
                 const Text('Welcome Back', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                Text('Sign in to continue to Mobile Shop', style: TextStyle(color: Colors.grey[500], fontSize: 14)),
-                const SizedBox(height: 32),
+                const SizedBox(height: 6),
+                Text('Sign in to continue to Mobile Shop & Repair Lab', style: TextStyle(color: Colors.grey[500], fontSize: 13)),
+                const SizedBox(height: 28),
                 TextField(
                   controller: _usernameCtrl,
                   decoration: const InputDecoration(
                     labelText: 'Username',
-                    prefixIcon: Icon(Icons.person_outline),
+                    prefixIcon: Icon(Icons.person_outline_rounded),
                     border: OutlineInputBorder(),
                   ),
                 ),
@@ -105,9 +111,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   obscureText: _obscurePassword,
                   decoration: InputDecoration(
                     labelText: 'Password',
-                    prefixIcon: const Icon(Icons.lock_outline),
+                    prefixIcon: const Icon(Icons.lock_outline_rounded),
                     suffixIcon: IconButton(
-                      icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+                      icon: Icon(_obscurePassword ? Icons.visibility_off_rounded : Icons.visibility_rounded),
                       onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                     ),
                     border: const OutlineInputBorder(),
@@ -131,11 +137,21 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     child: _isLoading 
                         ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                        : const Text('Sign In', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        : const Text('Sign In', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
                   ),
                 ),
                 const SizedBox(height: 24),
-                const Text('Software Developed by Devnix Limited', style: TextStyle(color: Colors.grey, fontSize: 10)),
+                const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.code_rounded, size: 13, color: AppTheme.accentTealLight),
+                    SizedBox(width: 6),
+                    Text(
+                      'Devnix Limited • 0300-7720839',
+                      style: TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
