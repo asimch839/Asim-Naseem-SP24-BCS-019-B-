@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import '../../core/database/db_helper.dart';
 import '../../core/database/db_tables.dart';
 import '../../core/utils/password_hasher.dart';
@@ -7,8 +8,53 @@ import '../models/user_model.dart';
 class UserRepository {
   final DbHelper _dbHelper = DbHelper.instance;
 
+  /// Ensures the default admin user exists in the database.
+  /// If no admin user is found, creates one with default credentials.
+  Future<void> ensureAdminExists() async {
+    try {
+      final db = await _dbHelper.database;
+      final adminCheck = await db.query(
+        DbTables.users,
+        where: 'username = ?',
+        whereArgs: ['admin'],
+        limit: 1,
+      );
+
+      if (adminCheck.isEmpty) {
+        debugPrint('[AUTH] No admin user found — creating default admin account.');
+        final salt = PasswordHasher.generateSalt();
+        final hash = PasswordHasher.hashPassword('admin@123', salt);
+        final now = DateTime.now().toIso8601String();
+
+        await db.insert(DbTables.users, {
+          'username': 'admin',
+          'password_hash': hash,
+          'salt': salt,
+          'full_name': 'Administrator',
+          'role': 'Admin',
+          'is_active': 1,
+          'created_at': now,
+          'updated_at': null,
+        });
+        debugPrint('[AUTH] Default admin user created successfully.');
+      } else {
+        debugPrint('[AUTH] Admin user already exists in database.');
+      }
+    } catch (e) {
+      debugPrint('[AUTH] Error ensuring admin exists: $e');
+    }
+  }
+
   Future<UserModel?> authenticate(String username, String password) async {
+    debugPrint('[AUTH] ====== LOGIN ATTEMPT ======');
+    debugPrint('[AUTH] Username entered: "$username"');
+    debugPrint('[AUTH] Password entered: "$password"');
+
     final db = await _dbHelper.database;
+
+    // First ensure at least admin user exists
+    await ensureAdminExists();
+
     final results = await db.query(
       DbTables.users,
       where: 'username = ? AND is_active = 1',
@@ -16,12 +62,27 @@ class UserRepository {
       limit: 1,
     );
 
-    if (results.isEmpty) return null;
+    debugPrint('[AUTH] Query results count: ${results.length}');
+
+    if (results.isEmpty) {
+      debugPrint('[AUTH] ❌ No user found with username "$username". Login REJECTED.');
+      return null;
+    }
 
     final user = UserModel.fromMap(results.first);
+    debugPrint('[AUTH] Found user: "${user.username}", role: "${user.role}", id: ${user.id}');
+    debugPrint('[AUTH] Stored hash: "${user.passwordHash}"');
+    debugPrint('[AUTH] Stored salt: "${user.salt}"');
+
+    final computedHash = PasswordHasher.hashPassword(password, user.salt);
+    debugPrint('[AUTH] Computed hash for entered password: "$computedHash"');
+    debugPrint('[AUTH] Hashes match: ${computedHash == user.passwordHash}');
+
     final isValid = PasswordHasher.verifyPassword(password, user.salt, user.passwordHash);
+    debugPrint('[AUTH] PasswordHasher.verifyPassword result: $isValid');
 
     if (isValid) {
+      debugPrint('[AUTH] ✅ Password CORRECT — Login ALLOWED for "${user.username}".');
       await AuditService.log(
         activityType: 'User Login',
         description: 'User "${user.username}" (${user.role}) logged in.',
@@ -30,6 +91,8 @@ class UserRepository {
       );
       return user;
     }
+
+    debugPrint('[AUTH] ❌ Password WRONG — Login REJECTED for "${user.username}".');
     return null;
   }
 

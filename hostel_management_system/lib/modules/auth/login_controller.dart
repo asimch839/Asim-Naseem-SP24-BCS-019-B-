@@ -28,20 +28,33 @@ class LoginController extends GetxController {
     errorMessage.value = '';
 
     try {
-      final user = await _userRepo.authenticate(
-        usernameController.text.trim(),
-        passwordController.text.trim(),
-      );
+      final enteredUsername = usernameController.text.trim();
+      final enteredPassword = passwordController.text.trim();
+
+      debugPrint('[LOGIN] Attempting login with username: "$enteredUsername"');
+
+      if (enteredUsername.isEmpty || enteredPassword.isEmpty) {
+        errorMessage.value = 'Username and password are required.';
+        debugPrint('[LOGIN] ❌ Empty username or password. Login blocked.');
+        return;
+      }
+
+      final user = await _userRepo.authenticate(enteredUsername, enteredPassword);
+
+      debugPrint('[LOGIN] authenticate() returned: ${user != null ? "UserModel(${user.username})" : "null"}');
 
       if (user != null) {
+        debugPrint('[LOGIN] ✅ Login successful for "${user.username}". Navigating to main.');
         AuthService.to.setUser(user);
         passwordController.clear();
         errorMessage.value = '';
         Get.offAllNamed(AppRoutes.main);
       } else {
+        debugPrint('[LOGIN] ❌ Login FAILED. Invalid credentials.');
         errorMessage.value = 'Invalid username or password. Please try again.';
       }
     } catch (e) {
+      debugPrint('[LOGIN] ❌ Login ERROR: $e');
       errorMessage.value = 'Login error: ${e.toString()}';
     } finally {
       isLoading.value = false;
