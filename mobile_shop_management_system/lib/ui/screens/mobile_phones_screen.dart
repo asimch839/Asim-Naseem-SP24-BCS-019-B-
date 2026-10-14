@@ -7,6 +7,8 @@ import '../../core/models/phone_item.dart';
 import '../../core/models/supplier.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/services/barcode_lookup_service.dart';
+import '../widgets/barcode_scan_dialog.dart';
 
 class MobilePhonesScreen extends StatefulWidget {
   const MobilePhonesScreen({super.key});
@@ -397,13 +399,96 @@ class _MobilePhonesScreenState extends State<MobilePhonesScreen> {
           final led = ctx.read<LedgerProvider>();
           final inv = ctx.read<InventoryProvider>();
 
+          void applyBarcodeInfo(BarcodeProductInfo info) {
+            setState(() {
+              if (info.barcode.isNotEmpty) {
+                imei1Ctrl.text = info.barcode;
+              }
+              if (info.brand.isNotEmpty) brandCtrl.text = info.brand;
+              if (info.model.isNotEmpty) modelCtrl.text = info.model;
+              if (info.purchasePrice > 0) costCtrl.text = info.purchasePrice.toStringAsFixed(0);
+              if (info.salePrice > 0) priceCtrl.text = info.salePrice.toStringAsFixed(0);
+            });
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  info.isFound
+                      ? 'Handset details filled from barcode: ${info.brand} ${info.model} (${info.source})'
+                      : 'Barcode/IMEI "${info.barcode}" set. Please enter model details.',
+                ),
+                backgroundColor: info.isFound ? AppTheme.successGreen : AppTheme.primaryBlue,
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          }
+
           return AlertDialog(
-            title: const Text('Add Mobile Phone Handset', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            title: const Row(
+              children: [
+                Icon(Icons.phone_android_rounded, color: AppTheme.primaryBlue, size: 20),
+                SizedBox(width: 8),
+                Text('Add Mobile Phone Handset', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              ],
+            ),
             content: SizedBox(
               width: 580,
               child: SingleChildScrollView(
                 child: Column(
                   children: [
+                    // Quick Barcode / IMEI Scan Banner
+                    InkWell(
+                      onTap: () async {
+                        final info = await BarcodeScanDialog.show(
+                          context,
+                          initialBarcode: imei1Ctrl.text,
+                          title: 'Scan Phone Box Barcode or IMEI',
+                        );
+                        if (info != null) {
+                          applyBarcodeInfo(info);
+                        }
+                      },
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryBlue.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppTheme.primaryBlue.withValues(alpha: 0.35)),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: AppTheme.primaryBlue.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(Icons.qr_code_scanner_rounded, color: AppTheme.primaryBlue, size: 20),
+                            ),
+                            const SizedBox(width: 10),
+                            const Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Scan Box Barcode or 15-Digit IMEI',
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.primaryBlue),
+                                  ),
+                                  Text(
+                                    'Scan barcode to auto-detect Brand, Model and IMEI number',
+                                    style: TextStyle(fontSize: 11, color: Colors.grey),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: AppTheme.primaryBlue),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
                     Row(
                       children: [
                         Expanded(child: TextField(controller: brandCtrl, decoration: const InputDecoration(labelText: 'Brand (e.g. Samsung, Apple) *'))),
@@ -453,7 +538,36 @@ class _MobilePhonesScreenState extends State<MobilePhonesScreen> {
                     const SizedBox(height: 10),
                     Row(
                       children: [
-                        Expanded(child: TextField(controller: imei1Ctrl, decoration: const InputDecoration(labelText: 'IMEI 1 (15 Digits) *'))),
+                        Expanded(
+                          child: TextField(
+                            controller: imei1Ctrl,
+                            decoration: InputDecoration(
+                              labelText: 'IMEI 1 (15 Digits) *',
+                              suffixIcon: IconButton(
+                                icon: const Icon(Icons.qr_code_scanner_rounded, color: AppTheme.primaryBlue, size: 20),
+                                tooltip: 'Scan IMEI Barcode',
+                                onPressed: () async {
+                                  final info = await BarcodeScanDialog.show(
+                                    context,
+                                    initialBarcode: imei1Ctrl.text,
+                                    title: 'Scan IMEI 1 Barcode',
+                                  );
+                                  if (info != null) {
+                                    applyBarcodeInfo(info);
+                                  }
+                                },
+                              ),
+                            ),
+                            onSubmitted: (code) async {
+                              if (code.trim().isEmpty) return;
+                              final info = await BarcodeLookupService.lookupBarcode(
+                                barcode: code.trim(),
+                                inventoryProvider: inv,
+                              );
+                              applyBarcodeInfo(info);
+                            },
+                          ),
+                        ),
                         const SizedBox(width: 12),
                         Expanded(child: TextField(controller: imei2Ctrl, decoration: const InputDecoration(labelText: 'IMEI 2 (Optional)'))),
                       ],

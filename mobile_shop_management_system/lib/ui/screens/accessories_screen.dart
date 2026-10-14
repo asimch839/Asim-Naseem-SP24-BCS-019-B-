@@ -4,7 +4,9 @@ import '../../core/providers/inventory_provider.dart';
 import '../../core/models/product.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/services/barcode_lookup_service.dart';
 import '../widgets/custom_dialogs.dart';
+import '../widgets/barcode_scan_dialog.dart';
 
 class AccessoriesScreen extends StatefulWidget {
   const AccessoriesScreen({super.key});
@@ -272,6 +274,7 @@ class _AccessoriesScreenState extends State<AccessoriesScreen> {
     final nameCtrl = TextEditingController();
     final brandCtrl = TextEditingController();
     final skuCtrl = TextEditingController(text: 'ACC-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}');
+    final barcodeCtrl = TextEditingController();
     final costCtrl = TextEditingController();
     final priceCtrl = TextEditingController();
     final stockCtrl = TextEditingController(text: '10');
@@ -283,13 +286,116 @@ class _AccessoriesScreenState extends State<AccessoriesScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setState) {
+          void applyBarcodeInfo(BarcodeProductInfo info) {
+            setState(() {
+              if (info.barcode.isNotEmpty) barcodeCtrl.text = info.barcode;
+              if (info.name.isNotEmpty) nameCtrl.text = info.name;
+              if (info.brand.isNotEmpty) brandCtrl.text = info.brand;
+              if (info.category.isNotEmpty) {
+                const validCategories = [
+                  'Chargers',
+                  'Cables',
+                  'Earphones',
+                  'Power Banks',
+                  'Screen Protectors',
+                  'Back Covers',
+                  'LCD / OLED Screens',
+                  'Batteries',
+                  'Charging Ports & Flex',
+                  'Other',
+                ];
+                if (validCategories.contains(info.category)) {
+                  category = info.category;
+                } else {
+                  category = 'Other';
+                }
+              }
+              if (info.type != ProductType.phone) {
+                type = info.type;
+              }
+              if (info.purchasePrice > 0) costCtrl.text = info.purchasePrice.toStringAsFixed(0);
+              if (info.salePrice > 0) priceCtrl.text = info.salePrice.toStringAsFixed(0);
+            });
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  info.isFound
+                      ? 'Item details filled from barcode: ${info.name} (${info.source})'
+                      : 'Barcode "${info.barcode}" saved. Please fill details.',
+                ),
+                backgroundColor: info.isFound ? AppTheme.successGreen : AppTheme.primaryBlue,
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          }
+
           return AlertDialog(
-            title: const Text('Add Accessory / Repair Part', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            title: const Row(
+              children: [
+                Icon(Icons.headset_mic_rounded, color: AppTheme.primaryBlue, size: 20),
+                SizedBox(width: 8),
+                Text('Add Accessory / Repair Part', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              ],
+            ),
             content: SizedBox(
-              width: 480,
+              width: 500,
               child: SingleChildScrollView(
                 child: Column(
                   children: [
+                    // Quick Barcode Scan Banner
+                    InkWell(
+                      onTap: () async {
+                        final info = await BarcodeScanDialog.show(
+                          context,
+                          initialBarcode: barcodeCtrl.text,
+                          title: 'Scan Accessory / Part Barcode',
+                        );
+                        if (info != null) {
+                          applyBarcodeInfo(info);
+                        }
+                      },
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryBlue.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppTheme.primaryBlue.withValues(alpha: 0.35)),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: AppTheme.primaryBlue.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(Icons.qr_code_scanner_rounded, color: AppTheme.primaryBlue, size: 20),
+                            ),
+                            const SizedBox(width: 10),
+                            const Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Scan Barcode to Auto-Fill Details',
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.primaryBlue),
+                                  ),
+                                  Text(
+                                    'Scan barcode on box / back to populate title, brand & price',
+                                    style: TextStyle(fontSize: 11, color: Colors.grey),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: AppTheme.primaryBlue),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
                     Row(
                       children: [
                         Expanded(
@@ -336,6 +442,36 @@ class _AccessoriesScreenState extends State<AccessoriesScreen> {
                       ],
                     ),
                     const SizedBox(height: 10),
+                    TextField(
+                      controller: barcodeCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'Barcode',
+                        hintText: 'Scan or type barcode',
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.qr_code_scanner_rounded, color: AppTheme.primaryBlue, size: 20),
+                          tooltip: 'Scan Barcode',
+                          onPressed: () async {
+                            final info = await BarcodeScanDialog.show(
+                              context,
+                              initialBarcode: barcodeCtrl.text,
+                              title: 'Scan Accessory Barcode',
+                            );
+                            if (info != null) {
+                              applyBarcodeInfo(info);
+                            }
+                          },
+                        ),
+                      ),
+                      onSubmitted: (code) async {
+                        if (code.trim().isEmpty) return;
+                        final info = await BarcodeLookupService.lookupBarcode(
+                          barcode: code.trim(),
+                          inventoryProvider: ctx.read<InventoryProvider>(),
+                        );
+                        applyBarcodeInfo(info);
+                      },
+                    ),
+                    const SizedBox(height: 10),
                     Row(
                       children: [
                         Expanded(child: TextField(controller: costCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Cost Price (Rs.) *'))),
@@ -368,6 +504,7 @@ class _AccessoriesScreenState extends State<AccessoriesScreen> {
                     category: category,
                     brand: brandCtrl.text.trim(),
                     sku: skuCtrl.text.trim(),
+                    barcode: barcodeCtrl.text.trim(),
                     purchasePrice: double.tryParse(costCtrl.text) ?? 0.0,
                     salePrice: double.tryParse(priceCtrl.text) ?? 0.0,
                     stockQuantity: int.tryParse(stockCtrl.text) ?? 0,

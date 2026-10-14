@@ -6,7 +6,9 @@ import '../../core/models/product.dart';
 import '../../core/models/stock_movement.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/services/barcode_lookup_service.dart';
 import '../widgets/custom_dialogs.dart';
+import '../widgets/barcode_scan_dialog.dart';
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({super.key});
@@ -369,14 +371,127 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setState) {
+          void applyBarcodeInfo(BarcodeProductInfo info) {
+            setState(() {
+              if (info.barcode.isNotEmpty) barcodeCtrl.text = info.barcode;
+              if (info.name.isNotEmpty) nameCtrl.text = info.name;
+              if (info.brand.isNotEmpty) brandCtrl.text = info.brand;
+              if (info.model.isNotEmpty) modelCtrl.text = info.model;
+              if (info.category.isNotEmpty) {
+                const validCategories = [
+                  'Smartphones',
+                  'Chargers',
+                  'Cables',
+                  'Earphones',
+                  'Power Banks',
+                  'Screen Protectors',
+                  'Back Covers',
+                  'LCD / OLED Screens',
+                  'Batteries',
+                  'Charging Ports & Flex',
+                  'Repair Tools',
+                  'Other',
+                ];
+                if (validCategories.contains(info.category)) {
+                  selectedCategory = info.category;
+                } else {
+                  selectedCategory = 'Other';
+                }
+              }
+              selectedType = info.type;
+              if (info.purchasePrice > 0) costCtrl.text = info.purchasePrice.toStringAsFixed(0);
+              if (info.salePrice > 0) priceCtrl.text = info.salePrice.toStringAsFixed(0);
+              if (info.description.isNotEmpty) descCtrl.text = info.description;
+            });
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Row(
+                  children: [
+                    const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        info.isFound
+                            ? 'Details filled from barcode: ${info.name} (${info.source})'
+                            : 'Barcode "${info.barcode}" captured. Please fill remaining details.',
+                      ),
+                    ),
+                  ],
+                ),
+                backgroundColor: info.isFound ? AppTheme.successGreen : AppTheme.primaryBlue,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          }
+
           return AlertDialog(
-            title: const Text('Add New Product', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            title: const Row(
+              children: [
+                Icon(Icons.add_box_rounded, color: AppTheme.primaryBlue, size: 22),
+                SizedBox(width: 8),
+                Text('Add New Product', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              ],
+            ),
             content: SizedBox(
-              width: 550,
+              width: 560,
               child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // Quick Barcode Scan & Auto-Fill Banner
+                    InkWell(
+                      onTap: () async {
+                        final info = await BarcodeScanDialog.show(
+                          context,
+                          initialBarcode: barcodeCtrl.text,
+                        );
+                        if (info != null) {
+                          applyBarcodeInfo(info);
+                        }
+                      },
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryBlue.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppTheme.primaryBlue.withValues(alpha: 0.35)),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: AppTheme.primaryBlue.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(Icons.qr_code_scanner_rounded, color: AppTheme.primaryBlue, size: 22),
+                            ),
+                            const SizedBox(width: 12),
+                            const Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Scan Barcode to Auto-Fill Details',
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.primaryBlue),
+                                  ),
+                                  SizedBox(height: 1),
+                                  Text(
+                                    'Point barcode scanner gun or click to lookup brand, model, price',
+                                    style: TextStyle(fontSize: 11, color: Colors.grey),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: AppTheme.primaryBlue),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
                     Row(
                       children: [
                         Expanded(
@@ -426,7 +541,36 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
                       children: [
                         Expanded(child: TextField(controller: skuCtrl, decoration: const InputDecoration(labelText: 'SKU Code *'))),
                         const SizedBox(width: 12),
-                        Expanded(child: TextField(controller: barcodeCtrl, decoration: const InputDecoration(labelText: 'Barcode'))),
+                        Expanded(
+                          child: TextField(
+                            controller: barcodeCtrl,
+                            decoration: InputDecoration(
+                              labelText: 'Barcode',
+                              hintText: 'Scan or type barcode',
+                              suffixIcon: IconButton(
+                                icon: const Icon(Icons.qr_code_scanner_rounded, color: AppTheme.primaryBlue, size: 20),
+                                tooltip: 'Scan / Auto-Fill from Barcode',
+                                onPressed: () async {
+                                  final info = await BarcodeScanDialog.show(
+                                    context,
+                                    initialBarcode: barcodeCtrl.text,
+                                  );
+                                  if (info != null) {
+                                    applyBarcodeInfo(info);
+                                  }
+                                },
+                              ),
+                            ),
+                            onSubmitted: (code) async {
+                              if (code.trim().isEmpty) return;
+                              final info = await BarcodeLookupService.lookupBarcode(
+                                barcode: code.trim(),
+                                inventoryProvider: ctx.read<InventoryProvider>(),
+                              );
+                              applyBarcodeInfo(info);
+                            },
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 12),
@@ -497,7 +641,7 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
       builder: (ctx) => AlertDialog(
         title: Text('Edit "${prod.name}"', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         content: SizedBox(
-          width: 420,
+          width: 440,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -509,7 +653,23 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
               const SizedBox(height: 10),
               TextField(controller: minStockCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Min Stock Alert Threshold')),
               const SizedBox(height: 10),
-              TextField(controller: barcodeCtrl, decoration: const InputDecoration(labelText: 'Barcode')),
+              TextField(
+                controller: barcodeCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Barcode',
+                  hintText: 'Scan or type barcode',
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.qr_code_scanner_rounded, color: AppTheme.primaryBlue, size: 20),
+                    tooltip: 'Scan Barcode',
+                    onPressed: () async {
+                      final info = await BarcodeScanDialog.show(context, initialBarcode: barcodeCtrl.text);
+                      if (info != null && info.barcode.isNotEmpty) {
+                        barcodeCtrl.text = info.barcode;
+                      }
+                    },
+                  ),
+                ),
+              ),
             ],
           ),
         ),

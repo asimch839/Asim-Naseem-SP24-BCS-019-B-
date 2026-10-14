@@ -8,6 +8,8 @@ import '../../core/models/product.dart';
 import '../../core/models/supplier.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/services/barcode_lookup_service.dart';
+import '../widgets/barcode_scan_dialog.dart';
 
 class PurchasesScreen extends StatefulWidget {
   const PurchasesScreen({super.key});
@@ -237,6 +239,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
     bool isNewProductMode = inv.products.isEmpty;
     final newProdNameCtrl = TextEditingController();
     final newProdBrandCtrl = TextEditingController();
+    final newProdBarcodeCtrl = TextEditingController();
     ProductType newProdType = ProductType.phone;
     String newProdCategory = 'Smartphones';
     final newProdSalePriceCtrl = TextEditingController(text: '0');
@@ -531,6 +534,71 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                                   ],
                                 ),
                               ),
+                              const SizedBox(width: 8),
+                              InkWell(
+                                onTap: () async {
+                                  final info = await BarcodeScanDialog.show(
+                                    context,
+                                    title: 'Scan Barcode to Add / Restock Item',
+                                  );
+                                  if (info != null) {
+                                    final existing = inv.products.where((p) =>
+                                      (p.barcode.isNotEmpty && p.barcode.trim().toLowerCase() == info.barcode.toLowerCase()) ||
+                                      (p.sku.isNotEmpty && p.sku.trim().toLowerCase() == info.barcode.toLowerCase())
+                                    ).firstOrNull;
+
+                                    if (existing != null) {
+                                      setState(() {
+                                        isNewProductMode = false;
+                                        selectedProduct = existing;
+                                        costCtrl.text = existing.purchasePrice.toStringAsFixed(0);
+                                      });
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Selected "${existing.name}" from scanned barcode!'),
+                                          backgroundColor: AppTheme.successGreen,
+                                        ),
+                                      );
+                                    } else {
+                                      setState(() {
+                                        isNewProductMode = true;
+                                        newProdBarcodeCtrl.text = info.barcode;
+                                        if (info.name.isNotEmpty) newProdNameCtrl.text = info.name;
+                                        if (info.brand.isNotEmpty) newProdBrandCtrl.text = info.brand;
+                                        if (info.category.isNotEmpty) newProdCategory = info.category;
+                                        newProdType = info.type;
+                                        if (info.purchasePrice > 0) costCtrl.text = info.purchasePrice.toStringAsFixed(0);
+                                        if (info.salePrice > 0) newProdSalePriceCtrl.text = info.salePrice.toStringAsFixed(0);
+                                      });
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(info.isFound
+                                              ? 'Item details populated from barcode: ${info.name}!'
+                                              : 'Barcode "${info.barcode}" set. Fill remaining item details.'),
+                                          backgroundColor: info.isFound ? AppTheme.successGreen : AppTheme.primaryBlue,
+                                        ),
+                                      );
+                                    }
+                                  }
+                                },
+                                borderRadius: BorderRadius.circular(6),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.primaryBlue.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: AppTheme.primaryBlue.withValues(alpha: 0.3)),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.qr_code_scanner_rounded, size: 14, color: AppTheme.primaryBlue),
+                                      SizedBox(width: 4),
+                                      Text('Scan Barcode', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primaryBlue)),
+                                    ],
+                                  ),
+                                ),
+                              ),
                             ],
                           ),
                           const SizedBox(height: 10),
@@ -644,6 +712,51 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                                   ),
                                 ),
                               ],
+                            ),
+                            const SizedBox(height: 10),
+                            TextField(
+                              controller: newProdBarcodeCtrl,
+                              decoration: InputDecoration(
+                                labelText: 'Barcode (Optional)',
+                                hintText: 'Scan or type product barcode',
+                                prefixIcon: const Icon(Icons.qr_code_2_outlined, size: 18),
+                                suffixIcon: IconButton(
+                                  icon: const Icon(Icons.qr_code_scanner_rounded, size: 18, color: AppTheme.primaryBlue),
+                                  tooltip: 'Scan Barcode',
+                                  onPressed: () async {
+                                    final info = await BarcodeScanDialog.show(context, initialBarcode: newProdBarcodeCtrl.text);
+                                    if (info != null) {
+                                      setState(() {
+                                        newProdBarcodeCtrl.text = info.barcode;
+                                        if (info.name.isNotEmpty) newProdNameCtrl.text = info.name;
+                                        if (info.brand.isNotEmpty) newProdBrandCtrl.text = info.brand;
+                                        if (info.category.isNotEmpty) newProdCategory = info.category;
+                                        newProdType = info.type;
+                                        if (info.purchasePrice > 0) costCtrl.text = info.purchasePrice.toStringAsFixed(0);
+                                        if (info.salePrice > 0) newProdSalePriceCtrl.text = info.salePrice.toStringAsFixed(0);
+                                      });
+                                    }
+                                  },
+                                ),
+                              ),
+                              onSubmitted: (code) async {
+                                if (code.trim().isEmpty) return;
+                                final info = await BarcodeLookupService.lookupBarcode(
+                                  barcode: code.trim(),
+                                  inventoryProvider: inv,
+                                );
+                                if (info.isFound) {
+                                  setState(() {
+                                    newProdBarcodeCtrl.text = info.barcode;
+                                    if (info.name.isNotEmpty) newProdNameCtrl.text = info.name;
+                                    if (info.brand.isNotEmpty) newProdBrandCtrl.text = info.brand;
+                                    if (info.category.isNotEmpty) newProdCategory = info.category;
+                                    newProdType = info.type;
+                                    if (info.purchasePrice > 0) costCtrl.text = info.purchasePrice.toStringAsFixed(0);
+                                    if (info.salePrice > 0) newProdSalePriceCtrl.text = info.salePrice.toStringAsFixed(0);
+                                  });
+                                }
+                              },
                             ),
                           ],
 
@@ -788,6 +901,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                                     category: newProdCategory,
                                     brand: newProdBrandCtrl.text.trim().isNotEmpty ? newProdBrandCtrl.text.trim() : 'General',
                                     sku: 'SKU-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
+                                    barcode: newProdBarcodeCtrl.text.trim(),
                                     purchasePrice: currentCost,
                                     salePrice: double.tryParse(newProdSalePriceCtrl.text) ?? (currentCost * 1.15),
                                     stockQuantity: 0,
@@ -817,6 +931,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                                   imeiListCtrl.clear();
                                   newProdNameCtrl.clear();
                                   newProdBrandCtrl.clear();
+                                  newProdBarcodeCtrl.clear();
                                 });
 
                                 ScaffoldMessenger.of(context).showSnackBar(
@@ -1100,6 +1215,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                         category: newProdCategory,
                         brand: newProdBrandCtrl.text.trim().isNotEmpty ? newProdBrandCtrl.text.trim() : 'General',
                         sku: 'SKU-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
+                        barcode: newProdBarcodeCtrl.text.trim(),
                         purchasePrice: currentCost,
                         salePrice: double.tryParse(newProdSalePriceCtrl.text) ?? (currentCost * 1.15),
                         stockQuantity: 0,
