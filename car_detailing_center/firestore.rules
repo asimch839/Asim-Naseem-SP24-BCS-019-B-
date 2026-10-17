@@ -1,0 +1,127 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function belongsToBusiness(businessId) {
+      return isAuthenticated() && getUserData().businessId == businessId && getUserData().isActive == true;
+    }
+
+    function hasRole(allowedRoles) {
+      return isAuthenticated() && getUserData().role in allowedRoles;
+    }
+
+    function isAdmin(businessId) {
+      return belongsToBusiness(businessId) && hasRole(['admin']);
+    }
+
+    function isManagerOrAdmin(businessId) {
+      return belongsToBusiness(businessId) && hasRole(['admin', 'manager']);
+    }
+
+    // User profile documents (strictly admin & manager)
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || getUserData().role in ['admin', 'manager']);
+      allow write: if isAuthenticated() && (request.auth.uid == userId || getUserData().role == 'admin');
+    }
+
+    // Businesses root
+    match /businesses/{businessId} {
+      allow read: if belongsToBusiness(businessId);
+      allow write: if isAdmin(businessId);
+
+      // Customers & Vehicles
+      match /customers/{customerId} {
+        allow read, write: if isManagerOrAdmin(businessId);
+      }
+
+      match /vehicles/{vehicleId} {
+        allow read, write: if isManagerOrAdmin(businessId);
+      }
+
+      // Services Catalog
+      match /services/{serviceId} {
+        allow read, write: if isManagerOrAdmin(businessId);
+      }
+
+      // Inspections
+      match /inspections/{inspectionId} {
+        allow read, write: if isManagerOrAdmin(businessId);
+      }
+
+      // Detailing Jobs & Job Cards
+      match /jobs/{jobId} {
+        allow read, write: if isManagerOrAdmin(businessId);
+        allow delete: if isAdmin(businessId);
+      }
+
+      // Inventory
+      match /inventory_items/{itemId} {
+        allow read, write: if isManagerOrAdmin(businessId);
+      }
+
+      match /inventory_transactions/{txId} {
+        allow read, create: if isManagerOrAdmin(businessId);
+        allow update, delete: if isAdmin(businessId);
+      }
+
+      // Staff, Attendance & Salaries (Staff records are business records, NOT login roles)
+      match /staff/{staffId} {
+        allow read, write: if isManagerOrAdmin(businessId);
+      }
+
+      match /attendance/{attendanceId} {
+        allow read, write: if isManagerOrAdmin(businessId);
+      }
+
+      // Strict Financials: Salaries & Staff Expenses
+      match /salaries/{salaryId} {
+        allow read, write: if isAdmin(businessId);
+      }
+
+      match /staff_expenses/{expenseId} {
+        allow read, write: if isAdmin(businessId);
+      }
+
+      match /garage_expenses/{expenseId} {
+        allow read, write: if isManagerOrAdmin(businessId);
+      }
+
+      // Invoices & Payments
+      match /invoices/{invoiceId} {
+        allow read, write: if isManagerOrAdmin(businessId);
+      }
+
+      match /payments/{paymentId} {
+        allow read, write: if isManagerOrAdmin(businessId);
+        allow delete: if isAdmin(businessId);
+      }
+
+      // Notifications
+      match /notifications/{notificationId} {
+        allow read, write: if isManagerOrAdmin(businessId);
+      }
+
+      // Settings
+      match /settings/{settingId} {
+        allow read: if isManagerOrAdmin(businessId);
+        allow write: if isAdmin(businessId);
+      }
+
+      // Audit Logs (Immutable append-only for manager, readable by Admin)
+      match /audit_logs/{logId} {
+        allow read: if isAdmin(businessId);
+        allow create: if isManagerOrAdmin(businessId);
+        allow update, delete: if false; // Immutable audit log
+      }
+    }
+  }
+}

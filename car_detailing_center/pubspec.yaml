@@ -1,0 +1,51 @@
+name: car_detailing_center
+description: "Professional Car Detailing Center Management System - Offline-First SQLite"
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.3
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # State Management & Routing
+  get: ^4.6.6
+
+  # Local SQLite Database (Android, iOS & Windows Desktop)
+  sqflite: ^2.4.1
+  sqflite_common_ffi: ^2.3.4+4
+  sqlite3_flutter_libs: ^0.5.24
+
+  # File Paths, Storage & Utilities
+  path: ^1.9.0
+  path_provider: ^2.1.5
+  shared_preferences: ^2.3.5
+  uuid: ^4.5.1
+  intl: ^0.19.0
+  csv: ^6.0.0
+  archive: ^3.6.1
+
+  # UI, Charts & Typography
+  google_fonts: ^6.2.1
+  fl_chart: ^0.70.2
+
+  # Media & File Handling
+  image_picker: ^1.1.2
+  file_picker: ^8.1.7
+
+  # PDF Generation & Printing
+  pdf: ^3.11.1
+  printing: ^5.13.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
