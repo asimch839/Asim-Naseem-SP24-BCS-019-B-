@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
+import 'package:intl/intl.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -23,34 +25,116 @@ import 'sample_data.dart';
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
   static Database? _database;
+  static const String _defaultDbFileName = 'mobile_shop_lab_v2.db';
 
   DatabaseHelper._init();
 
   Future<Database> get database async {
     if (_database != null) return _database!;
-    _database = await _initDB('mobile_shop_lab_v2.db');
+    _database = await _initDB();
     return _database!;
   }
 
-  Future<Database> _initDB(String filePath) async {
-    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-      sqfliteFfiInit();
-      databaseFactory = databaseFactoryFfi;
-    }
-
-    String dbPath;
+  Future<String> getDefaultDatabaseDirectory() async {
     try {
       final docDir = await getApplicationDocumentsDirectory();
       final appDir = Directory(join(docDir.path, 'MobileShopLab'));
       if (!await appDir.exists()) {
         await appDir.create(recursive: true);
       }
-      dbPath = join(appDir.path, filePath);
+      return appDir.path;
     } catch (_) {
-      // Fallback for test environments or permission limits
       final currentDir = Directory.current.path;
-      dbPath = join(currentDir, filePath);
+      return currentDir;
     }
+  }
+
+  Future<String> getSafetyBackupDirectory() async {
+    final defaultDir = await getDefaultDatabaseDirectory();
+    final backupDir = Directory(join(defaultDir, 'Backups'));
+    if (!await backupDir.exists()) {
+      await backupDir.create(recursive: true);
+    }
+    return backupDir.path;
+  }
+
+  Future<File> getConfigFile() async {
+    final defaultDir = await getDefaultDatabaseDirectory();
+    return File(join(defaultDir, 'config.json'));
+  }
+
+  Future<String> getConfiguredDatabaseDirectory() async {
+    final defaultDir = await getDefaultDatabaseDirectory();
+    final configFile = await getConfigFile();
+    if (await configFile.exists()) {
+      try {
+        final content = await configFile.readAsString();
+        final json = jsonDecode(content) as Map<String, dynamic>;
+        final customDir = json['database_dir'] as String?;
+        if (customDir != null && customDir.trim().isNotEmpty) {
+          final dir = Directory(customDir.trim());
+          if (await dir.exists()) {
+            return dir.path;
+          }
+        }
+      } catch (e) {
+        debugPrint('Error reading config.json: $e');
+      }
+    }
+    return defaultDir;
+  }
+
+  Future<void> saveConfig({
+    String? databaseDir,
+    String? lastBackupAt,
+    String? lastBackupPath,
+  }) async {
+    final configFile = await getConfigFile();
+    Map<String, dynamic> data = {};
+    if (await configFile.exists()) {
+      try {
+        data = jsonDecode(await configFile.readAsString()) as Map<String, dynamic>;
+      } catch (_) {}
+    }
+
+    if (databaseDir != null) data['database_dir'] = databaseDir;
+    if (lastBackupAt != null) data['last_backup_at'] = lastBackupAt;
+    if (lastBackupPath != null) data['last_backup_path'] = lastBackupPath;
+
+    await configFile.writeAsString(const JsonEncoder.withIndent('  ').convert(data));
+  }
+
+  Future<String> getDatabaseFilePath() async {
+    final dir = await getConfiguredDatabaseDirectory();
+    return join(dir, _defaultDbFileName);
+  }
+
+  Future<void> checkpoint() async {
+    try {
+      final db = await database;
+      await db.rawQuery('PRAGMA wal_checkpoint(FULL)');
+    } catch (_) {}
+  }
+
+  Future<void> closeDatabase() async {
+    if (_database != null) {
+      await _database!.close();
+      _database = null;
+    }
+  }
+
+  Future<void> reopenDatabase() async {
+    await closeDatabase();
+    _database = await _initDB();
+  }
+
+  Future<Database> _initDB([String? customDbPath]) async {
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      sqfliteFfiInit();
+      databaseFactory = databaseFactoryFfi;
+    }
+
+    final dbPath = customDbPath ?? await getDatabaseFilePath();
 
     return await openDatabase(
       dbPath,
@@ -853,6 +937,15 @@ class DatabaseHelper {
           final newPaid = s.paidAmount + payment.amount;
           await txn.update('suppliers', {'due_amount': newDue, 'paid_amount': newPaid}, where: 'id = ?', whereArgs: [s.id]);
         }
+      } else if (payment.type == 'repair_advance' || payment.type == 'repair_balance') {
+        if (payment.entityId.isNotEmpty) {
+          final custRes = await txn.query('customers', where: 'id = ?', whereArgs: [payment.entityId]);
+          if (custRes.isNotEmpty) {
+            final c = Customer.fromMap(custRes.first);
+            final newPaid = c.totalPaid + payment.amount;
+            await txn.update('customers', {'total_paid': newPaid}, where: 'id = ?', whereArgs: [c.id]);
+          }
+        }
       }
     });
   }
@@ -968,5 +1061,347 @@ class DatabaseHelper {
         }
       }
     });
+  }
+
+  /// Creates an automatic safety backup of current database file
+  Future<String> createSafetyBackup({String reason = 'manual'}) async {
+    final backupDir = await getSafetyBackupDirectory();
+    final now = DateTime.now();
+    final timeStr = DateFormat('yyyy-MM-dd_HH-mm-ss').format(now);
+    final fileName = 'SafetyBackup_${timeStr}_$reason.db';
+    final destPath = join(backupDir, fileName);
+
+    final currentDbPath = await getDatabaseFilePath();
+    final currentFile = File(currentDbPath);
+    if (await currentFile.exists()) {
+      await checkpoint();
+      await currentFile.copy(destPath);
+    }
+    return destPath;
+  }
+
+  /// Create a verified backup of the database to a user-chosen destination directory or file path
+  Future<String> backupDatabase(String destinationDirectoryOrPath) async {
+    final currentDbPath = await getDatabaseFilePath();
+    final currentFile = File(currentDbPath);
+    if (!await currentFile.exists()) {
+      throw Exception('Database file does not exist to backup.');
+    }
+
+    // Flush WAL
+    await checkpoint();
+
+    String finalPath;
+    if (FileSystemEntity.isDirectorySync(destinationDirectoryOrPath)) {
+      final now = DateTime.now();
+      final timeStr = DateFormat('yyyy-MM-dd_HH-mm').format(now);
+      final fileName = 'MobileShopBackup_$timeStr.db';
+      finalPath = join(destinationDirectoryOrPath, fileName);
+    } else {
+      finalPath = destinationDirectoryOrPath;
+    }
+
+    // Ensure parent directory exists
+    final parentDir = Directory(dirname(finalPath));
+    if (!await parentDir.exists()) {
+      await parentDir.create(recursive: true);
+    }
+
+    await currentFile.copy(finalPath);
+
+    // Also create a local safety snapshot
+    await createSafetyBackup(reason: 'manual_backup');
+
+    // Save last backup timestamp & path
+    final timestampIso = DateTime.now().toIso8601String();
+    await saveConfig(lastBackupAt: timestampIso, lastBackupPath: finalPath);
+
+    await addAuditLog(
+      AuditLog(
+        id: 'AUD-${DateTime.now().millisecondsSinceEpoch}',
+        userId: 'ADMIN',
+        userName: 'Admin',
+        action: 'Database Backup',
+        module: 'Backup & Restore',
+        recordId: basename(finalPath),
+        details: 'Manual database backup saved to user selected location: $finalPath',
+      ),
+    );
+
+    return finalPath;
+  }
+
+  /// Validate and restore database from a chosen backup file path (.db or .json)
+  Future<bool> restoreDatabase(String sourceBackupPath, {String restoredBy = 'Admin'}) async {
+    final sourceFile = File(sourceBackupPath);
+    if (!await sourceFile.exists()) {
+      throw Exception('Selected backup file does not exist.');
+    }
+
+    final ext = extension(sourceBackupPath).toLowerCase();
+
+    if (ext == '.json') {
+      await createSafetyBackup(reason: 'pre_json_restore');
+      final jsonContent = await sourceFile.readAsString();
+      await restoreDatabaseFromJson(jsonContent);
+
+      await addAuditLog(
+        AuditLog(
+          id: 'AUD-${DateTime.now().millisecondsSinceEpoch}',
+          userId: 'ADMIN',
+          userName: restoredBy,
+          action: 'Database Restored',
+          module: 'Backup & Restore',
+          recordId: basename(sourceBackupPath),
+          details: 'Database restored from JSON backup: ${basename(sourceBackupPath)} by $restoredBy',
+        ),
+      );
+      return true;
+    } else if (ext == '.db') {
+      // 1. Pre-validate backup file integrity before touching active database
+      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+        sqfliteFfiInit();
+        databaseFactory = databaseFactoryFfi;
+      }
+
+      Database? testDb;
+      try {
+        testDb = await databaseFactory.openDatabase(
+          sourceBackupPath,
+          options: OpenDatabaseOptions(readOnly: true),
+        );
+        final check = await testDb.rawQuery('PRAGMA integrity_check');
+        if (check.isEmpty || check.first.values.first.toString().toLowerCase() != 'ok') {
+          throw Exception('Backup file integrity check failed. The file may be corrupt.');
+        }
+        final tables = await testDb.rawQuery("SELECT name FROM sqlite_master WHERE type='table'");
+        final tableNames = tables.map((t) => t['name'] as String).toSet();
+        if (!tableNames.contains('users') || !tableNames.contains('products') || !tableNames.contains('sales')) {
+          throw Exception('The selected file is not a valid Mobile Shop Management System database.');
+        }
+      } catch (e) {
+        throw Exception('Validation failed for backup file: $e');
+      } finally {
+        await testDb?.close();
+      }
+
+      // 2. Create automatic safety backup of current data before overwriting
+      await createSafetyBackup(reason: 'pre_db_restore');
+
+      // 3. Close active database connection
+      await checkpoint();
+      await closeDatabase();
+
+      final currentDbPath = await getDatabaseFilePath();
+
+      // 4. Remove stale WAL & SHM files if present
+      final walFile = File('$currentDbPath-wal');
+      if (await walFile.exists()) await walFile.delete();
+      final shmFile = File('$currentDbPath-shm');
+      if (await shmFile.exists()) await shmFile.delete();
+
+      // 5. Replace current database with backup file
+      await sourceFile.copy(currentDbPath);
+
+      // 6. Reopen database and verify
+      _database = await _initDB();
+
+      await addAuditLog(
+        AuditLog(
+          id: 'AUD-${DateTime.now().millisecondsSinceEpoch}',
+          userId: 'ADMIN',
+          userName: restoredBy,
+          action: 'Database Restored',
+          module: 'Backup & Restore',
+          recordId: basename(sourceBackupPath),
+          details: 'Database restored successfully from $sourceBackupPath by $restoredBy',
+        ),
+      );
+
+      return true;
+    } else {
+      throw Exception('Invalid file format. Please select a valid .db or .json backup file.');
+    }
+  }
+
+  /// Change database storage folder with validation, safety backup, and integrity check
+  Future<bool> changeDatabaseLocation(String newDirectoryPath) async {
+    final targetDir = Directory(newDirectoryPath.trim());
+    if (!await targetDir.exists()) {
+      await targetDir.create(recursive: true);
+    }
+
+    // 1. Verify folder writability
+    final probeFile = File(join(targetDir.path, '.probe_${DateTime.now().millisecondsSinceEpoch}'));
+    try {
+      await probeFile.writeAsString('probe');
+      await probeFile.delete();
+    } catch (e) {
+      throw Exception('Selected directory is not writable. Please check permissions: $e');
+    }
+
+    final currentDir = await getConfiguredDatabaseDirectory();
+    if (canonicalize(currentDir) == canonicalize(targetDir.path)) {
+      throw Exception('Selected folder is already the active database storage location.');
+    }
+
+    // 2. Automatic safety backup of current data
+    await createSafetyBackup(reason: 'pre_migration');
+
+    // 3. Flush & close current DB connection
+    await checkpoint();
+    await closeDatabase();
+
+    // 4. Safely copy database file(s) to new folder
+    final currentDbPath = join(currentDir, _defaultDbFileName);
+    final targetDbPath = join(targetDir.path, _defaultDbFileName);
+
+    final currentFile = File(currentDbPath);
+    if (await currentFile.exists()) {
+      await currentFile.copy(targetDbPath);
+    }
+
+    // Also copy WAL & SHM files if present
+    final currentWal = File('$currentDbPath-wal');
+    if (await currentWal.exists()) {
+      await currentWal.copy('$targetDbPath-wal');
+    }
+    final currentShm = File('$currentDbPath-shm');
+    if (await currentShm.exists()) {
+      await currentShm.copy('$targetDbPath-shm');
+    }
+
+    // 5. Verify copied database at destination
+    Database? testDb;
+    try {
+      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+        sqfliteFfiInit();
+        databaseFactory = databaseFactoryFfi;
+      }
+      testDb = await databaseFactory.openDatabase(
+        targetDbPath,
+        options: OpenDatabaseOptions(readOnly: true),
+      );
+      final check = await testDb.rawQuery('PRAGMA integrity_check');
+      if (check.isEmpty || check.first.values.first.toString().toLowerCase() != 'ok') {
+        throw Exception('Integrity check failed on copied database.');
+      }
+      final tables = await testDb.rawQuery("SELECT name FROM sqlite_master WHERE type='table'");
+      final tableNames = tables.map((t) => t['name'] as String).toSet();
+      if (!tableNames.contains('users') || !tableNames.contains('products') || !tableNames.contains('sales')) {
+        throw Exception('Required schema tables missing in migrated database.');
+      }
+    } catch (e) {
+      final targetFile = File(targetDbPath);
+      if (await targetFile.exists()) await targetFile.delete();
+      _database = await _initDB();
+      throw Exception('Database migration verification failed: $e. Original database was preserved.');
+    } finally {
+      await testDb?.close();
+    }
+
+    // 6. Save new directory in config and switch
+    await saveConfig(databaseDir: targetDir.path);
+    _database = await _initDB();
+
+    await addAuditLog(
+      AuditLog(
+        id: 'AUD-${DateTime.now().millisecondsSinceEpoch}',
+        userId: 'ADMIN',
+        userName: 'Admin',
+        action: 'Data Location Changed',
+        module: 'Backup & Restore',
+        recordId: basename(targetDbPath),
+        details: 'Active database storage moved to: ${targetDir.path}',
+      ),
+    );
+
+    return true;
+  }
+
+  /// Fetch live database metrics, record counts, and storage metadata
+  Future<DatabaseInfoModel> getDatabaseInfo() async {
+    final dbPath = await getDatabaseFilePath();
+    final dir = dirname(dbPath);
+    final file = File(dbPath);
+    int sizeBytes = 0;
+    DateTime? modified;
+    if (await file.exists()) {
+      sizeBytes = await file.length();
+      modified = await file.lastModified();
+    }
+
+    String? lastBackupAt;
+    String? lastBackupPath;
+    final configFile = await getConfigFile();
+    if (await configFile.exists()) {
+      try {
+        final cfg = jsonDecode(await configFile.readAsString()) as Map<String, dynamic>;
+        lastBackupAt = cfg['last_backup_at'] as String?;
+        lastBackupPath = cfg['last_backup_path'] as String?;
+      } catch (_) {}
+    }
+
+    int totalProducts = 0;
+    int totalSales = 0;
+    int totalRepairs = 0;
+    int totalCustomers = 0;
+
+    try {
+      final db = await database;
+      final pRes = await db.rawQuery('SELECT COUNT(*) as count FROM products');
+      totalProducts = (pRes.first['count'] as num?)?.toInt() ?? 0;
+      final sRes = await db.rawQuery('SELECT COUNT(*) as count FROM sales');
+      totalSales = (sRes.first['count'] as num?)?.toInt() ?? 0;
+      final rRes = await db.rawQuery('SELECT COUNT(*) as count FROM repair_jobs');
+      totalRepairs = (rRes.first['count'] as num?)?.toInt() ?? 0;
+      final cRes = await db.rawQuery('SELECT COUNT(*) as count FROM customers');
+      totalCustomers = (cRes.first['count'] as num?)?.toInt() ?? 0;
+    } catch (_) {}
+
+    return DatabaseInfoModel(
+      path: dbPath,
+      directory: dir,
+      sizeBytes: sizeBytes,
+      lastModified: modified,
+      lastBackupAt: lastBackupAt,
+      lastBackupPath: lastBackupPath,
+      totalProducts: totalProducts,
+      totalSales: totalSales,
+      totalRepairs: totalRepairs,
+      totalCustomers: totalCustomers,
+    );
+  }
+}
+
+class DatabaseInfoModel {
+  final String path;
+  final String directory;
+  final int sizeBytes;
+  final DateTime? lastModified;
+  final String? lastBackupAt;
+  final String? lastBackupPath;
+  final int totalProducts;
+  final int totalSales;
+  final int totalRepairs;
+  final int totalCustomers;
+
+  DatabaseInfoModel({
+    required this.path,
+    required this.directory,
+    required this.sizeBytes,
+    this.lastModified,
+    this.lastBackupAt,
+    this.lastBackupPath,
+    this.totalProducts = 0,
+    this.totalSales = 0,
+    this.totalRepairs = 0,
+    this.totalCustomers = 0,
+  });
+
+  String get formattedSize {
+    if (sizeBytes < 1024) return '$sizeBytes B';
+    if (sizeBytes < 1024 * 1024) return '${(sizeBytes / 1024).toStringAsFixed(1)} KB';
+    return '${(sizeBytes / (1024 * 1024)).toStringAsFixed(2)} MB';
   }
 }

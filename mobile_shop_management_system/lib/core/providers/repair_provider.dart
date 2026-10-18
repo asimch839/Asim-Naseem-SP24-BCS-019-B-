@@ -198,54 +198,83 @@ class RepairProvider extends ChangeNotifier {
     }
   }
 
+  Future<PaymentRecord?> collectPayment({
+    required String repairId,
+    required double paymentAmount,
+    required String paymentMethod,
+    String notes = '',
+    required String collectedBy,
+    RepairStatus? newStatus,
+  }) async {
+    final idx = _repairs.indexWhere((r) => r.id == repairId);
+    if (idx == -1) return null;
+
+    final current = _repairs[idx];
+    final actualPaidAmount = paymentAmount.clamp(0.0, current.remainingDue > 0 ? current.remainingDue : paymentAmount);
+    final newRemaining = (current.remainingDue - actualPaidAmount).clamp(0.0, double.infinity);
+    final newAdvancePaid = current.advancePaid + actualPaidAmount;
+    final updatedStatus = newStatus ?? current.status;
+    final isDelivered = updatedStatus == RepairStatus.delivered;
+
+    final histNote = notes.isNotEmpty
+        ? notes
+        : 'Payment received: Rs. ${actualPaidAmount.toStringAsFixed(0)} via $paymentMethod. Balance remaining: Rs. ${newRemaining.toStringAsFixed(0)}';
+
+    final newHist = List<RepairStatusHistory>.from(current.history)
+      ..add(
+        RepairStatusHistory(
+          id: 'RSH-${DateTime.now().millisecondsSinceEpoch}',
+          repairId: current.id,
+          status: updatedStatus,
+          changedBy: collectedBy,
+          notes: histNote,
+        ),
+      );
+
+    final updated = current.copyWith(
+      status: updatedStatus,
+      advancePaid: newAdvancePaid,
+      remainingDue: newRemaining,
+      deliveredAt: isDelivered ? (current.deliveredAt ?? DateTime.now()) : current.deliveredAt,
+      history: newHist,
+    );
+
+    await DatabaseHelper.instance.updateRepair(updated);
+
+    PaymentRecord? paymentRecord;
+    if (actualPaidAmount > 0) {
+      paymentRecord = PaymentRecord(
+        id: 'PAY-${DateTime.now().millisecondsSinceEpoch}',
+        receiptNumber: 'REC-BAL-${current.jobId}-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
+        type: 'repair_balance',
+        referenceId: current.jobId,
+        entityId: current.customerId,
+        entityName: current.customerName,
+        amount: actualPaidAmount,
+        paymentMethod: paymentMethod,
+        notes: notes.isNotEmpty ? notes : 'Settled balance payment for Repair Job #${current.jobId}',
+        collectedBy: collectedBy,
+      );
+      await DatabaseHelper.instance.recordPayment(paymentRecord);
+    }
+
+    await loadRepairs();
+    return paymentRecord;
+  }
+
   Future<void> deliverAndSettle({
     required String repairId,
     required double paymentAmount,
     required String paymentMethod,
     required String deliveredBy,
   }) async {
-    final idx = _repairs.indexWhere((r) => r.id == repairId);
-    if (idx != -1) {
-      final current = _repairs[idx];
-      final newRemaining = (current.remainingDue - paymentAmount).clamp(0.0, double.infinity);
-
-      final newHist = List<RepairStatusHistory>.from(current.history)
-        ..add(
-          RepairStatusHistory(
-            id: 'RSH-${DateTime.now().millisecondsSinceEpoch}',
-            repairId: current.id,
-            status: RepairStatus.delivered,
-            changedBy: deliveredBy,
-            notes: 'Delivered to customer. Received remaining balance Rs. $paymentAmount via $paymentMethod',
-          ),
-        );
-
-      final updated = current.copyWith(
-        status: RepairStatus.delivered,
-        remainingDue: newRemaining,
-        deliveredAt: DateTime.now(),
-        history: newHist,
-      );
-
-      await DatabaseHelper.instance.updateRepair(updated);
-
-      if (paymentAmount > 0) {
-        final pay = PaymentRecord(
-          id: 'PAY-${DateTime.now().millisecondsSinceEpoch}',
-          receiptNumber: 'REC-BAL-${current.jobId}',
-          type: 'repair_balance',
-          referenceId: current.jobId,
-          entityId: current.customerId,
-          entityName: current.customerName,
-          amount: paymentAmount,
-          paymentMethod: paymentMethod,
-          notes: 'Settled remaining balance for Repair Job #${current.jobId}',
-          collectedBy: deliveredBy,
-        );
-        await DatabaseHelper.instance.recordPayment(pay);
-      }
-
-      await loadRepairs();
-    }
+    await collectPayment(
+      repairId: repairId,
+      paymentAmount: paymentAmount,
+      paymentMethod: paymentMethod,
+      notes: 'Delivered to customer. Received remaining balance Rs. $paymentAmount via $paymentMethod',
+      collectedBy: deliveredBy,
+      newStatus: RepairStatus.delivered,
+    );
   }
 }

@@ -527,15 +527,43 @@ class _RepairLabScreenState extends State<RepairLabScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Final: ${AppFormatters.currency(job.finalTotal > 0 ? job.finalTotal : job.estimatedCost)}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-                      if (job.remainingDue > 0)
-                        Text('Due: ${AppFormatters.currency(job.remainingDue)}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.dangerRed))
-                      else
-                        const Text('Fully Paid', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: AppTheme.successGreen)),
-                    ],
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Final: ${AppFormatters.currency(job.finalTotal > 0 ? job.finalTotal : job.estimatedCost)}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                        if (job.remainingDue > 0)
+                          Wrap(
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 6,
+                            children: [
+                              Text('Due: ${AppFormatters.currency(job.remainingDue)}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.dangerRed)),
+                              InkWell(
+                                onTap: () => _showCollectPaymentDialog(context, job, rep, app),
+                                borderRadius: BorderRadius.circular(4),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.successGreen.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(color: AppTheme.successGreen.withValues(alpha: 0.35)),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.payments_rounded, size: 11, color: AppTheme.successGreen),
+                                      SizedBox(width: 3),
+                                      Text('Clear', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.successGreen)),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          )
+                        else
+                          const Text('Fully Paid', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: AppTheme.successGreen)),
+                      ],
+                    ),
                   ),
                   IconButton(
                     tooltip: 'Print Job Card',
@@ -627,13 +655,38 @@ class _RepairLabScreenState extends State<RepairLabScreen> {
                       DataCell(Text(AppFormatters.currency(job.finalTotal > 0 ? job.finalTotal : job.estimatedCost), style: const TextStyle(fontWeight: FontWeight.bold))),
                       DataCell(
                         job.remainingDue > 0
-                            ? Text(AppFormatters.currency(job.remainingDue), style: const TextStyle(color: AppTheme.dangerRed, fontWeight: FontWeight.bold))
+                            ? Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(AppFormatters.currency(job.remainingDue), style: const TextStyle(color: AppTheme.dangerRed, fontWeight: FontWeight.bold)),
+                                  const SizedBox(width: 6),
+                                  InkWell(
+                                    onTap: () => _showCollectPaymentDialog(context, job, rep, app),
+                                    borderRadius: BorderRadius.circular(4),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.successGreen.withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(color: AppTheme.successGreen.withValues(alpha: 0.35)),
+                                      ),
+                                      child: const Text('Clear', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: AppTheme.successGreen)),
+                                    ),
+                                  ),
+                                ],
+                              )
                             : const Text('Fully Cleared', style: TextStyle(color: AppTheme.successGreen, fontSize: 11, fontWeight: FontWeight.bold)),
                       ),
                       DataCell(
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
+                            if (job.remainingDue > 0)
+                              IconButton(
+                                tooltip: 'Collect Payment / Clear Due',
+                                icon: const Icon(Icons.payments_rounded, size: 20, color: AppTheme.successGreen),
+                                onPressed: () => _showCollectPaymentDialog(context, job, rep, app),
+                              ),
                             IconButton(
                               tooltip: 'Job Card Details & Status Update',
                               icon: const Icon(Icons.edit_note_rounded, size: 20, color: AppTheme.primaryBlue),
@@ -797,6 +850,21 @@ class _RepairLabScreenState extends State<RepairLabScreen> {
                     const Divider(height: 20),
 
                     // Cost Calculation Breakdown
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('COST CALCULATION & PAYMENT BREAKDOWN:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: AppTheme.primaryBlue)),
+                        TextButton.icon(
+                          icon: const Icon(Icons.edit_note_rounded, size: 14),
+                          label: const Text('Edit Labor / Discount', style: TextStyle(fontSize: 12)),
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            _showEditChargesDialog(context, job, rep, inv, app);
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(6)),
@@ -846,6 +914,65 @@ class _RepairLabScreenState extends State<RepairLabScreen> {
                               Text(AppFormatters.currency(job.remainingDue), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.dangerRed)),
                             ],
                           ),
+                          if (job.remainingDue > 0) ...[
+                            const SizedBox(height: 10),
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: Colors.red.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: Colors.red.withValues(alpha: 0.25)),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.pending_actions_rounded, size: 18, color: AppTheme.dangerRed),
+                                      const SizedBox(width: 8),
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Text('Pending Balance from Client', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppTheme.dangerRed)),
+                                          Text('Amount to Clear: ${AppFormatters.currency(job.remainingDue)}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                  ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppTheme.successGreen,
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                      textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                    ),
+                                    icon: const Icon(Icons.payments_rounded, size: 15),
+                                    label: const Text('Clear / Collect Due'),
+                                    onPressed: () {
+                                      Navigator.pop(ctx);
+                                      _showCollectPaymentDialog(context, job, rep, app);
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ] else ...[
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFDCFCE7),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: const Color(0xFF86EFAC)),
+                              ),
+                              child: const Row(
+                                children: [
+                                  Icon(Icons.check_circle_rounded, size: 16, color: Color(0xFF166534)),
+                                  SizedBox(width: 6),
+                                  Text('Payment Status: Fully Paid & Cleared', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5, color: Color(0xFF166534))),
+                                ],
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -868,12 +995,56 @@ class _RepairLabScreenState extends State<RepairLabScreen> {
                         const SizedBox(width: 10),
                         ElevatedButton(
                           onPressed: () async {
+                            final isFinishing = (nextStatus == RepairStatus.completed ||
+                                nextStatus == RepairStatus.readyForDelivery ||
+                                nextStatus == RepairStatus.delivered);
+
+                            if (isFinishing && job.remainingDue > 0) {
+                              final clearNow = await showDialog<bool>(
+                                context: context,
+                                builder: (dialogCtx) => AlertDialog(
+                                  title: Row(
+                                    children: [
+                                      const Icon(Icons.account_balance_wallet_rounded, color: AppTheme.warningOrange),
+                                      const SizedBox(width: 8),
+                                      Text('Pending Balance (${AppFormatters.currency(job.remainingDue)})', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                                    ],
+                                  ),
+                                  content: Text(
+                                    'Job #${job.jobId} is being marked as "${nextStatus.displayName}".\n\n'
+                                    'The client has a remaining balance of ${AppFormatters.currency(job.remainingDue)}.\n\n'
+                                    'Would you like to collect and clear this payment now?',
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(dialogCtx, false),
+                                      child: const Text('Save Status Only (Keep Due)'),
+                                    ),
+                                    ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(backgroundColor: AppTheme.successGreen),
+                                      icon: const Icon(Icons.payments_rounded, size: 16),
+                                      label: const Text('Collect Payment Now'),
+                                      onPressed: () => Navigator.pop(dialogCtx, true),
+                                    ),
+                                  ],
+                                ),
+                              );
+
+                              if (clearNow == true) {
+                                if (!context.mounted) return;
+                                Navigator.pop(ctx);
+                                _showCollectPaymentDialog(context, job, rep, app, targetStatus: nextStatus);
+                                return;
+                              }
+                            }
+
                             await rep.updateRepairStatus(
                               repairId: job.id,
                               newStatus: nextStatus,
                               changedBy: app.currentUser.name,
                               notes: statusNotesCtrl.text.trim(),
                             );
+                            if (!context.mounted) return;
                             Navigator.pop(ctx);
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(content: Text('Job #${job.jobId} updated to "${nextStatus.displayName}"!')),
@@ -889,7 +1060,7 @@ class _RepairLabScreenState extends State<RepairLabScreen> {
                       decoration: const InputDecoration(labelText: 'Status Transition Note (e.g. OLED replaced, tested OK)'),
                     ),
 
-                    if (job.status == RepairStatus.readyForDelivery && job.remainingDue > 0) ...[
+                    if ((job.status == RepairStatus.completed || job.status == RepairStatus.readyForDelivery) && job.remainingDue > 0) ...[
                       const SizedBox(height: 14),
                       Container(
                         padding: const EdgeInsets.all(12),
@@ -900,25 +1071,68 @@ class _RepairLabScreenState extends State<RepairLabScreen> {
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('Ready for Delivery!', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF166534))),
-                                Text('Remaining due: ${AppFormatters.currency(job.remainingDue)}', style: const TextStyle(fontSize: 12)),
+                                Text(
+                                  job.status == RepairStatus.completed ? 'Repair Completed!' : 'Ready for Delivery!',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF166534)),
+                                ),
+                                Text('Remaining balance due: ${AppFormatters.currency(job.remainingDue)}', style: const TextStyle(fontSize: 12)),
+                              ],
+                            ),
+                            Wrap(
+                              spacing: 8,
+                              children: [
+                                OutlinedButton.icon(
+                                  icon: const Icon(Icons.payments_outlined, size: 15),
+                                  label: const Text('Clear Balance Only'),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: const Color(0xFF166534),
+                                    side: const BorderSide(color: Color(0xFF166534)),
+                                  ),
+                                  onPressed: () {
+                                    Navigator.pop(ctx);
+                                    _showCollectPaymentDialog(context, job, rep, app, markDelivered: false);
+                                  },
+                                ),
+                                ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(backgroundColor: AppTheme.successGreen),
+                                  icon: const Icon(Icons.check_circle_rounded, size: 16),
+                                  label: const Text('Collect & Deliver Device'),
+                                  onPressed: () {
+                                    Navigator.pop(ctx);
+                                    _showCollectPaymentDialog(context, job, rep, app, markDelivered: true);
+                                  },
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ] else if (job.status == RepairStatus.delivered && job.remainingDue > 0) ...[
+                      const SizedBox(height: 14),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF2F2),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: const Color(0xFFFECACA)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Device Delivered with Balance Pending!', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.dangerRed)),
+                                Text('Outstanding Due: ${AppFormatters.currency(job.remainingDue)}', style: const TextStyle(fontSize: 12)),
                               ],
                             ),
                             ElevatedButton.icon(
                               style: ElevatedButton.styleFrom(backgroundColor: AppTheme.successGreen),
-                              icon: const Icon(Icons.check_circle_rounded, size: 16),
-                              label: const Text('Collect & Deliver Device'),
-                              onPressed: () async {
-                                await rep.deliverAndSettle(
-                                  repairId: job.id,
-                                  paymentAmount: job.remainingDue,
-                                  paymentMethod: 'Cash',
-                                  deliveredBy: app.currentUser.name,
-                                );
+                              icon: const Icon(Icons.payments_rounded, size: 16),
+                              label: const Text('Settle Pending Balance'),
+                              onPressed: () {
                                 Navigator.pop(ctx);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Device delivered for #${job.jobId} and remaining balance cleared!')),
-                                );
+                                _showCollectPaymentDialog(context, job, rep, app);
                               },
                             ),
                           ],
@@ -1036,11 +1250,416 @@ class _RepairLabScreenState extends State<RepairLabScreen> {
                     technicianName: app.currentUser.name,
                   );
 
+                  if (!context.mounted) return;
                   Navigator.pop(ctx); // Close part modal
                   Navigator.pop(context); // Refresh details modal
                   _showJobDetailsDialog(context, rep.repairs.firstWhere((r) => r.id == job.id), rep, inv, app);
                 },
                 child: const Text('Consume Part & Recalculate'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  void _showCollectPaymentDialog(
+    BuildContext context,
+    RepairJob job,
+    RepairProvider rep,
+    AppProvider app, {
+    RepairStatus? targetStatus,
+    bool markDelivered = false,
+  }) {
+    final amountCtrl = TextEditingController(text: job.remainingDue.toStringAsFixed(0));
+    final notesCtrl = TextEditingController();
+    String paymentMethod = 'Cash';
+    bool shouldDeliver = markDelivered || (job.status == RepairStatus.readyForDelivery || job.status == RepairStatus.completed);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setState) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+          final currentInputAmount = double.tryParse(amountCtrl.text.trim()) ?? 0.0;
+          final remainingAfterPayment = (job.remainingDue - currentInputAmount).clamp(0.0, double.infinity);
+
+          return AlertDialog(
+            title: Row(
+              children: [
+                const Icon(Icons.payments_rounded, color: AppTheme.successGreen),
+                const SizedBox(width: 8),
+                Text('Collect Payment - Job #${job.jobId}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              ],
+            ),
+            content: SizedBox(
+              width: 480,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Customer & Device Info Card
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(job.customerName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                              Text(job.customerPhone, style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B))),
+                            ],
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text('${job.deviceBrand} ${job.deviceModel}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5)),
+                              Text('Status: ${job.status.displayName}', style: const TextStyle(fontSize: 11, color: AppTheme.purpleRepair, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    // Financial Overview Breakdown
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Total Repair Cost:', style: TextStyle(fontSize: 12)),
+                              Text(AppFormatters.currency(job.finalTotal > 0 ? job.finalTotal : job.estimatedCost), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Advance Deposit Paid:', style: TextStyle(fontSize: 12)),
+                              Text(AppFormatters.currency(job.advancePaid), style: const TextStyle(color: AppTheme.successGreen, fontWeight: FontWeight.bold, fontSize: 12)),
+                            ],
+                          ),
+                          const Divider(height: 10),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Remaining Balance Due:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.dangerRed)),
+                              Text(AppFormatters.currency(job.remainingDue), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.dangerRed)),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    // Amount to Collect Input
+                    TextField(
+                      controller: amountCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: InputDecoration(
+                        labelText: 'Payment Amount to Collect (Rs.) *',
+                        prefixIcon: const Icon(Icons.attach_money_rounded),
+                        suffixIcon: IconButton(
+                          tooltip: 'Set to Full Due Amount',
+                          icon: const Icon(Icons.refresh_rounded, size: 18),
+                          onPressed: () {
+                            amountCtrl.text = job.remainingDue.toStringAsFixed(0);
+                            setState(() {});
+                          },
+                        ),
+                      ),
+                      onChanged: (_) => setState(() {}),
+                    ),
+
+                    const SizedBox(height: 6),
+
+                    // Quick Fill Buttons (Full, Half)
+                    Wrap(
+                      spacing: 6,
+                      children: [
+                        ActionChip(
+                          avatar: const Icon(Icons.done_all_rounded, size: 13, color: AppTheme.successGreen),
+                          label: Text('Full Balance (${AppFormatters.currency(job.remainingDue)})', style: const TextStyle(fontSize: 11)),
+                          onPressed: () {
+                            amountCtrl.text = job.remainingDue.toStringAsFixed(0);
+                            setState(() {});
+                          },
+                        ),
+                        if (job.remainingDue > 500)
+                          ActionChip(
+                            avatar: const Icon(Icons.pie_chart_outline_rounded, size: 13, color: AppTheme.primaryBlue),
+                            label: Text('Half Balance (${AppFormatters.currency(job.remainingDue / 2)})', style: const TextStyle(fontSize: 11)),
+                            onPressed: () {
+                              amountCtrl.text = (job.remainingDue / 2).toStringAsFixed(0);
+                              setState(() {});
+                            },
+                          ),
+                      ],
+                    ),
+
+                    if (currentInputAmount > 0 && remainingAfterPayment > 0) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        'Partial payment: Remaining balance after this payment will be ${AppFormatters.currency(remainingAfterPayment)}',
+                        style: const TextStyle(fontSize: 11.5, color: AppTheme.warningOrange, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+
+                    const SizedBox(height: 12),
+
+                    // Payment Method Dropdown
+                    DropdownButtonFormField<String>(
+                      value: paymentMethod,
+                      decoration: const InputDecoration(
+                        labelText: 'Payment Method *',
+                        prefixIcon: Icon(Icons.account_balance_wallet_rounded),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'Cash', child: Text('Cash')),
+                        DropdownMenuItem(value: 'JazzCash', child: Text('JazzCash')),
+                        DropdownMenuItem(value: 'Easypaisa', child: Text('Easypaisa')),
+                        DropdownMenuItem(value: 'Bank Transfer', child: Text('Bank Transfer')),
+                        DropdownMenuItem(value: 'Card', child: Text('Card / POS')),
+                      ],
+                      onChanged: (v) => setState(() => paymentMethod = v!),
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    // Remarks / Notes
+                    TextField(
+                      controller: notesCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Remarks / Voucher Notes (Optional)',
+                        hintText: 'e.g. Cleared remaining balance on delivery',
+                        prefixIcon: Icon(Icons.notes_rounded),
+                      ),
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    // Checkbox for delivery status
+                    if (job.status != RepairStatus.delivered)
+                      CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        title: const Text('Mark device as Delivered to customer', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                        subtitle: const Text('Updates status to Delivered and sets handover timestamp', style: TextStyle(fontSize: 11)),
+                        value: shouldDeliver,
+                        onChanged: (v) => setState(() => shouldDeliver = v ?? false),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.successGreen,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                ),
+                icon: const Icon(Icons.check_circle_rounded, size: 16),
+                label: const Text('Confirm Payment & Clear'),
+                onPressed: () async {
+                  final payAmount = double.tryParse(amountCtrl.text.trim()) ?? 0.0;
+                  if (payAmount <= 0) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Please enter a valid payment amount greater than 0.')),
+                    );
+                    return;
+                  }
+
+                  final targetSt = shouldDeliver
+                      ? RepairStatus.delivered
+                      : (targetStatus ?? (job.status == RepairStatus.received ? RepairStatus.inProgress : job.status));
+
+                  final payment = await rep.collectPayment(
+                    repairId: job.id,
+                    paymentAmount: payAmount,
+                    paymentMethod: paymentMethod,
+                    notes: notesCtrl.text.trim(),
+                    collectedBy: app.currentUser.name,
+                    newStatus: targetSt != job.status ? targetSt : null,
+                  );
+
+                  if (!context.mounted) return;
+                  Navigator.pop(ctx);
+
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Payment of ${AppFormatters.currency(payAmount)} received for #${job.jobId}!'),
+                        action: SnackBarAction(
+                          label: 'Print Voucher',
+                          onPressed: () {
+                            if (payment != null) {
+                              PrintService.printPaymentReceipt(payment: payment, settings: app.settings);
+                            }
+                          },
+                        ),
+                      ),
+                    );
+                  }
+                },
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  void _showEditChargesDialog(
+    BuildContext context,
+    RepairJob job,
+    RepairProvider rep,
+    InventoryProvider inv,
+    AppProvider app,
+  ) {
+    final laborCtrl = TextEditingController(text: job.laborCharges.toStringAsFixed(0));
+    final otherCtrl = TextEditingController(text: job.otherCharges.toStringAsFixed(0));
+    final discountCtrl = TextEditingController(text: job.discount.toStringAsFixed(0));
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setState) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+          final labor = double.tryParse(laborCtrl.text.trim()) ?? 0.0;
+          final other = double.tryParse(otherCtrl.text.trim()) ?? 0.0;
+          final discount = double.tryParse(discountCtrl.text.trim()) ?? 0.0;
+          final partsTotal = job.partsTotalSelling;
+          final calculatedFinal = (labor + partsTotal + other) - discount;
+          final calculatedDue = (calculatedFinal - job.advancePaid).clamp(0.0, double.infinity);
+
+          return AlertDialog(
+            title: Row(
+              children: [
+                const Icon(Icons.edit_note_rounded, color: AppTheme.primaryBlue),
+                const SizedBox(width: 8),
+                Text('Edit Charges & Discount - #${job.jobId}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              ],
+            ),
+            content: SizedBox(
+              width: 440,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: laborCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(
+                        labelText: 'Labor Charges (Rs.)',
+                        prefixIcon: Icon(Icons.engineering_rounded),
+                      ),
+                      onChanged: (_) => setState(() {}),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: otherCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(
+                        labelText: 'Other / Extra Charges (Rs.)',
+                        prefixIcon: Icon(Icons.add_circle_outline_rounded),
+                      ),
+                      onChanged: (_) => setState(() {}),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: discountCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(
+                        labelText: 'Discount Given (Rs.)',
+                        prefixIcon: Icon(Icons.discount_rounded),
+                      ),
+                      onChanged: (_) => setState(() {}),
+                    ),
+                    const SizedBox(height: 14),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Parts Consumed Total:'),
+                              Text(AppFormatters.currency(partsTotal), style: const TextStyle(fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                          const Divider(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('New Total Cost:', style: TextStyle(fontWeight: FontWeight.bold)),
+                              Text(AppFormatters.currency(calculatedFinal), style: const TextStyle(fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Advance Already Paid:'),
+                              Text(AppFormatters.currency(job.advancePaid), style: const TextStyle(color: AppTheme.successGreen, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('New Balance Due:', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.dangerRed)),
+                              Text(AppFormatters.currency(calculatedDue), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.dangerRed)),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+              ElevatedButton(
+                onPressed: () async {
+                  await rep.updateCosts(
+                    repairId: job.id,
+                    labor: labor,
+                    other: other,
+                    discount: discount,
+                  );
+                  if (!context.mounted) return;
+                  Navigator.pop(ctx);
+                  final updatedJob = rep.repairs.firstWhere((r) => r.id == job.id);
+                  _showJobDetailsDialog(context, updatedJob, rep, inv, app);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Repair charges and due amount updated successfully!')),
+                  );
+                },
+                child: const Text('Save Charges'),
               ),
             ],
           );

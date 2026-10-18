@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
@@ -6,6 +8,95 @@ import '../database/database_helper.dart';
 import '../models/audit_log.dart';
 
 class BackupService {
+  /// Open directory picker and perform verified database backup to user-selected location
+  static Future<String?> performBackup() async {
+    final selectedDirectory = await FilePicker.getDirectoryPath(
+      dialogTitle: 'Select Folder to Save Database Backup',
+    );
+
+    if (selectedDirectory == null || selectedDirectory.trim().isEmpty) {
+      return null;
+    }
+
+    final backupPath = await DatabaseHelper.instance.backupDatabase(selectedDirectory.trim());
+    return backupPath;
+  }
+
+  /// Open file picker to select a backup file (.db or .json) and perform verified database restore
+  static Future<bool> performRestore({required String currentUserName}) async {
+    final file = await FilePicker.pickFile(
+      dialogTitle: 'Select Backup File to Restore (.db or .json)',
+      type: FileType.any,
+    );
+
+    if (file == null || file.path == null) {
+      return false;
+    }
+
+    final backupFilePath = file.path!;
+    final ext = extension(backupFilePath).toLowerCase();
+    if (ext != '.db' && ext != '.json') {
+      throw Exception('Invalid file format. Please select a valid database backup file ending in .db or .json');
+    }
+
+    final success = await DatabaseHelper.instance.restoreDatabase(
+      backupFilePath,
+      restoredBy: currentUserName,
+    );
+    return success;
+  }
+
+  /// Open folder picker to move the active database to a user-chosen directory
+  static Future<String?> changeDataLocation() async {
+    final selectedDirectory = await FilePicker.getDirectoryPath(
+      dialogTitle: 'Select Destination Folder for Shop Database Storage',
+    );
+
+    if (selectedDirectory == null || selectedDirectory.trim().isEmpty) {
+      return null;
+    }
+
+    final success = await DatabaseHelper.instance.changeDatabaseLocation(selectedDirectory.trim());
+    if (success) {
+      return selectedDirectory.trim();
+    }
+    return null;
+  }
+
+  /// Open any directory in Windows File Explorer
+  static Future<void> openFolder(String path) async {
+    try {
+      if (Platform.isWindows) {
+        await Process.run('explorer.exe', [path]);
+      }
+    } catch (e) {
+      debugPrint('Error opening directory in explorer: $e');
+    }
+  }
+
+  /// Fetch list of safety backups in Backups directory
+  static Future<List<File>> getSafetyBackupsList() async {
+    try {
+      final dirPath = await DatabaseHelper.instance.getSafetyBackupDirectory();
+      final dir = Directory(dirPath);
+      if (!await dir.exists()) return [];
+
+      final files = dir
+          .listSync()
+          .whereType<File>()
+          .where((f) => f.path.endsWith('.db') || f.path.endsWith('.json'))
+          .toList();
+
+      files.sort((a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()));
+      return files;
+    } catch (e) {
+      debugPrint('Error loading safety backups: $e');
+      return [];
+    }
+  }
+
+  // --- Legacy Compatibility Methods ---
+
   static Future<Directory> getBackupDirectory() async {
     final docs = await getApplicationDocumentsDirectory();
     final backupDir = Directory(join(docs.path, 'MobileShopLab', 'backups'));
@@ -47,30 +138,6 @@ class BackupService {
   }
 
   static Future<void> restoreBackup(String filePath, String currentUserName) async {
-    // 1. Create safety backup first
-    await createBackup(note: 'Pre-restore safety snapshot');
-
-    // 2. Read selected backup
-    final file = File(filePath);
-    if (!await file.exists()) {
-      throw Exception('Selected backup file not found.');
-    }
-    final content = await file.readAsString();
-
-    // 3. Restore into database
-    await DatabaseHelper.instance.restoreDatabaseFromJson(content);
-
-    // 4. Log restore event
-    await DatabaseHelper.instance.addAuditLog(
-      AuditLog(
-        id: 'AUD-${DateTime.now().millisecondsSinceEpoch}',
-        userId: 'ADMIN',
-        userName: currentUserName,
-        action: 'Database Restored',
-        module: 'Backup & Restore',
-        recordId: basename(filePath),
-        details: 'Database restored from backup: ${basename(filePath)} by $currentUserName',
-      ),
-    );
+    await DatabaseHelper.instance.restoreDatabase(filePath, restoredBy: currentUserName);
   }
 }
