@@ -675,70 +675,359 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
 
             const SizedBox(height: 20),
 
-            // Card 5: Audit Trail
+            // Card 5: Audit Trail & System Security Logs
             Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+              ),
               child: Padding(
                 padding: const EdgeInsets.all(18),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Row(
+                    // Header Row
+                    Row(
                       children: [
-                        Icon(Icons.history_edu_rounded, size: 18, color: AppTheme.primaryBlue),
-                        SizedBox(width: 8),
-                        Text('AUDIT TRAIL & SYSTEM SECURITY LOGS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.primaryBlue)),
+                        const Icon(Icons.history_edu_rounded, size: 20, color: AppTheme.primaryBlue),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'AUDIT TRAIL & SYSTEM SECURITY LOGS',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: AppTheme.primaryBlue),
+                        ),
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                          ),
+                          child: Text(
+                            '${_logs.length} Total Logs',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 6),
-                    Text('Full activity audit trail documenting backups, location changes, database restores, and administrative operations.',
-                        style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B))),
-                    const Divider(height: 20),
+                    Text(
+                      'Full activity audit trail documenting backups, location changes, database restores, and administrative operations.',
+                      style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                    ),
+                    const SizedBox(height: 14),
 
-                    if (_logs.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.all(16),
-                        child: Center(child: Text('No audit logs recorded yet.')),
-                      )
-                    else
-                      SingleChildScrollView(
-                        scrollDirection: Axis.vertical,
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: DataTable(
-                            columns: const [
-                              DataColumn(label: Text('Timestamp')),
-                              DataColumn(label: Text('Operator')),
-                              DataColumn(label: Text('Action Type')),
-                              DataColumn(label: Text('Module')),
-                              DataColumn(label: Text('Record / Ref')),
-                              DataColumn(label: Text('Action Narrative & Verification')),
-                            ],
-                            rows: _logs.take(15).map((log) {
-                              return DataRow(
-                                cells: [
-                                  DataCell(Text(AppFormatters.dateTime(log.timestamp), style: const TextStyle(fontSize: 12))),
-                                  DataCell(Text(log.userName, style: const TextStyle(fontWeight: FontWeight.bold))),
-                                  DataCell(
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(4)),
-                                      child: Text(log.action, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-                                    ),
+                    // Search & Filter Bar
+                    if (_logs.isNotEmpty) ...[
+                      Row(
+                        children: [
+                          Expanded(
+                            child: SizedBox(
+                              height: 38,
+                              child: TextField(
+                                decoration: InputDecoration(
+                                  hintText: 'Search audit logs (by operator, action, ref, or text)...',
+                                  hintStyle: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF64748B) : Colors.grey),
+                                  prefixIcon: const Icon(Icons.search_rounded, size: 18),
+                                  contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 12),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
                                   ),
-                                  DataCell(Text(log.module)),
-                                  DataCell(Text(log.recordId.isNotEmpty ? log.recordId : '-')),
-                                  DataCell(
-                                    SizedBox(
-                                      width: 320,
-                                      child: Text(log.details, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
-                                    ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                                   ),
-                                ],
-                              );
-                            }).toList(),
+                                  filled: true,
+                                  fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                                ),
+                                style: const TextStyle(fontSize: 12.5),
+                                onChanged: (val) => setState(() => _auditSearchQuery = val),
+                              ),
+                            ),
                           ),
+                          const SizedBox(width: 12),
+                          if (_logs.length > 10)
+                            TextButton.icon(
+                              onPressed: () => setState(() => _showAllLogs = !_showAllLogs),
+                              icon: Icon(_showAllLogs ? Icons.unfold_less_rounded : Icons.unfold_more_rounded, size: 16),
+                              label: Text(
+                                _showAllLogs ? 'Show Recent (10)' : 'Show All (${_logs.length})',
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Module Filter Chips
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.only(right: 6),
+                              child: Text(
+                                'Filter by Module:',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                ),
+                              ),
+                            ),
+                            ...{'All', ..._logs.map((l) => l.module).where((m) => m.isNotEmpty)}.map((mod) {
+                              final isSelected = _auditFilterModule == mod;
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 6),
+                                child: ChoiceChip(
+                                  selected: isSelected,
+                                  label: Text(mod, style: TextStyle(fontSize: 11.5, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+                                  onSelected: (_) => setState(() => _auditFilterModule = mod),
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                              );
+                            }),
+                          ],
                         ),
                       ),
+                      const Divider(height: 24),
+                    ],
+
+                    // Filter logic & DataTable
+                    Builder(
+                      builder: (context) {
+                        if (_logs.isEmpty) {
+                          return const Padding(
+                            padding: EdgeInsets.all(24),
+                            child: Center(child: Text('No audit logs recorded yet.')),
+                          );
+                        }
+
+                        final query = _auditSearchQuery.trim().toLowerCase();
+                        final filtered = _logs.where((l) {
+                          final matchesModule = _auditFilterModule == 'All' || l.module == _auditFilterModule;
+                          if (!matchesModule) return false;
+                          if (query.isEmpty) return true;
+                          return l.userName.toLowerCase().contains(query) ||
+                              l.action.toLowerCase().contains(query) ||
+                              l.module.toLowerCase().contains(query) ||
+                              l.recordId.toLowerCase().contains(query) ||
+                              l.details.toLowerCase().contains(query);
+                        }).toList();
+
+                        if (filtered.isEmpty) {
+                          return Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Center(
+                              child: Text(
+                                'No matching audit logs found for "$_auditSearchQuery".',
+                                style: TextStyle(fontSize: 12.5, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                              ),
+                            ),
+                          );
+                        }
+
+                        final displayLogs = _showAllLogs ? filtered : filtered.take(10).toList();
+
+                        return ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: DataTable(
+                                headingRowColor: WidgetStateProperty.all(
+                                  isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                                ),
+                                headingTextStyle: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12,
+                                  color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF334155),
+                                  letterSpacing: 0.3,
+                                ),
+                                dataRowColor: WidgetStateProperty.resolveWith((states) {
+                                  if (states.contains(WidgetState.hovered)) {
+                                    return isDark ? const Color(0xFF334155).withValues(alpha: 0.5) : const Color(0xFFF8FAFC);
+                                  }
+                                  return isDark ? const Color(0xFF0F172A).withValues(alpha: 0.3) : Colors.white;
+                                }),
+                                dividerThickness: 1,
+                                dataRowMinHeight: 52,
+                                dataRowMaxHeight: 64,
+                                columnSpacing: 20,
+                                horizontalMargin: 16,
+                                columns: const [
+                                  DataColumn(label: Text('Timestamp')),
+                                  DataColumn(label: Text('Operator')),
+                                  DataColumn(label: Text('Action Type')),
+                                  DataColumn(label: Text('Module')),
+                                  DataColumn(label: Text('Record / Ref')),
+                                  DataColumn(label: Text('Action Narrative & Verification')),
+                                  DataColumn(label: Text('Details')),
+                                ],
+                                rows: displayLogs.map((log) {
+                                  return DataRow(
+                                    cells: [
+                                      // Timestamp
+                                      DataCell(
+                                        Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Text(
+                                              DateFormat('dd MMM yyyy').format(log.timestamp),
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                                color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF0F172A),
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              DateFormat('hh:mm a').format(log.timestamp),
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        onTap: () => _showLogDetailsDialog(context, log, isDark),
+                                      ),
+                                      // Operator
+                                      DataCell(
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            CircleAvatar(
+                                              radius: 12,
+                                              backgroundColor: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                                              child: Text(
+                                                log.userName.isNotEmpty ? log.userName[0].toUpperCase() : 'U',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: isDark ? const Color(0xFF93C5FD) : AppTheme.primaryBlue,
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              log.userName.isNotEmpty ? log.userName : 'System',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 12.5,
+                                                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        onTap: () => _showLogDetailsDialog(context, log, isDark),
+                                      ),
+                                      // Action Type
+                                      DataCell(
+                                        _buildActionBadge(log.action, isDark),
+                                        onTap: () => _showLogDetailsDialog(context, log, isDark),
+                                      ),
+                                      // Module
+                                      DataCell(
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                          decoration: BoxDecoration(
+                                            color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                                            borderRadius: BorderRadius.circular(4),
+                                            border: Border.all(
+                                              color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                                            ),
+                                          ),
+                                          child: Text(
+                                            log.module,
+                                            style: TextStyle(
+                                              fontSize: 11.5,
+                                              fontWeight: FontWeight.w500,
+                                              color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                                            ),
+                                          ),
+                                        ),
+                                        onTap: () => _showLogDetailsDialog(context, log, isDark),
+                                      ),
+                                      // Record / Ref
+                                      DataCell(
+                                        log.recordId.isEmpty || log.recordId == '-'
+                                            ? Text('-', style: TextStyle(color: isDark ? const Color(0xFF64748B) : Colors.grey))
+                                            : Tooltip(
+                                                message: log.recordId,
+                                                child: Container(
+                                                  constraints: const BoxConstraints(maxWidth: 190),
+                                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                                  decoration: BoxDecoration(
+                                                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                                                    borderRadius: BorderRadius.circular(4),
+                                                    border: Border.all(
+                                                      color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                                                    ),
+                                                  ),
+                                                  child: Text(
+                                                    log.recordId,
+                                                    style: TextStyle(
+                                                      fontSize: 11,
+                                                      fontFamily: 'monospace',
+                                                      fontWeight: FontWeight.w600,
+                                                      color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB),
+                                                    ),
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              ),
+                                        onTap: () => _showLogDetailsDialog(context, log, isDark),
+                                      ),
+                                      // Action Narrative & Verification
+                                      DataCell(
+                                        Tooltip(
+                                          message: log.details,
+                                          child: SizedBox(
+                                            width: 420,
+                                            child: Text(
+                                              log.details,
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF1E293B),
+                                                height: 1.3,
+                                              ),
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ),
+                                        onTap: () => _showLogDetailsDialog(context, log, isDark),
+                                      ),
+                                      // Details Button
+                                      DataCell(
+                                        IconButton(
+                                          icon: const Icon(Icons.open_in_new_rounded, size: 17),
+                                          color: isDark ? const Color(0xFF93C5FD) : AppTheme.primaryBlue,
+                                          tooltip: 'View Full Audit Record',
+                                          onPressed: () => _showLogDetailsDialog(context, log, isDark),
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                }).toList(),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
                   ],
                 ),
               ),
@@ -801,6 +1090,222 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
           style: const TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.w600),
         ),
       ],
+    );
+  }
+
+  Widget _buildActionBadge(String action, bool isDark) {
+    final upper = action.toUpperCase();
+    Color bg;
+    Color text;
+    Color border;
+    IconData icon;
+
+    if (upper.contains('RESTORE') || upper.contains('REVERT')) {
+      bg = isDark ? const Color(0xFF78350F).withValues(alpha: 0.45) : const Color(0xFFFEF3C7);
+      text = isDark ? const Color(0xFFFDE68A) : const Color(0xFF92400E);
+      border = isDark ? const Color(0xFFB45309) : const Color(0xFFFCD34D);
+      icon = Icons.settings_backup_restore_rounded;
+    } else if (upper.contains('BACKUP') || upper.contains('SAFETY')) {
+      bg = isDark ? const Color(0xFF064E3B).withValues(alpha: 0.45) : const Color(0xFFDCFCE7);
+      text = isDark ? const Color(0xFF6EE7B7) : const Color(0xFF166534);
+      border = isDark ? const Color(0xFF059669) : const Color(0xFF86EFAC);
+      icon = Icons.verified_user_rounded;
+    } else if (upper.contains('LOCATION') || upper.contains('MIGRATE') || upper.contains('MOVE')) {
+      bg = isDark ? const Color(0xFF1E3A8A).withValues(alpha: 0.45) : const Color(0xFFDBEAFE);
+      text = isDark ? const Color(0xFF93C5FD) : const Color(0xFF1E40AF);
+      border = isDark ? const Color(0xFF2563EB) : const Color(0xFF93C5FD);
+      icon = Icons.drive_file_move_rounded;
+    } else if (upper.contains('CREATE') || upper.contains('ADD') || upper.contains('INSERT') || upper.contains('SALE')) {
+      bg = isDark ? const Color(0xFF042F2E).withValues(alpha: 0.45) : const Color(0xFFCCFBF1);
+      text = isDark ? const Color(0xFF5EEAD4) : const Color(0xFF115E59);
+      border = isDark ? const Color(0xFF0D9488) : const Color(0xFF99F6E4);
+      icon = Icons.add_circle_outline_rounded;
+    } else if (upper.contains('UPDATE') || upper.contains('EDIT') || upper.contains('REPAIR')) {
+      bg = isDark ? const Color(0xFF3B0764).withValues(alpha: 0.45) : const Color(0xFFF3E8FF);
+      text = isDark ? const Color(0xFFD8B4FE) : const Color(0xFF6B21A8);
+      border = isDark ? const Color(0xFF9333EA) : const Color(0xFFD8B4FE);
+      icon = Icons.edit_note_rounded;
+    } else if (upper.contains('DELETE') || upper.contains('REMOVE') || upper.contains('DROP')) {
+      bg = isDark ? const Color(0xFF7F1D1D).withValues(alpha: 0.45) : const Color(0xFFFEE2E2);
+      text = isDark ? const Color(0xFFFCA5A5) : const Color(0xFF991B1B);
+      border = isDark ? const Color(0xFFDC2626) : const Color(0xFFFCA5A5);
+      icon = Icons.delete_outline_rounded;
+    } else {
+      bg = isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9);
+      text = isDark ? const Color(0xFFE2E8F0) : const Color(0xFF334155);
+      border = isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1);
+      icon = Icons.info_outline_rounded;
+    }
+
+    final displayAction = action.replaceAll('_', ' ').toUpperCase();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: border, width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: text),
+          const SizedBox(width: 5),
+          Text(
+            displayAction,
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+              color: text,
+              letterSpacing: 0.3,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showLogDetailsDialog(BuildContext context, AuditLog log, bool isDark) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        title: Row(
+          children: [
+            const Icon(Icons.security_rounded, color: AppTheme.primaryBlue, size: 22),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'Audit Log Record Details',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.close_rounded, size: 20),
+              onPressed: () => Navigator.of(ctx).pop(),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: 540,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildDialogRow('Timestamp', DateFormat('dd MMMM yyyy, hh:mm:ss a').format(log.timestamp), isDark),
+                _buildDialogRow('Operator / User', log.userName.isNotEmpty ? log.userName : 'System', isDark),
+                const SizedBox(height: 6),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 130,
+                        child: Text(
+                          'Action Type:',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12.5,
+                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                          ),
+                        ),
+                      ),
+                      _buildActionBadge(log.action, isDark),
+                    ],
+                  ),
+                ),
+                _buildDialogRow('Module', log.module, isDark),
+                if (log.recordId.isNotEmpty)
+                  _buildDialogRow('Record / Ref', log.recordId, isDark),
+                const Divider(height: 24),
+                Text(
+                  'Action Narrative & Verification:',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12.5,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                    ),
+                  ),
+                  child: SelectableText(
+                    log.details,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      height: 1.5,
+                      fontFamily: 'monospace',
+                      color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF1E293B),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          OutlinedButton.icon(
+            onPressed: () {
+              Clipboard.setData(ClipboardData(
+                text: 'Timestamp: ${log.timestamp}\nOperator: ${log.userName}\nAction: ${log.action}\nModule: ${log.module}\nRecord: ${log.recordId}\nDetails: ${log.details}',
+              ));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Log narrative copied to clipboard!'), duration: Duration(seconds: 2)),
+              );
+            },
+            icon: const Icon(Icons.copy_rounded, size: 16),
+            label: const Text('Copy to Clipboard'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Done'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDialogRow(String label, String value, bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 130,
+            child: Text(
+              '$label:',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 12.5,
+                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+              ),
+            ),
+          ),
+          Expanded(
+            child: SelectableText(
+              value,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white : const Color(0xFF0F172A),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
