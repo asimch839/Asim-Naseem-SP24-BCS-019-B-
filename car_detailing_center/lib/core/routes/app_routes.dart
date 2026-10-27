@@ -26,7 +26,8 @@ class AppRoutes {
   static const salaries = staffSalaries;
   static const jobs = '/jobs';
   static const services = '/services';
-  static const suppliers = '/suppliers';
+  static const vendors = '/vendors';
+  static const suppliers = vendors;
   static const purchases = '/purchases';
   static const sales = '/sales';
   static const devices = '/devices';

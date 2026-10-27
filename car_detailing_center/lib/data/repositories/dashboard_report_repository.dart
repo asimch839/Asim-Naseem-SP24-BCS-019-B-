@@ -343,10 +343,10 @@ class DashboardReportRepository {
 
     switch (reportType) {
       case 'customers':
-        return await db.rawQuery('SELECT * FROM customers WHERE is_deleted = 0 ORDER BY name ASC');
+        return await db.rawQuery('SELECT id, name, phone, address, registration_date, status, notes FROM customers WHERE is_deleted = 0 ORDER BY name ASC');
       case 'vehicles':
         return await db.rawQuery('''
-          SELECT v.*, c.name as customer_name, c.phone as customer_phone
+          SELECT v.registration_number, v.vehicle_name, v.model, v.model_year, v.color, v.current_odometer, c.name as customer_name, c.phone as customer_phone
           FROM vehicles v
           INNER JOIN customers c ON v.customer_id = c.id
           WHERE v.is_deleted = 0
@@ -354,28 +354,75 @@ class DashboardReportRepository {
         ''');
       case 'service_history':
         return await db.rawQuery('''
-          SELECT sh.*, v.registration_number, v.vehicle_name, c.name as customer_name
+          SELECT sh.date, v.registration_number, v.vehicle_name, c.name as customer_name, sh.service_description, sh.odometer, sh.amount, sh.payment_status, sh.staff_names
           FROM vehicle_service_history sh
           INNER JOIN vehicles v ON sh.vehicle_id = v.id
           INNER JOIN customers c ON sh.customer_id = c.id
           WHERE sh.date BETWEEN ? AND ?
           ORDER BY sh.date DESC
         ''', [startStr, endStr]);
+      case 'inspections':
+        return await db.rawQuery('''
+          SELECT i.inspection_date, v.registration_number, v.vehicle_name, c.name as customer_name, i.inspector_name, i.status, i.notes
+          FROM inspections i
+          INNER JOIN vehicles v ON i.vehicle_id = v.id
+          INNER JOIN customers c ON i.customer_id = c.id
+          WHERE i.inspection_date BETWEEN ? AND ?
+          ORDER BY i.inspection_date DESC
+        ''', [startStr, endStr]);
+      case 'staff':
+        return await db.rawQuery('''
+          SELECT name, father_name, cnic, phone, designation, salary_type, basic_salary, commission_rate, joining_date, status
+          FROM staff
+          WHERE is_deleted = 0
+          ORDER BY name ASC
+        ''');
+      case 'attendance':
+        return await db.rawQuery('''
+          SELECT a.date, s.name as staff_name, s.designation, a.status, a.check_in_time, a.check_out_time, a.notes
+          FROM attendance a
+          INNER JOIN staff s ON a.staff_id = s.id
+          WHERE a.date BETWEEN ? AND ?
+          ORDER BY a.date DESC, s.name ASC
+        ''', [startStr, endStr]);
+      case 'salaries':
+        return await db.rawQuery('''
+          SELECT sal.pay_period, s.name as staff_name, sal.salary_type, sal.basic_salary, sal.present_days, sal.absent_days, sal.gross_salary, sal.net_salary, sal.paid_amount, sal.remaining_amount, sal.status
+          FROM salaries sal
+          INNER JOIN staff s ON sal.staff_id = s.id
+          ORDER BY sal.pay_period DESC, s.name ASC
+        ''');
+      case 'staff_expenses':
+        return await db.rawQuery('''
+          SELECT se.date, s.name as staff_name, se.category, se.description, se.amount, se.payment_method, se.vendor_details, se.reference
+          FROM staff_expenses se
+          INNER JOIN staff s ON se.staff_id = s.id
+          WHERE se.date BETWEEN ? AND ?
+          ORDER BY se.date DESC
+        ''', [startStr, endStr]);
       case 'garage_expenses':
-        return await db.rawQuery('SELECT * FROM garage_expenses WHERE date BETWEEN ? AND ? ORDER BY date DESC', [startStr, endStr]);
+        return await db.rawQuery('SELECT date, category, description, amount, payment_method, vendor_name, vendor_company, vendor_contact, vendor_invoice_ref FROM garage_expenses WHERE date BETWEEN ? AND ? ORDER BY date DESC', [startStr, endStr]);
       case 'vendor_expenses':
         return await db.rawQuery('''
-          SELECT vendor_name, vendor_company, COUNT(*) as tx_count, COALESCE(SUM(amount), 0.0) as total_amount
+          SELECT vendor_name, vendor_company, COUNT(*) as expense_count, COALESCE(SUM(amount), 0.0) as total_spent
           FROM garage_expenses
-          WHERE date BETWEEN ? AND ? AND vendor_name != ''
+          WHERE date BETWEEN ? AND ? AND vendor_name IS NOT NULL AND vendor_name != ''
           GROUP BY vendor_name
-          ORDER BY total_amount DESC
+          ORDER BY total_spent DESC
         ''', [startStr, endStr]);
       case 'inventory':
-        return await db.rawQuery('SELECT * FROM inventory_items WHERE is_deleted = 0 ORDER BY item_name ASC');
+        return await db.rawQuery('SELECT item_name, current_quantity, unit, brand, purchase_price, (current_quantity * purchase_price) as stock_value, purchase_date FROM inventory_items WHERE is_deleted = 0 ORDER BY item_name ASC');
+      case 'inventory_transactions':
+        return await db.rawQuery('''
+          SELECT it.date_time, ii.item_name, it.transaction_type, it.previous_quantity, it.quantity_change, it.new_quantity, it.user_name, it.reason_notes, it.vendor_reference
+          FROM inventory_transactions it
+          INNER JOIN inventory_items ii ON it.item_id = ii.id
+          WHERE it.date_time BETWEEN ? AND ?
+          ORDER BY it.date_time DESC
+        ''', [startStr, endStr]);
       case 'invoices':
         return await db.rawQuery('''
-          SELECT inv.*, c.name as customer_name, v.registration_number
+          SELECT inv.invoice_number, inv.date, c.name as customer_name, v.registration_number, inv.subtotal, inv.discount, inv.tax_amount, inv.grand_total, inv.paid_amount, inv.remaining_amount, inv.status
           FROM invoices inv
           INNER JOIN customers c ON inv.customer_id = c.id
           INNER JOIN vehicles v ON inv.vehicle_id = v.id
@@ -384,18 +431,28 @@ class DashboardReportRepository {
         ''', [startStr, endStr]);
       case 'payments':
         return await db.rawQuery('''
-          SELECT p.*, inv.invoice_number, c.name as customer_name
+          SELECT p.payment_date, inv.invoice_number, c.name as customer_name, p.amount, p.payment_method, p.reference_number, p.is_refund, p.notes
           FROM payments p
           INNER JOIN invoices inv ON p.invoice_id = inv.id
           INNER JOIN customers c ON p.customer_id = c.id
           WHERE p.payment_date BETWEEN ? AND ?
           ORDER BY p.payment_date DESC
         ''', [startStr, endStr]);
+      case 'outstanding_balances':
+        return await db.rawQuery('''
+          SELECT c.name as customer_name, c.phone as customer_phone, COUNT(inv.id) as unpaid_invoices_count, COALESCE(SUM(inv.grand_total), 0.0) as total_invoiced, COALESCE(SUM(inv.paid_amount), 0.0) as total_paid, COALESCE(SUM(inv.remaining_amount), 0.0) as total_outstanding
+          FROM invoices inv
+          INNER JOIN customers c ON inv.customer_id = c.id
+          WHERE inv.status != 'Cancelled' AND inv.remaining_amount > 0
+          GROUP BY c.id
+          ORDER BY total_outstanding DESC
+        ''');
       case 'income_expense':
       default:
-        final inc = await db.rawQuery("SELECT date(payment_date) as day, COALESCE(SUM(amount), 0.0) as amount, 'Income' as type FROM payments WHERE payment_date BETWEEN ? AND ? GROUP BY day", [startStr, endStr]);
-        final exp = await db.rawQuery("SELECT date(date) as day, COALESCE(SUM(amount), 0.0) as amount, 'Expense' as type FROM garage_expenses WHERE date BETWEEN ? AND ? GROUP BY day", [startStr, endStr]);
-        return [...inc, ...exp];
+        final inc = await db.rawQuery("SELECT date(payment_date) as record_date, 'Payment Received' as category, amount, payment_method as method, 'Income' as type FROM payments WHERE payment_date BETWEEN ? AND ? AND is_refund = 0", [startStr, endStr]);
+        final expG = await db.rawQuery("SELECT date(date) as record_date, category, amount, payment_method as method, 'Garage Expense' as type FROM garage_expenses WHERE date BETWEEN ? AND ?", [startStr, endStr]);
+        final expS = await db.rawQuery("SELECT date(date) as record_date, category, amount, payment_method as method, 'Staff Expense' as type FROM staff_expenses WHERE date BETWEEN ? AND ?", [startStr, endStr]);
+        return [...inc, ...expG, ...expS];
     }
   }
 }

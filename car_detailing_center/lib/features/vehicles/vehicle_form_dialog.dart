@@ -109,12 +109,15 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
   Widget build(BuildContext context) {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Container(
-        width: 580,
-        padding: const EdgeInsets.all(24),
-        child: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 580,
+          maxHeight: MediaQuery.of(context).size.height * 0.88,
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Form(
+            key: _formKey,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -122,9 +125,12 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      widget.vehicle == null ? 'Register New Vehicle' : 'Edit Vehicle Details',
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    Expanded(
+                      child: Text(
+                        widget.vehicle == null ? 'Register New Vehicle' : 'Edit Vehicle Details',
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                     IconButton(icon: const Icon(Icons.close_rounded), onPressed: () => Get.back()),
                   ],
@@ -136,7 +142,7 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
                 DropdownButtonFormField<String>(
                   value: _selectedCustomerId,
                   decoration: const InputDecoration(labelText: 'Vehicle Owner (Customer) *', prefixIcon: Icon(Icons.person_rounded)),
-                  items: _customers.map((c) => DropdownMenuItem(value: c.id, child: Text('${c.fullName} (${c.phone})'))).toList(),
+                  items: _customers.map((c) => DropdownMenuItem(value: c.id, child: Text('${c.fullName} (${c.phone})', overflow: TextOverflow.ellipsis))).toList(),
                   onChanged: widget.preselectedCustomerId != null
                       ? null
                       : (val) => setState(() => _selectedCustomerId = val),
@@ -214,11 +220,12 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
                 ),
                 const SizedBox(height: 24),
 
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
+                Wrap(
+                  alignment: WrapAlignment.end,
+                  spacing: 12,
+                  runSpacing: 8,
                   children: [
                     OutlinedButton(onPressed: () => Get.back(), child: const Text('Cancel')),
-                    const SizedBox(width: 12),
                     ElevatedButton(
                       onPressed: _isSaving ? null : _saveVehicle,
                       child: _isSaving

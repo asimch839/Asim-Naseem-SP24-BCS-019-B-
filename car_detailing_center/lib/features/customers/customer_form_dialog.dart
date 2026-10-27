@@ -71,93 +71,132 @@ class _CustomerFormDialogState extends State<CustomerFormDialog> {
   Widget build(BuildContext context) {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Container(
-        width: 520,
-        padding: const EdgeInsets.all(24),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    widget.customer == null ? 'Register New Customer' : 'Edit Customer Profile',
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close_rounded),
-                    onPressed: () => Get.back(),
-                  ),
-                ],
-              ),
-              const Divider(),
-              const SizedBox(height: 12),
-
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(labelText: 'Customer Full Name *', prefixIcon: Icon(Icons.person_outline_rounded)),
-                validator: Validators.required,
-              ),
-              const SizedBox(height: 12),
-
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _phoneController,
-                      decoration: const InputDecoration(labelText: 'Phone Number *', prefixIcon: Icon(Icons.phone_outlined)),
-                      validator: Validators.phone,
-                      keyboardType: TextInputType.phone,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 520,
+          maxHeight: MediaQuery.of(context).size.height * 0.88,
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        widget.customer == null ? 'Register New Customer' : 'Edit Customer Profile',
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      value: _status,
-                      decoration: const InputDecoration(labelText: 'Status', prefixIcon: Icon(Icons.toggle_on_outlined)),
-                      items: const [
-                        DropdownMenuItem(value: 'Active', child: Text('Active')),
-                        DropdownMenuItem(value: 'Inactive', child: Text('Inactive')),
-                      ],
-                      onChanged: (val) {
-                        if (val != null) setState(() => _status = val);
-                      },
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded),
+                      onPressed: () => Get.back(),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
+                  ],
+                ),
+                const Divider(),
+                const SizedBox(height: 12),
 
-              TextFormField(
-                controller: _addressController,
-                decoration: const InputDecoration(labelText: 'Address', prefixIcon: Icon(Icons.location_on_outlined)),
-              ),
-              const SizedBox(height: 12),
+                TextFormField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(labelText: 'Customer Full Name *', prefixIcon: Icon(Icons.person_outline_rounded)),
+                  validator: Validators.required,
+                ),
+                const SizedBox(height: 12),
 
-              TextFormField(
-                controller: _notesController,
-                decoration: const InputDecoration(labelText: 'Customer Notes (Preferences, VIP, etc.)', prefixIcon: Icon(Icons.notes_rounded)),
-                maxLines: 2,
-              ),
-              const SizedBox(height: 24),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isWide = constraints.maxWidth > 380;
+                    if (isWide) {
+                      return Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: _phoneController,
+                              decoration: const InputDecoration(labelText: 'Phone Number *', prefixIcon: Icon(Icons.phone_outlined)),
+                              validator: Validators.phone,
+                              keyboardType: TextInputType.phone,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              value: _status,
+                              decoration: const InputDecoration(labelText: 'Status', prefixIcon: Icon(Icons.toggle_on_outlined)),
+                              items: const [
+                                DropdownMenuItem(value: 'Active', child: Text('Active')),
+                                DropdownMenuItem(value: 'Inactive', child: Text('Inactive')),
+                              ],
+                              onChanged: (val) {
+                                if (val != null) setState(() => _status = val);
+                              },
+                            ),
+                          ),
+                        ],
+                      );
+                    } else {
+                      return Column(
+                        children: [
+                          TextFormField(
+                            controller: _phoneController,
+                            decoration: const InputDecoration(labelText: 'Phone Number *', prefixIcon: Icon(Icons.phone_outlined)),
+                            validator: Validators.phone,
+                            keyboardType: TextInputType.phone,
+                          ),
+                          const SizedBox(height: 12),
+                          DropdownButtonFormField<String>(
+                            value: _status,
+                            decoration: const InputDecoration(labelText: 'Status', prefixIcon: Icon(Icons.toggle_on_outlined)),
+                            items: const [
+                              DropdownMenuItem(value: 'Active', child: Text('Active')),
+                              DropdownMenuItem(value: 'Inactive', child: Text('Inactive')),
+                            ],
+                            onChanged: (val) {
+                              if (val != null) setState(() => _status = val);
+                            },
+                          ),
+                        ],
+                      );
+                    }
+                  },
+                ),
+                const SizedBox(height: 12),
 
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  OutlinedButton(onPressed: () => Get.back(), child: const Text('Cancel')),
-                  const SizedBox(width: 12),
-                  ElevatedButton(
-                    onPressed: _isSaving ? null : _saveCustomer,
-                    child: _isSaving
-                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                        : Text(widget.customer == null ? 'Register Customer' : 'Save Changes'),
-                  ),
-                ],
-              ),
-            ],
+                TextFormField(
+                  controller: _addressController,
+                  decoration: const InputDecoration(labelText: 'Address', prefixIcon: Icon(Icons.location_on_outlined)),
+                ),
+                const SizedBox(height: 12),
+
+                TextFormField(
+                  controller: _notesController,
+                  decoration: const InputDecoration(labelText: 'Customer Notes (Preferences, VIP, etc.)', prefixIcon: Icon(Icons.notes_rounded)),
+                  maxLines: 2,
+                ),
+                const SizedBox(height: 24),
+
+                Wrap(
+                  alignment: WrapAlignment.end,
+                  spacing: 12,
+                  runSpacing: 8,
+                  children: [
+                    OutlinedButton(onPressed: () => Get.back(), child: const Text('Cancel')),
+                    ElevatedButton(
+                      onPressed: _isSaving ? null : _saveCustomer,
+                      child: _isSaving
+                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : Text(widget.customer == null ? 'Register Customer' : 'Save Changes'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),

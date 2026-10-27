@@ -166,184 +166,241 @@ class _JobCreateDialogState extends State<JobCreateDialog> {
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Container(
-        width: 760,
-        height: 700,
-        padding: const EdgeInsets.all(24),
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('New Digital Job Card / Repair Order', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                        IconButton(icon: const Icon(Icons.close_rounded), onPressed: () => Get.back()),
-                      ],
-                    ),
-                    const Divider(),
-                    const SizedBox(height: 8),
-
-                    // Customer & Vehicle Selection
-                    Row(
-                      children: [
-                        Expanded(
-                          child: DropdownButtonFormField<CustomerModel>(
-                            value: _selectedCustomer,
-                            decoration: const InputDecoration(labelText: 'Customer *', prefixIcon: Icon(Icons.person_rounded)),
-                            items: _customers.map((c) => DropdownMenuItem(value: c, child: Text('${c.fullName} (${c.phone})'))).toList(),
-                            onChanged: (val) => _onCustomerChanged(val),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: DropdownButtonFormField<VehicleModel>(
-                            value: _selectedVehicle,
-                            decoration: const InputDecoration(labelText: 'Vehicle *', prefixIcon: Icon(Icons.directions_car_rounded)),
-                            items: _customerVehicles.map((v) => DropdownMenuItem(value: v, child: Text('${v.displayName} (${v.plateNumber})'))).toList(),
-                            onChanged: (val) {
-                              setState(() {
-                                _selectedVehicle = val;
-                                if (val != null) _odometerInController.text = val.mileage?.toString() ?? '0';
-                              });
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Odometer In & Staff
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextFormField(
-                            controller: _odometerInController,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              labelText: 'Odometer In (KM) *',
-                              prefixIcon: Icon(Icons.speed_rounded),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: DropdownButtonFormField<StaffModel>(
-                            decoration: const InputDecoration(labelText: 'Assign Primary Technician', prefixIcon: Icon(Icons.badge_rounded)),
-                            items: _staffList.map((st) => DropdownMenuItem(value: st, child: Text('${st.name} (${st.designation})'))).toList(),
-                            onChanged: (val) {
-                              if (val != null && !_assignedStaff.contains(val)) {
-                                setState(() => _assignedStaff.add(val));
-                              }
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Services Selection Header
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Detailing Operations & Packages', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                        Text('${_selectedServices.length} Selected', style: const TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-
-                    Expanded(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Theme.of(context).dividerColor),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: ListView.separated(
-                          itemCount: _availableServices.length,
-                          separatorBuilder: (_, __) => const Divider(height: 1),
-                          itemBuilder: (context, index) {
-                            final s = _availableServices[index];
-                            final isSelected = _selectedServices.any((item) => item.name == s.name);
-
-                            return CheckboxListTile(
-                              title: Text(s.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                              subtitle: Text(Formatters.currency(s.price, symbol: currency)),
-                              value: isSelected,
-                              activeColor: AppColors.primary,
-                              onChanged: (val) {
-                                setState(() {
-                                  if (val == true) {
-                                    _selectedServices.add(s);
-                                  } else {
-                                    _selectedServices.removeWhere((item) => item.name == s.name);
-                                  }
-                                });
-                              },
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Financial Summary Box
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).cardTheme.color,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Theme.of(context).dividerColor),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 760,
+          maxHeight: MediaQuery.of(context).size.height * 0.9,
+        ),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : Form(
+                  key: _formKey,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isWide = constraints.maxWidth >= 560;
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              SizedBox(
-                                width: 140,
-                                child: TextFormField(
-                                  controller: _discountController,
-                                  decoration: const InputDecoration(labelText: 'Discount'),
-                                  keyboardType: TextInputType.number,
-                                  onChanged: (_) => setState(() {}),
+                              const Expanded(
+                                child: Text(
+                                  'New Digital Job Card / Repair Order',
+                                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
+                              IconButton(icon: const Icon(Icons.close_rounded), onPressed: () => Get.back()),
                             ],
                           ),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
+                          const Divider(),
+                          const SizedBox(height: 8),
+
+                          // Customer & Vehicle Selection
+                          if (isWide)
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: DropdownButtonFormField<CustomerModel>(
+                                    value: _selectedCustomer,
+                                    decoration: const InputDecoration(labelText: 'Customer *', prefixIcon: Icon(Icons.person_rounded)),
+                                    items: _customers.map((c) => DropdownMenuItem(value: c, child: Text('${c.fullName} (${c.phone})', overflow: TextOverflow.ellipsis))).toList(),
+                                    onChanged: (val) => _onCustomerChanged(val),
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: DropdownButtonFormField<VehicleModel>(
+                                    value: _selectedVehicle,
+                                    decoration: const InputDecoration(labelText: 'Vehicle *', prefixIcon: Icon(Icons.directions_car_rounded)),
+                                    items: _customerVehicles.map((v) => DropdownMenuItem(value: v, child: Text('${v.displayName} (${v.plateNumber})', overflow: TextOverflow.ellipsis))).toList(),
+                                    onChanged: (val) {
+                                      setState(() {
+                                        _selectedVehicle = val;
+                                        if (val != null) _odometerInController.text = val.mileage?.toString() ?? '0';
+                                      });
+                                    },
+                                  ),
+                                ),
+                              ],
+                            )
+                          else ...[
+                            DropdownButtonFormField<CustomerModel>(
+                              value: _selectedCustomer,
+                              decoration: const InputDecoration(labelText: 'Customer *', prefixIcon: Icon(Icons.person_rounded)),
+                              items: _customers.map((c) => DropdownMenuItem(value: c, child: Text('${c.fullName} (${c.phone})', overflow: TextOverflow.ellipsis))).toList(),
+                              onChanged: (val) => _onCustomerChanged(val),
+                            ),
+                            const SizedBox(height: 10),
+                            DropdownButtonFormField<VehicleModel>(
+                              value: _selectedVehicle,
+                              decoration: const InputDecoration(labelText: 'Vehicle *', prefixIcon: Icon(Icons.directions_car_rounded)),
+                              items: _customerVehicles.map((v) => DropdownMenuItem(value: v, child: Text('${v.displayName} (${v.plateNumber})', overflow: TextOverflow.ellipsis))).toList(),
+                              onChanged: (val) {
+                                setState(() {
+                                  _selectedVehicle = val;
+                                  if (val != null) _odometerInController.text = val.mileage?.toString() ?? '0';
+                                });
+                              },
+                            ),
+                          ],
+                          const SizedBox(height: 12),
+
+                          // Odometer In & Staff
+                          if (isWide)
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextFormField(
+                                    controller: _odometerInController,
+                                    keyboardType: TextInputType.number,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Odometer In (KM) *',
+                                      prefixIcon: Icon(Icons.speed_rounded),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: DropdownButtonFormField<StaffModel>(
+                                    decoration: const InputDecoration(labelText: 'Assign Primary Technician', prefixIcon: Icon(Icons.badge_rounded)),
+                                    items: _staffList.map((st) => DropdownMenuItem(value: st, child: Text('${st.name} (${st.designation})', overflow: TextOverflow.ellipsis))).toList(),
+                                    onChanged: (val) {
+                                      if (val != null && !_assignedStaff.contains(val)) {
+                                        setState(() => _assignedStaff.add(val));
+                                      }
+                                    },
+                                  ),
+                                ),
+                              ],
+                            )
+                          else ...[
+                            TextFormField(
+                              controller: _odometerInController,
+                              keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(
+                                labelText: 'Odometer In (KM) *',
+                                prefixIcon: Icon(Icons.speed_rounded),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            DropdownButtonFormField<StaffModel>(
+                              decoration: const InputDecoration(labelText: 'Assign Primary Technician', prefixIcon: Icon(Icons.badge_rounded)),
+                              items: _staffList.map((st) => DropdownMenuItem(value: st, child: Text('${st.name} (${st.designation})', overflow: TextOverflow.ellipsis))).toList(),
+                              onChanged: (val) {
+                                if (val != null && !_assignedStaff.contains(val)) {
+                                  setState(() => _assignedStaff.add(val));
+                                }
+                              },
+                            ),
+                          ],
+                          const SizedBox(height: 14),
+
+                          // Services Selection Header
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text('Subtotal: ${Formatters.currency(_subtotal, symbol: currency)}', style: const TextStyle(fontSize: 12, color: AppColors.textDarkSecondary)),
-                              Text(
-                                'Grand Total: ${Formatters.currency(_grandTotal, symbol: currency)}',
-                                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.success),
+                              const Text('Detailing Operations & Packages', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                              Text('${_selectedServices.length} Selected', style: const TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+
+                          Expanded(
+                            child: Container(
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Theme.of(context).dividerColor),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: ListView.separated(
+                                itemCount: _availableServices.length,
+                                separatorBuilder: (_, __) => const Divider(height: 1),
+                                itemBuilder: (context, index) {
+                                  final s = _availableServices[index];
+                                  final isSelected = _selectedServices.any((item) => item.name == s.name);
+
+                                  return CheckboxListTile(
+                                    title: Text(s.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                                    subtitle: Text(Formatters.currency(s.price, symbol: currency)),
+                                    value: isSelected,
+                                    activeColor: AppColors.primary,
+                                    onChanged: (val) {
+                                      setState(() {
+                                        if (val == true) {
+                                          _selectedServices.add(s);
+                                        } else {
+                                          _selectedServices.removeWhere((item) => item.name == s.name);
+                                        }
+                                      });
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+
+                          // Financial Summary Box
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).cardTheme.color,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Theme.of(context).dividerColor),
+                            ),
+                            child: Wrap(
+                              alignment: WrapAlignment.spaceBetween,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: 12,
+                              runSpacing: 8,
+                              children: [
+                                SizedBox(
+                                  width: 140,
+                                  child: TextFormField(
+                                    controller: _discountController,
+                                    decoration: const InputDecoration(labelText: 'Discount'),
+                                    keyboardType: TextInputType.number,
+                                    onChanged: (_) => setState(() {}),
+                                  ),
+                                ),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text('Subtotal: ${Formatters.currency(_subtotal, symbol: currency)}', style: const TextStyle(fontSize: 12, color: AppColors.textDarkSecondary)),
+                                    Text(
+                                      'Grand Total: ${Formatters.currency(_grandTotal, symbol: currency)}',
+                                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.success),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+
+                          Wrap(
+                            alignment: WrapAlignment.end,
+                            spacing: 12,
+                            runSpacing: 8,
+                            children: [
+                              OutlinedButton(onPressed: () => Get.back(), child: const Text('Cancel')),
+                              ElevatedButton(
+                                onPressed: _isSaving ? null : _createJob,
+                                child: _isSaving
+                                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                    : const Text('Create Digital Job Card'),
                               ),
                             ],
                           ),
                         ],
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        OutlinedButton(onPressed: () => Get.back(), child: const Text('Cancel')),
-                        const SizedBox(width: 12),
-                        ElevatedButton(
-                          onPressed: _isSaving ? null : _createJob,
-                          child: _isSaving
-                              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                              : const Text('Create Digital Job Card'),
-                        ),
-                      ],
-                    ),
-                  ],
+                      );
+                    },
+                  ),
                 ),
-              ),
+        ),
       ),
     );
   }

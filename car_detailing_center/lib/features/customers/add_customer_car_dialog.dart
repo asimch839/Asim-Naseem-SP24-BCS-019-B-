@@ -101,8 +101,11 @@ class _AddCustomerCarDialogState extends State<AddCustomerCarDialog> {
           Expanded(child: Text('Add Car for ${widget.customer.fullName}', maxLines: 1, overflow: TextOverflow.ellipsis)),
         ],
       ),
-      content: SizedBox(
-        width: 540,
+      content: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 540,
+          maxHeight: MediaQuery.of(context).size.height * 0.88,
+        ),
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(

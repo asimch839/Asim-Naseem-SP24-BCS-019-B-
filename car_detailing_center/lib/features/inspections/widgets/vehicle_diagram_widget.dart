@@ -30,16 +30,23 @@ class VehicleDiagramWidget extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 12,
+              runSpacing: 10,
               children: [
                 const Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(Icons.directions_car_rounded, color: AppColors.primaryLight),
                     SizedBox(width: 8),
-                    Text(
-                      'Interactive Vehicle Inspection Diagram',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    Flexible(
+                      child: Text(
+                        'Interactive Vehicle Inspection Diagram',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ],
                 ),
@@ -170,28 +177,50 @@ class VehicleDiagramWidget extends StatelessWidget {
     return _viewContainer(
       title: 'Top View (Bird\'s Eye)',
       icon: Icons.directions_car_filled_outlined,
-      child: Column(
-        children: [
-          Row(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isNarrow = constraints.maxWidth < 520;
+          if (isNarrow) {
+            return Column(
+              children: [
+                _buildPartTile('Front Windscreen', 'Top'),
+                const SizedBox(height: 6),
+                _buildPartTile('Roof & Sunroof', 'Top'),
+                const SizedBox(height: 6),
+                _buildPartTile('Rear Windscreen', 'Top'),
+                const SizedBox(height: 6),
+                _buildPartTile('Left Side Mirrors', 'Top'),
+                const SizedBox(height: 6),
+                _buildPartTile('Antenna / Shark Fin', 'Top'),
+                const SizedBox(height: 6),
+                _buildPartTile('Right Side Mirrors', 'Top'),
+              ],
+            );
+          }
+          return Column(
             children: [
-              Expanded(child: _buildPartTile('Front Windscreen', 'Top')),
-              const SizedBox(width: 8),
-              Expanded(child: _buildPartTile('Roof & Sunroof', 'Top')),
-              const SizedBox(width: 8),
-              Expanded(child: _buildPartTile('Rear Windscreen', 'Top')),
+              Row(
+                children: [
+                  Expanded(child: _buildPartTile('Front Windscreen', 'Top')),
+                  const SizedBox(width: 8),
+                  Expanded(child: _buildPartTile('Roof & Sunroof', 'Top')),
+                  const SizedBox(width: 8),
+                  Expanded(child: _buildPartTile('Rear Windscreen', 'Top')),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(child: _buildPartTile('Left Side Mirrors', 'Top')),
+                  const SizedBox(width: 8),
+                  Expanded(child: _buildPartTile('Antenna / Shark Fin', 'Top')),
+                  const SizedBox(width: 8),
+                  Expanded(child: _buildPartTile('Right Side Mirrors', 'Top')),
+                ],
+              ),
             ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(child: _buildPartTile('Left Side Mirrors', 'Top')),
-              const SizedBox(width: 8),
-              Expanded(child: _buildPartTile('Antenna / Shark Fin', 'Top')),
-              const SizedBox(width: 8),
-              Expanded(child: _buildPartTile('Right Side Mirrors', 'Top')),
-            ],
-          ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -324,7 +353,13 @@ class VehicleDiagramWidget extends StatelessWidget {
               color: hasDamage ? AppColors.error : existing != null ? AppColors.success : AppColors.textDarkMuted,
             ),
             const SizedBox(width: 6),
-            Text('$partName: $conditionText', style: TextStyle(fontSize: 11, fontWeight: hasDamage ? FontWeight.bold : FontWeight.normal)),
+            Flexible(
+              child: Text(
+                '$partName: $conditionText',
+                style: TextStyle(fontSize: 11, fontWeight: hasDamage ? FontWeight.bold : FontWeight.normal),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
             if (existing?.photoUrls.isNotEmpty == true) ...[
               const SizedBox(width: 4),
               const Icon(Icons.camera_alt_outlined, size: 12, color: AppColors.primaryLight),

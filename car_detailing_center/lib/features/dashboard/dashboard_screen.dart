@@ -151,112 +151,212 @@ class DashboardScreen extends StatelessWidget {
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+      child: LayoutBuilder(
+        builder: (context, headerConstraints) {
+          final isNarrow = headerConstraints.maxWidth < 780;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(
-                radius: 24,
-                backgroundColor: AppColors.primary.withValues(alpha: 0.15),
-                child: const Icon(Icons.speed_rounded, color: AppColors.primary, size: 26),
-              ),
-              const SizedBox(width: 14),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              if (isNarrow) ...[
+                Row(
                   children: [
-                    Text('AutoDetail Pro Center', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                    SizedBox(height: 2),
-                    Text('Offline-First SQLite Business Intelligence', style: TextStyle(fontSize: 12, color: AppColors.textDarkSecondary)),
+                    CircleAvatar(
+                      radius: 20,
+                      backgroundColor: AppColors.primary.withValues(alpha: 0.15),
+                      child: const Icon(Icons.speed_rounded, color: AppColors.primary, size: 22),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('AutoDetail Pro Center', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          SizedBox(height: 2),
+                          Text('Offline-First SQLite Business Intelligence', style: TextStyle(fontSize: 11, color: AppColors.textDarkSecondary)),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
-              ),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: () => showDialog(context: context, builder: (_) => const CustomerFormDialog()),
-                    icon: const Icon(Icons.person_add_rounded, size: 16),
-                    label: const Text('Customer'),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: () => showDialog(context: context, builder: (_) => const JobCreateDialog()),
-                    icon: const Icon(Icons.build_rounded, size: 16),
-                    label: const Text('Job Card'),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: () => showDialog(context: context, builder: (_) => const GarageExpenseFormDialog()),
-                    icon: const Icon(Icons.receipt_long_rounded, size: 16),
-                    label: const Text('Expense'),
-                  ),
-                  ElevatedButton.icon(
-                    onPressed: () => showDialog(context: context, builder: (_) => const InvoiceCreateDialog()),
-                    icon: const Icon(Icons.receipt_rounded, size: 16),
-                    label: const Text('New Invoice'),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const Divider(height: 28),
-
-          // Date Filters Row
-          Row(
-            children: [
-              const Icon(Icons.calendar_today_rounded, size: 16, color: AppColors.primaryLight),
-              const SizedBox(width: 8),
-              const Text('Reporting Filter:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-              const SizedBox(width: 12),
-              Expanded(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _buildTimeChip(controller, 'Today', DateFilter.today),
-                      const SizedBox(width: 8),
-                      _buildTimeChip(controller, 'This Week', DateFilter.thisWeek),
-                      const SizedBox(width: 8),
-                      _buildTimeChip(controller, 'This Month', DateFilter.thisMonth),
-                      const SizedBox(width: 8),
-                      _buildTimeChip(controller, 'Last Month', DateFilter.lastMonth),
-                      const SizedBox(width: 8),
-                      Obx(() {
-                        final isCustom = controller.selectedFilter.value == DateFilter.custom;
-                        return OutlinedButton.icon(
-                          onPressed: () async {
-                            final range = await showDateRangePicker(
-                              context: context,
-                              firstDate: DateTime(2020),
-                              lastDate: DateTime.now().add(const Duration(days: 365)),
-                            );
-                            if (range != null) {
-                              controller.setFilter(DateFilter.custom, DateTimeRange(start: range.start, end: range.end));
-                            }
-                          },
-                          icon: const Icon(Icons.date_range_rounded, size: 14),
-                          label: Text(isCustom ? 'Custom Range ✓' : 'Custom Range'),
-                          style: OutlinedButton.styleFrom(
-                            side: BorderSide(color: isCustom ? AppColors.primary : Colors.grey.withValues(alpha: 0.3)),
-                          ),
-                        );
-                      }),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        icon: const Icon(Icons.refresh_rounded, size: 20),
-                        tooltip: 'Refresh Metrics',
-                        onPressed: () => controller.loadDashboardData(),
-                      ),
-                    ],
-                  ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: () => showDialog(context: context, builder: (_) => const CustomerFormDialog()),
+                      icon: const Icon(Icons.person_add_rounded, size: 15),
+                      label: const Text('Customer'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () => showDialog(context: context, builder: (_) => const JobCreateDialog()),
+                      icon: const Icon(Icons.build_rounded, size: 15),
+                      label: const Text('Job Card'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () => showDialog(context: context, builder: (_) => const GarageExpenseFormDialog()),
+                      icon: const Icon(Icons.receipt_long_rounded, size: 15),
+                      label: const Text('Expense'),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: () => showDialog(context: context, builder: (_) => const InvoiceCreateDialog()),
+                      icon: const Icon(Icons.receipt_rounded, size: 15),
+                      label: const Text('New Invoice'),
+                    ),
+                  ],
                 ),
+              ] else ...[
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 24,
+                      backgroundColor: AppColors.primary.withValues(alpha: 0.15),
+                      child: const Icon(Icons.speed_rounded, color: AppColors.primary, size: 26),
+                    ),
+                    const SizedBox(width: 14),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('AutoDetail Pro Center', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                          SizedBox(height: 2),
+                          Text('Offline-First SQLite Business Intelligence', style: TextStyle(fontSize: 12, color: AppColors.textDarkSecondary)),
+                        ],
+                      ),
+                    ),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: () => showDialog(context: context, builder: (_) => const CustomerFormDialog()),
+                          icon: const Icon(Icons.person_add_rounded, size: 16),
+                          label: const Text('Customer'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: () => showDialog(context: context, builder: (_) => const JobCreateDialog()),
+                          icon: const Icon(Icons.build_rounded, size: 16),
+                          label: const Text('Job Card'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: () => showDialog(context: context, builder: (_) => const GarageExpenseFormDialog()),
+                          icon: const Icon(Icons.receipt_long_rounded, size: 16),
+                          label: const Text('Expense'),
+                        ),
+                        ElevatedButton.icon(
+                          onPressed: () => showDialog(context: context, builder: (_) => const InvoiceCreateDialog()),
+                          icon: const Icon(Icons.receipt_rounded, size: 16),
+                          label: const Text('New Invoice'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+              const Divider(height: 24),
+
+              // Date Filters Row
+              LayoutBuilder(
+                builder: (context, dateConstraints) {
+                  final isDateNarrow = dateConstraints.maxWidth < 540;
+                  return isDateNarrow
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.calendar_today_rounded, size: 15, color: AppColors.primaryLight),
+                                const SizedBox(width: 6),
+                                const Text('Reporting Filter:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                const Spacer(),
+                                IconButton(
+                                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                                  tooltip: 'Refresh Metrics',
+                                  onPressed: () => controller.loadDashboardData(),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children: [
+                                  _buildTimeChip(controller, 'Today', DateFilter.today),
+                                  const SizedBox(width: 6),
+                                  _buildTimeChip(controller, 'This Week', DateFilter.thisWeek),
+                                  const SizedBox(width: 6),
+                                  _buildTimeChip(controller, 'This Month', DateFilter.thisMonth),
+                                  const SizedBox(width: 6),
+                                  _buildTimeChip(controller, 'Last Month', DateFilter.lastMonth),
+                                  const SizedBox(width: 6),
+                                  _buildCustomDateButton(context, controller),
+                                ],
+                              ),
+                            ),
+                          ],
+                        )
+                      : Row(
+                          children: [
+                            const Icon(Icons.calendar_today_rounded, size: 16, color: AppColors.primaryLight),
+                            const SizedBox(width: 8),
+                            const Text('Reporting Filter:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  children: [
+                                    _buildTimeChip(controller, 'Today', DateFilter.today),
+                                    const SizedBox(width: 8),
+                                    _buildTimeChip(controller, 'This Week', DateFilter.thisWeek),
+                                    const SizedBox(width: 8),
+                                    _buildTimeChip(controller, 'This Month', DateFilter.thisMonth),
+                                    const SizedBox(width: 8),
+                                    _buildTimeChip(controller, 'Last Month', DateFilter.lastMonth),
+                                    const SizedBox(width: 8),
+                                    _buildCustomDateButton(context, controller),
+                                    const SizedBox(width: 8),
+                                    IconButton(
+                                      icon: const Icon(Icons.refresh_rounded, size: 20),
+                                      tooltip: 'Refresh Metrics',
+                                      onPressed: () => controller.loadDashboardData(),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                },
               ),
             ],
-          ),
-        ],
+          );
+        },
       ),
     );
+  }
+
+  Widget _buildCustomDateButton(BuildContext context, DashboardController controller) {
+    return Obx(() {
+      final isCustom = controller.selectedFilter.value == DateFilter.custom;
+      return OutlinedButton.icon(
+        onPressed: () async {
+          final range = await showDateRangePicker(
+            context: context,
+            firstDate: DateTime(2020),
+            lastDate: DateTime.now().add(const Duration(days: 365)),
+          );
+          if (range != null) {
+            controller.setFilter(DateFilter.custom, DateTimeRange(start: range.start, end: range.end));
+          }
+        },
+        icon: const Icon(Icons.date_range_rounded, size: 14),
+        label: Text(isCustom ? 'Custom Range ✓' : 'Custom Range'),
+        style: OutlinedButton.styleFrom(
+          side: BorderSide(color: isCustom ? AppColors.primary : Colors.grey.withValues(alpha: 0.3)),
+        ),
+      );
+    });
   }
 
   Widget _buildTimeChip(DashboardController controller, String label, DateFilter filter) {
@@ -277,14 +377,15 @@ class DashboardScreen extends StatelessWidget {
   Widget _buildFinancialKPIs(BuildContext context, DashboardMetrics m, String currency) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final count = constraints.maxWidth > 1000 ? 4 : constraints.maxWidth > 600 ? 2 : 1;
+        final count = constraints.maxWidth > 1000 ? 4 : constraints.maxWidth > 580 ? 2 : 1;
+        final ratio = count == 1 ? 3.2 : (constraints.maxWidth < 650 ? 1.9 : 2.3);
         return GridView.count(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           crossAxisCount: count,
           crossAxisSpacing: 14,
           mainAxisSpacing: 14,
-          childAspectRatio: 2.3,
+          childAspectRatio: ratio,
           children: [
             _kpiCard(
               title: 'Total Income',
@@ -324,14 +425,15 @@ class DashboardScreen extends StatelessWidget {
   Widget _buildOperationalKPIs(BuildContext context, DashboardMetrics m) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final count = constraints.maxWidth > 1100 ? 6 : constraints.maxWidth > 700 ? 3 : 2;
+        final count = constraints.maxWidth > 1100 ? 6 : constraints.maxWidth > 700 ? 3 : constraints.maxWidth > 400 ? 2 : 1;
+        final ratio = count == 1 ? 3.4 : (constraints.maxWidth < 500 ? 1.7 : 2.1);
         return GridView.count(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           crossAxisCount: count,
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
-          childAspectRatio: 2.1,
+          childAspectRatio: ratio,
           children: [
             _kpiCard(title: 'Total Customers', value: '${m.totalCustomers}', subtitle: 'Active client directory', color: AppColors.primary, icon: Icons.people_rounded, onTap: () => Get.toNamed(AppRoutes.customers)),
             _kpiCard(title: 'Total Vehicles', value: '${m.totalVehicles}', subtitle: 'Registered garage fleet', color: AppColors.primaryLight, icon: Icons.directions_car_rounded, onTap: () => Get.toNamed(AppRoutes.vehicles)),
@@ -348,14 +450,15 @@ class DashboardScreen extends StatelessWidget {
   Widget _buildStaffAndInventoryKPIs(BuildContext context, DashboardMetrics m, String currency) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final count = constraints.maxWidth > 1100 ? 8 : constraints.maxWidth > 700 ? 4 : 2;
+        final count = constraints.maxWidth > 1100 ? 8 : constraints.maxWidth > 700 ? 4 : constraints.maxWidth > 400 ? 2 : 1;
+        final ratio = count == 1 ? 3.4 : (constraints.maxWidth < 500 ? 1.6 : 1.9);
         return GridView.count(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           crossAxisCount: count,
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
-          childAspectRatio: 1.8,
+          childAspectRatio: ratio,
           children: [
             // Staff
             _kpiCard(title: 'Total Staff', value: '${m.totalStaff}', subtitle: 'Active team', color: AppColors.primary, icon: Icons.badge_rounded, onTap: () => Get.toNamed(AppRoutes.staff)),
@@ -412,11 +515,14 @@ class DashboardScreen extends StatelessWidget {
                   Icon(icon, size: 16, color: color),
                 ],
               ),
-              Text(
-                value,
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  value,
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color),
+                  maxLines: 1,
+                ),
               ),
               Text(
                 subtitle,
@@ -469,7 +575,7 @@ class DashboardScreen extends StatelessWidget {
   }) {
     return Container(
       padding: const EdgeInsets.all(20),
-      height: 320,
+      height: 330,
       decoration: BoxDecoration(
         color: AppColors.cardDark,
         borderRadius: BorderRadius.circular(16),

@@ -74,106 +74,118 @@ class _RecordPaymentDialogState extends State<RecordPaymentDialog> {
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Container(
-        width: 480,
-        padding: const EdgeInsets.all(24),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Collect Payment: ${widget.invoice.invoiceNumber}',
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close_rounded),
-                    onPressed: () => Get.back(),
-                  ),
-                ],
-              ),
-              const Divider(),
-              const SizedBox(height: 12),
-
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 480,
+          maxHeight: MediaQuery.of(context).size.height * 0.88,
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(widget.invoice.customerName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                        Text('Total: ${Formatters.currency(widget.invoice.grandTotal, symbol: currency)}', style: const TextStyle(fontSize: 12, color: AppColors.textDarkSecondary)),
-                      ],
+                    Expanded(
+                      child: Text(
+                        'Collect Payment: ${widget.invoice.invoiceNumber}',
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        const Text('Remaining Due', style: TextStyle(fontSize: 11, color: AppColors.textDarkSecondary)),
-                        Text(
-                          Formatters.currency(widget.invoice.remainingAmount, symbol: currency),
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.error),
-                        ),
-                      ],
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded),
+                      onPressed: () => Get.back(),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 16),
+                const Divider(),
+                const SizedBox(height: 12),
 
-              TextFormField(
-                controller: _amountController,
-                decoration: const InputDecoration(labelText: 'Received Amount *', prefixIcon: Icon(Icons.attach_money_rounded)),
-                keyboardType: TextInputType.number,
-                validator: Validators.positiveNumber,
-              ),
-              const SizedBox(height: 12),
-
-              DropdownButtonFormField<String>(
-                value: _paymentMethod,
-                decoration: const InputDecoration(labelText: 'Payment Method', prefixIcon: Icon(Icons.payment_rounded)),
-                items: AppConstants.paymentMethods.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
-                onChanged: (val) {
-                  if (val != null) setState(() => _paymentMethod = val);
-                },
-              ),
-              const SizedBox(height: 12),
-
-              TextFormField(
-                controller: _refController,
-                decoration: const InputDecoration(labelText: 'Transaction Reference / Cheque # / Slip ID', prefixIcon: Icon(Icons.tag_rounded)),
-              ),
-              const SizedBox(height: 12),
-
-              TextFormField(
-                controller: _notesController,
-                decoration: const InputDecoration(labelText: 'Payment Notes'),
-              ),
-              const SizedBox(height: 24),
-
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  OutlinedButton(onPressed: () => Get.back(), child: const Text('Cancel')),
-                  const SizedBox(width: 12),
-                  ElevatedButton(
-                    onPressed: _isSaving ? null : _submitPayment,
-                    child: _isSaving
-                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                        : const Text('Confirm Payment'),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                ],
-              ),
-            ],
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(widget.invoice.customerName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14), overflow: TextOverflow.ellipsis),
+                            Text('Total: ${Formatters.currency(widget.invoice.grandTotal, symbol: currency)}', style: const TextStyle(fontSize: 12, color: AppColors.textDarkSecondary)),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          const Text('Remaining Due', style: TextStyle(fontSize: 11, color: AppColors.textDarkSecondary)),
+                          Text(
+                            Formatters.currency(widget.invoice.remainingAmount, symbol: currency),
+                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.error),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                TextFormField(
+                  controller: _amountController,
+                  decoration: const InputDecoration(labelText: 'Received Amount *', prefixIcon: Icon(Icons.attach_money_rounded)),
+                  keyboardType: TextInputType.number,
+                  validator: Validators.positiveNumber,
+                ),
+                const SizedBox(height: 12),
+
+                DropdownButtonFormField<String>(
+                  value: _paymentMethod,
+                  decoration: const InputDecoration(labelText: 'Payment Method', prefixIcon: Icon(Icons.payment_rounded)),
+                  items: AppConstants.paymentMethods.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+                  onChanged: (val) {
+                    if (val != null) setState(() => _paymentMethod = val);
+                  },
+                ),
+                const SizedBox(height: 12),
+
+                TextFormField(
+                  controller: _refController,
+                  decoration: const InputDecoration(labelText: 'Transaction Reference / Cheque # / Slip ID', prefixIcon: Icon(Icons.tag_rounded)),
+                ),
+                const SizedBox(height: 12),
+
+                TextFormField(
+                  controller: _notesController,
+                  decoration: const InputDecoration(labelText: 'Payment Notes'),
+                ),
+                const SizedBox(height: 24),
+
+                Wrap(
+                  alignment: WrapAlignment.end,
+                  spacing: 12,
+                  runSpacing: 8,
+                  children: [
+                    OutlinedButton(onPressed: () => Get.back(), child: const Text('Cancel')),
+                    ElevatedButton(
+                      onPressed: _isSaving ? null : _submitPayment,
+                      child: _isSaving
+                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Text('Confirm Payment'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),

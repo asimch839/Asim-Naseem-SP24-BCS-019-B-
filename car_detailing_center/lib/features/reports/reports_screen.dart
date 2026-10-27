@@ -31,12 +31,19 @@ class _ReportsScreenState extends State<ReportsScreen> {
     'income_expense': 'Income & Expenses (P&L)',
     'customers': 'Customer Directory Report',
     'vehicles': 'Vehicle Fleet & Customer Links',
-    'service_history': 'Vehicle Service & Odometer History',
+    'service_history': 'Vehicle Service & Permanent Odometer History',
+    'inspections': 'Vehicle Inspection Records',
+    'staff': 'Staff Directory & Designations',
+    'attendance': 'Staff Attendance & Log',
+    'salaries': 'Staff Salaries & Disbursals',
+    'staff_expenses': 'Staff Expenses Report',
     'garage_expenses': 'Garage Expenses Report',
     'vendor_expenses': 'Vendor-Wise Expenses Report',
-    'inventory': 'Inventory Valuation & Stock Details',
+    'inventory': 'Inventory Valuation & Current Stock',
+    'inventory_transactions': 'Inventory Quantity & Movement History',
     'invoices': 'Invoices & Billing Summary',
-    'payments': 'Payments Received Report',
+    'payments': 'Payments & Collections Received',
+    'outstanding_balances': 'Customer Outstanding Balances & Aging',
   };
 
   @override
@@ -130,18 +137,22 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     // Report Type Selector
-                    DropdownButton<String>(
-                      value: _selectedReport,
-                      underline: const SizedBox(),
-                      items: _reportTypes.entries.map((e) {
-                        return DropdownMenuItem(value: e.key, child: Text(e.value, style: const TextStyle(fontWeight: FontWeight.bold)));
-                      }).toList(),
-                      onChanged: (val) {
-                        if (val != null) {
-                          setState(() => _selectedReport = val);
-                          _fetchReport();
-                        }
-                      },
+                    ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width > 500 ? 340 : MediaQuery.of(context).size.width - 64),
+                      child: DropdownButton<String>(
+                        value: _selectedReport,
+                        isExpanded: true,
+                        underline: const SizedBox(),
+                        items: _reportTypes.entries.map((e) {
+                          return DropdownMenuItem(value: e.key, child: Text(e.value, style: const TextStyle(fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis));
+                        }).toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setState(() => _selectedReport = val);
+                            _fetchReport();
+                          }
+                        },
+                      ),
                     ),
 
                     // Date Range Controls
@@ -211,18 +222,41 @@ class _ReportsScreenState extends State<ReportsScreen> {
                                   color: AppColors.primary.withValues(alpha: 0.1),
                                   borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
                                 ),
-                                child: Row(
-                                  children: [
-                                    Text(
-                                      '${_reportTypes[_selectedReport]} (${_reportData.length} records)',
-                                      style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryLight),
-                                    ),
-                                    const Spacer(),
-                                    Text(
-                                      'Audited locally from SQLite',
-                                      style: const TextStyle(fontSize: 11, color: AppColors.textDarkSecondary),
-                                    ),
-                                  ],
+                                child: LayoutBuilder(
+                                  builder: (context, constraints) {
+                                    if (constraints.maxWidth < 500) {
+                                      return Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            '${_reportTypes[_selectedReport]} (${_reportData.length} records)',
+                                            style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryLight),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          const Text(
+                                            'Audited locally from SQLite',
+                                            style: TextStyle(fontSize: 11, color: AppColors.textDarkSecondary),
+                                          ),
+                                        ],
+                                      );
+                                    }
+                                    return Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            '${_reportTypes[_selectedReport]} (${_reportData.length} records)',
+                                            style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryLight),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        const Text(
+                                          'Audited locally from SQLite',
+                                          style: TextStyle(fontSize: 11, color: AppColors.textDarkSecondary),
+                                        ),
+                                      ],
+                                    );
+                                  },
                                 ),
                               ),
                               Expanded(

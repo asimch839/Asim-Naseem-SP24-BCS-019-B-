@@ -117,23 +117,25 @@ class _InvoiceCreateDialogState extends State<InvoiceCreateDialog> {
       builder: (context) {
         return AlertDialog(
           title: const Text('Add Invoice Line Item'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Item / Service Name *')),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(controller: qtyCtrl, decoration: const InputDecoration(labelText: 'Quantity *'), keyboardType: TextInputType.number),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(controller: priceCtrl, decoration: const InputDecoration(labelText: 'Unit Price *'), keyboardType: TextInputType.number),
-                  ),
-                ],
-              ),
-            ],
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Item / Service Name *')),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(controller: qtyCtrl, decoration: const InputDecoration(labelText: 'Quantity *'), keyboardType: TextInputType.number),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextField(controller: priceCtrl, decoration: const InputDecoration(labelText: 'Unit Price *'), keyboardType: TextInputType.number),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
@@ -240,192 +242,308 @@ class _InvoiceCreateDialogState extends State<InvoiceCreateDialog> {
   Widget build(BuildContext context) {
     final currency = AuthService.to.currentBusiness.value?.currency ?? AppConstants.defaultCurrency;
 
+    final height = MediaQuery.of(context).size.height;
+
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Container(
-        width: 760,
-        height: 720,
-        padding: const EdgeInsets.all(24),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 780,
+          maxHeight: height * 0.9,
+        ),
         child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Create Official Tax Invoice', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                        IconButton(icon: const Icon(Icons.close_rounded), onPressed: () => Get.back()),
-                      ],
-                    ),
-                    const Divider(),
-                    const SizedBox(height: 8),
+            ? const SizedBox(
+                height: 200,
+                child: Center(child: CircularProgressIndicator()),
+              )
+            : LayoutBuilder(
+                builder: (context, constraints) {
+                  final isNarrow = constraints.maxWidth < 620;
 
-                    // Customer & Vehicle Selection
-                    Row(
-                      children: [
-                        Expanded(
-                          child: DropdownButtonFormField<CustomerModel>(
-                            value: _selectedCustomer,
-                            decoration: const InputDecoration(labelText: 'Customer *', prefixIcon: Icon(Icons.person_rounded)),
-                            items: _customers.map((c) => DropdownMenuItem(value: c, child: Text('${c.fullName} (${c.phone})'))).toList(),
-                            onChanged: (val) => _onCustomerChanged(val),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: DropdownButtonFormField<VehicleModel>(
-                            value: _selectedVehicle,
-                            decoration: const InputDecoration(labelText: 'Vehicle', prefixIcon: Icon(Icons.directions_car_rounded)),
-                            items: _customerVehicles.map((v) => DropdownMenuItem(value: v, child: Text('${v.displayName} (${v.plateNumber})'))).toList(),
-                            onChanged: (val) => setState(() => _selectedVehicle = val),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Line Items Table Header
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Services & Products Billed', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                        ElevatedButton.icon(
-                          onPressed: _addItem,
-                          icon: const Icon(Icons.add_rounded, size: 16),
-                          label: const Text('Add Line Item'),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-
-                    // Items List Box
-                    Expanded(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Theme.of(context).dividerColor),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: _items.isEmpty
-                            ? const Center(child: Text('No items added. Click "Add Line Item" to start.'))
-                            : ListView.separated(
-                                itemCount: _items.length,
-                                separatorBuilder: (_, __) => const Divider(height: 1),
-                                itemBuilder: (context, index) {
-                                  final item = _items[index];
-                                  return ListTile(
-                                    title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                    subtitle: Text('Qty: ${item.quantity.toStringAsFixed(1)} × ${Formatters.currency(item.unitPrice, symbol: currency)}'),
-                                    trailing: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(Formatters.currency(item.total, symbol: currency), style: const TextStyle(fontWeight: FontWeight.bold)),
-                                        IconButton(
-                                          icon: const Icon(Icons.delete_outline_rounded, color: AppColors.error),
-                                          onPressed: () => setState(() => _items.removeAt(index)),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                },
-                              ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Pricing & Payments Row
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
+                  return SingleChildScrollView(
+                    padding: const EdgeInsets.all(20),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
                             children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: TextFormField(
-                                      controller: _discountController,
-                                      decoration: const InputDecoration(labelText: 'Discount Amount'),
-                                      keyboardType: TextInputType.number,
-                                      onChanged: (_) => setState(() {}),
-                                    ),
+                              const Expanded(
+                                child: Text(
+                                  'Create Official Tax Invoice',
+                                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              IconButton(icon: const Icon(Icons.close_rounded), onPressed: () => Get.back()),
+                            ],
+                          ),
+                          const Divider(),
+                          const SizedBox(height: 8),
+
+                          // Customer & Vehicle Selection
+                          if (isNarrow) ...[
+                            DropdownButtonFormField<CustomerModel>(
+                              value: _selectedCustomer,
+                              isExpanded: true,
+                              decoration: const InputDecoration(labelText: 'Customer *', prefixIcon: Icon(Icons.person_rounded)),
+                              items: _customers.map((c) => DropdownMenuItem(value: c, child: Text('${c.fullName} (${c.phone})', overflow: TextOverflow.ellipsis))).toList(),
+                              onChanged: (val) => _onCustomerChanged(val),
+                            ),
+                            const SizedBox(height: 12),
+                            DropdownButtonFormField<VehicleModel>(
+                              value: _selectedVehicle,
+                              isExpanded: true,
+                              decoration: const InputDecoration(labelText: 'Vehicle', prefixIcon: Icon(Icons.directions_car_rounded)),
+                              items: _customerVehicles.map((v) => DropdownMenuItem(value: v, child: Text('${v.displayName} (${v.plateNumber})', overflow: TextOverflow.ellipsis))).toList(),
+                              onChanged: (val) => setState(() => _selectedVehicle = val),
+                            ),
+                          ] else ...[
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: DropdownButtonFormField<CustomerModel>(
+                                    value: _selectedCustomer,
+                                    isExpanded: true,
+                                    decoration: const InputDecoration(labelText: 'Customer *', prefixIcon: Icon(Icons.person_rounded)),
+                                    items: _customers.map((c) => DropdownMenuItem(value: c, child: Text('${c.fullName} (${c.phone})', overflow: TextOverflow.ellipsis))).toList(),
+                                    onChanged: (val) => _onCustomerChanged(val),
                                   ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: TextFormField(
-                                      controller: _paidAmountController,
-                                      decoration: const InputDecoration(labelText: 'Paid Amount (Advance)'),
-                                      keyboardType: TextInputType.number,
-                                      onChanged: (_) => setState(() {}),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: DropdownButtonFormField<VehicleModel>(
+                                    value: _selectedVehicle,
+                                    isExpanded: true,
+                                    decoration: const InputDecoration(labelText: 'Vehicle', prefixIcon: Icon(Icons.directions_car_rounded)),
+                                    items: _customerVehicles.map((v) => DropdownMenuItem(value: v, child: Text('${v.displayName} (${v.plateNumber})', overflow: TextOverflow.ellipsis))).toList(),
+                                    onChanged: (val) => setState(() => _selectedVehicle = val),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                          const SizedBox(height: 16),
+
+                          // Line Items Table Header
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Expanded(
+                                child: Text(
+                                  'Services & Products Billed',
+                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              ElevatedButton.icon(
+                                onPressed: _addItem,
+                                icon: const Icon(Icons.add_rounded, size: 16),
+                                label: const Text('Add Line Item'),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+
+                          // Items List Box
+                          Container(
+                            constraints: BoxConstraints(maxHeight: isNarrow ? 180 : 220),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Theme.of(context).dividerColor),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: _items.isEmpty
+                                ? const Padding(
+                                    padding: EdgeInsets.all(24),
+                                    child: Center(child: Text('No items added. Click "Add Line Item" to start.')),
+                                  )
+                                : ListView.separated(
+                                    shrinkWrap: true,
+                                    itemCount: _items.length,
+                                    separatorBuilder: (_, __) => const Divider(height: 1),
+                                    itemBuilder: (context, index) {
+                                      final item = _items[index];
+                                      return ListTile(
+                                        title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
+                                        subtitle: Text('Qty: ${item.quantity.toStringAsFixed(1)} × ${Formatters.currency(item.unitPrice, symbol: currency)}', overflow: TextOverflow.ellipsis),
+                                        trailing: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(Formatters.currency(item.total, symbol: currency), style: const TextStyle(fontWeight: FontWeight.bold)),
+                                            IconButton(
+                                              icon: const Icon(Icons.delete_outline_rounded, color: AppColors.error),
+                                              onPressed: () => setState(() => _items.removeAt(index)),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    },
+                                  ),
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Pricing & Payments Section
+                          if (isNarrow) ...[
+                            Column(
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: TextFormField(
+                                        controller: _discountController,
+                                        decoration: const InputDecoration(labelText: 'Discount Amount'),
+                                        keyboardType: TextInputType.number,
+                                        onChanged: (_) => setState(() {}),
+                                      ),
                                     ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: TextFormField(
+                                        controller: _paidAmountController,
+                                        decoration: const InputDecoration(labelText: 'Paid Amount (Advance)'),
+                                        keyboardType: TextInputType.number,
+                                        onChanged: (_) => setState(() {}),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                DropdownButtonFormField<String>(
+                                  value: _paymentMethod,
+                                  isExpanded: true,
+                                  decoration: const InputDecoration(labelText: 'Payment Method'),
+                                  items: AppConstants.paymentMethods.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+                                  onChanged: (val) {
+                                    if (val != null) setState(() => _paymentMethod = val);
+                                  },
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).cardTheme.color,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: Theme.of(context).dividerColor),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  _buildSummaryLine('Subtotal', Formatters.currency(_subtotal, symbol: currency)),
+                                  const SizedBox(height: 4),
+                                  _buildSummaryLine('Discount', '-${Formatters.currency(_discount, symbol: currency)}'),
+                                  const Divider(),
+                                  _buildSummaryLine('Grand Total', Formatters.currency(_grandTotal, symbol: currency), isBold: true),
+                                  const SizedBox(height: 4),
+                                  _buildSummaryLine('Paid', Formatters.currency(_paid, symbol: currency)),
+                                  const SizedBox(height: 4),
+                                  _buildSummaryLine(
+                                    'Remaining Due',
+                                    Formatters.currency(_remaining, symbol: currency),
+                                    isBold: true,
+                                    color: _remaining > 0 ? AppColors.error : AppColors.success,
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 10),
-                              DropdownButtonFormField<String>(
-                                value: _paymentMethod,
-                                decoration: const InputDecoration(labelText: 'Payment Method'),
-                                items: AppConstants.paymentMethods.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
-                                onChanged: (val) {
-                                  if (val != null) setState(() => _paymentMethod = val);
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 24),
+                            ),
+                          ] else ...[
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: TextFormField(
+                                              controller: _discountController,
+                                              decoration: const InputDecoration(labelText: 'Discount Amount'),
+                                              keyboardType: TextInputType.number,
+                                              onChanged: (_) => setState(() {}),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: TextFormField(
+                                              controller: _paidAmountController,
+                                              decoration: const InputDecoration(labelText: 'Paid Amount (Advance)'),
+                                              keyboardType: TextInputType.number,
+                                              onChanged: (_) => setState(() {}),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 10),
+                                      DropdownButtonFormField<String>(
+                                        value: _paymentMethod,
+                                        isExpanded: true,
+                                        decoration: const InputDecoration(labelText: 'Payment Method'),
+                                        items: AppConstants.paymentMethods.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+                                        onChanged: (val) {
+                                          if (val != null) setState(() => _paymentMethod = val);
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 24),
+                                Container(
+                                  width: 260,
+                                  padding: const EdgeInsets.all(14),
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context).cardTheme.color,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: Theme.of(context).dividerColor),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    children: [
+                                      _buildSummaryLine('Subtotal', Formatters.currency(_subtotal, symbol: currency)),
+                                      const SizedBox(height: 4),
+                                      _buildSummaryLine('Discount', '-${Formatters.currency(_discount, symbol: currency)}'),
+                                      const Divider(),
+                                      _buildSummaryLine('Grand Total', Formatters.currency(_grandTotal, symbol: currency), isBold: true),
+                                      const SizedBox(height: 4),
+                                      _buildSummaryLine('Paid', Formatters.currency(_paid, symbol: currency)),
+                                      const SizedBox(height: 4),
+                                      _buildSummaryLine(
+                                        'Remaining Due',
+                                        Formatters.currency(_remaining, symbol: currency),
+                                        isBold: true,
+                                        color: _remaining > 0 ? AppColors.error : AppColors.success,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                          const SizedBox(height: 20),
 
-                        // Financial totals block
-                        Container(
-                          width: 260,
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).cardTheme.color,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: Theme.of(context).dividerColor),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                          Wrap(
+                            alignment: WrapAlignment.end,
+                            spacing: 12,
+                            runSpacing: 8,
                             children: [
-                              _buildSummaryLine('Subtotal', Formatters.currency(_subtotal, symbol: currency)),
-                              const SizedBox(height: 4),
-                              _buildSummaryLine('Discount', '-${Formatters.currency(_discount, symbol: currency)}'),
-                              const Divider(),
-                              _buildSummaryLine('Grand Total', Formatters.currency(_grandTotal, symbol: currency), isBold: true),
-                              const SizedBox(height: 4),
-                              _buildSummaryLine('Paid', Formatters.currency(_paid, symbol: currency)),
-                              const SizedBox(height: 4),
-                              _buildSummaryLine(
-                                'Remaining Due',
-                                Formatters.currency(_remaining, symbol: currency),
-                                isBold: true,
-                                color: _remaining > 0 ? AppColors.error : AppColors.success,
+                              OutlinedButton(onPressed: () => Get.back(), child: const Text('Cancel')),
+                              ElevatedButton.icon(
+                                onPressed: _isSaving ? null : _saveAndPrintInvoice,
+                                icon: const Icon(Icons.print_rounded),
+                                label: _isSaving
+                                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                    : const Text('Save & Print Invoice (PDF)'),
                               ),
                             ],
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 16),
-
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        OutlinedButton(onPressed: () => Get.back(), child: const Text('Cancel')),
-                        const SizedBox(width: 12),
-                        ElevatedButton.icon(
-                          onPressed: _isSaving ? null : _saveAndPrintInvoice,
-                          icon: const Icon(Icons.print_rounded),
-                          label: _isSaving
-                              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                              : const Text('Save & Print Invoice (PDF)'),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+                  );
+                },
               ),
       ),
     );

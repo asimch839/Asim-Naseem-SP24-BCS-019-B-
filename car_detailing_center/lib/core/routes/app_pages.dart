@@ -15,6 +15,7 @@ import '../../features/payments/payment_list_screen.dart';
 import '../../features/reports/reports_screen.dart';
 import '../../features/notifications/notification_center_screen.dart';
 import '../../features/settings/settings_screen.dart';
+import '../../features/vendors/vendor_list_screen.dart';
 
 class AppPages {
   static const initial = AppRoutes.splash;
@@ -24,7 +25,7 @@ class AppPages {
     GetPage(name: AppRoutes.login, page: () => const LoginScreen()),
     GetPage(name: AppRoutes.forgotPassword, page: () => const ForgotPasswordScreen()),
 
-    // 11 Main Navigation Modules
+    // 11 Main Navigation Modules + Vendors
     GetPage(name: AppRoutes.dashboard, page: () => const DashboardScreen()),
     GetPage(name: AppRoutes.staff, page: () => const StaffScreen()),
     GetPage(name: AppRoutes.staffAttendance, page: () => const StaffScreen(initialTabIndex: 1)),
@@ -32,6 +33,8 @@ class AppPages {
     GetPage(name: AppRoutes.staffExpenses, page: () => const StaffScreen(initialTabIndex: 3)),
     GetPage(name: AppRoutes.garageExpenses, page: () => const GarageExpenseScreen()),
     GetPage(name: AppRoutes.inventory, page: () => const InventoryScreen()),
+    GetPage(name: AppRoutes.vendors, page: () => const VendorListScreen()),
+    GetPage(name: AppRoutes.suppliers, page: () => const VendorListScreen()),
     GetPage(name: AppRoutes.invoices, page: () => const InvoiceListScreen()),
     GetPage(name: AppRoutes.payments, page: () => const PaymentListScreen()),
     GetPage(name: AppRoutes.reports, page: () => const ReportsScreen()),

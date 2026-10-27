@@ -106,8 +106,11 @@ class _PartInspectionDialogState extends State<PartInspectionDialog> {
           Expanded(child: Text('Inspect Part: ${widget.part.partName}', maxLines: 1, overflow: TextOverflow.ellipsis)),
         ],
       ),
-      content: SizedBox(
-        width: 520,
+      content: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 520,
+          maxHeight: MediaQuery.of(context).size.height * 0.88,
+        ),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -187,7 +190,7 @@ class _PartInspectionDialogState extends State<PartInspectionDialog> {
               ),
               const SizedBox(height: 16),
 
-              // Photos Section (Upload to Firebase Storage per Section 20)
+              // Photos Section (Local app storage per Section 8 & 20)
               const Text('Inspection Photos:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
               const SizedBox(height: 8),
               Row(

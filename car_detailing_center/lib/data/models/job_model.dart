@@ -87,6 +87,9 @@ class JobModel {
   final List<String> afterPhotoUrls;
   final bool stockUsageConfirmed;
   final List<JobStockUsageItem> stockUsage;
+  final String? customerSignature;
+  final String? serviceAdvisorSignature;
+  final String? authorizedSignature;
   final String? notes;
   final String? invoiceId;
   final DateTime createdAt;
@@ -120,6 +123,9 @@ class JobModel {
     this.afterPhotoUrls = const [],
     this.stockUsageConfirmed = false,
     this.stockUsage = const [],
+    this.customerSignature,
+    this.serviceAdvisorSignature,
+    this.authorizedSignature,
     this.notes,
     this.invoiceId,
     DateTime? createdAt,
@@ -159,6 +165,9 @@ class JobModel {
       'afterPhotoUrls': afterPhotoUrls,
       'stockUsageConfirmed': stockUsageConfirmed,
       'stockUsage': stockUsage.map((u) => u.toMap()).toList(),
+      'customerSignature': customerSignature,
+      'serviceAdvisorSignature': serviceAdvisorSignature,
+      'authorizedSignature': authorizedSignature,
       'notes': notes,
       'invoiceId': invoiceId,
       'createdAt': createdAt.toIso8601String(),
@@ -201,6 +210,9 @@ class JobModel {
               ?.map((u) => JobStockUsageItem.fromMap(u as Map<String, dynamic>))
               .toList() ??
           [],
+      customerSignature: map['customerSignature'] ?? map['customer_signature'],
+      serviceAdvisorSignature: map['serviceAdvisorSignature'] ?? map['service_advisor_signature'],
+      authorizedSignature: map['authorizedSignature'] ?? map['authorized_signature'],
       notes: map['notes'],
       invoiceId: map['invoiceId'],
       createdAt: map['createdAt'] != null

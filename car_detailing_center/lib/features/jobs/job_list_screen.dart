@@ -209,7 +209,13 @@ class _JobListScreenState extends State<JobListScreen> {
                                       ),
                                     ),
                                     const SizedBox(width: 8),
-                                    Text('• $customerName', style: const TextStyle(fontSize: 13)),
+                                    Flexible(
+                                      child: Text(
+                                        '• $customerName',
+                                        style: const TextStyle(fontSize: 13),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
                                   ],
                                 ),
                                 subtitle: Padding(
@@ -217,6 +223,8 @@ class _JobListScreenState extends State<JobListScreen> {
                                   child: Text(
                                     '$vehicleName ($plate) • Date: ${Formatters.date(recDate)}',
                                     style: const TextStyle(fontSize: 12, color: AppColors.textDarkSecondary),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                                 trailing: Row(

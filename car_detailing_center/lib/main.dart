@@ -17,6 +17,7 @@ import 'data/repositories/invoice_payment_repository.dart';
 import 'data/repositories/dashboard_report_repository.dart';
 import 'data/repositories/settings_repository.dart';
 import 'data/repositories/notification_repository.dart';
+import 'data/repositories/vendor_repository.dart';
 import 'features/notifications/notification_controller.dart';
 
 void main() async {
@@ -54,6 +55,7 @@ void main() async {
   Get.put(StaffRepository(), permanent: true);
   Get.put(GarageExpenseRepository(), permanent: true);
   Get.put(InventoryRepository(), permanent: true);
+  Get.put(VendorRepository(), permanent: true);
   Get.put(InvoicePaymentRepository(), permanent: true);
   Get.put(DashboardReportRepository(), permanent: true);
   Get.put(NotificationRepository(), permanent: true);

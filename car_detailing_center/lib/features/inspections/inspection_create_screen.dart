@@ -330,19 +330,30 @@ class _InspectionCreateScreenState extends State<InspectionCreateScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Inspection: ${activeVehicle.make} ${activeVehicle.model} (${activeVehicle.registrationNumber})'),
+        title: Text(
+          'Inspection: ${activeVehicle.make} ${activeVehicle.model} (${activeVehicle.registrationNumber})',
+          overflow: TextOverflow.ellipsis,
+        ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => Get.back(),
         ),
         actions: [
-          ElevatedButton.icon(
-            onPressed: _isSaving ? null : _saveAndGeneratePdf,
-            icon: _isSaving
-                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Icon(Icons.picture_as_pdf_rounded),
-            label: const Text('Save & Generate PDF'),
-          ),
+          MediaQuery.of(context).size.width < 600
+              ? IconButton(
+                  onPressed: _isSaving ? null : _saveAndGeneratePdf,
+                  icon: _isSaving
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Icon(Icons.picture_as_pdf_rounded),
+                  tooltip: 'Save & Generate PDF',
+                )
+              : ElevatedButton.icon(
+                  onPressed: _isSaving ? null : _saveAndGeneratePdf,
+                  icon: _isSaving
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Icon(Icons.picture_as_pdf_rounded),
+                  label: const Text('Save & Generate PDF'),
+                ),
           const SizedBox(width: 16),
         ],
       ),
@@ -355,31 +366,74 @@ class _InspectionCreateScreenState extends State<InspectionCreateScreen> {
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    const Icon(Icons.directions_car_rounded, size: 28, color: AppColors.primaryLight),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isNarrow = constraints.maxWidth < 550;
+                    if (isNarrow) {
+                      return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('${activeVehicle.make} ${activeVehicle.model} (${activeVehicle.year ?? "Year N/A"})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          Row(
+                            children: [
+                              const Icon(Icons.directions_car_rounded, size: 28, color: AppColors.primaryLight),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  '${activeVehicle.make} ${activeVehicle.model} (${activeVehicle.year ?? "Year N/A"})',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
                           Text('Plate: ${activeVehicle.registrationNumber} • Mileage: ${activeVehicle.mileage ?? 0} km • Date: ${Formatters.date(DateTime.now())}'),
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.accent.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              'Inspector: ${AuthService.to.currentUser.value?.fullName ?? "Advisor"}',
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.accent),
+                            ),
+                          ),
                         ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: AppColors.accent.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        'Inspector: ${AuthService.to.currentUser.value?.fullName ?? "Advisor"}',
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.accent),
-                      ),
-                    ),
-                  ],
+                      );
+                    }
+                    return Row(
+                      children: [
+                        const Icon(Icons.directions_car_rounded, size: 28, color: AppColors.primaryLight),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${activeVehicle.make} ${activeVehicle.model} (${activeVehicle.year ?? "Year N/A"})',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              Text('Plate: ${activeVehicle.registrationNumber} • Mileage: ${activeVehicle.mileage ?? 0} km • Date: ${Formatters.date(DateTime.now())}'),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: AppColors.accent.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            'Inspector: ${AuthService.to.currentUser.value?.fullName ?? "Advisor"}',
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.accent),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
             ),
@@ -435,83 +489,89 @@ class _InspectionCreateScreenState extends State<InspectionCreateScreen> {
     );
   }
 
+  Widget _buildFieldPair(bool isNarrow, Widget first, Widget second) {
+    if (isNarrow) {
+      return Column(
+        children: [
+          first,
+          const SizedBox(height: 14),
+          second,
+        ],
+      );
+    }
+    return Row(
+      children: [
+        Expanded(child: first),
+        const SizedBox(width: 14),
+        Expanded(child: second),
+      ],
+    );
+  }
+
   // DRIVE CONDITION
   Widget _buildDriveConditionCard() {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Row(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isNarrow = constraints.maxWidth < 550;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.speed_rounded, color: AppColors.primaryLight),
-                SizedBox(width: 8),
-                Text('Vehicle Drive Condition', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              ],
-            ),
-            const SizedBox(height: 6),
-            const Text('Free-text record of driving dynamics, transmission, steering, and engine behavior.', style: TextStyle(fontSize: 12, color: AppColors.textDarkSecondary)),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
+                const Row(
+                  children: [
+                    Icon(Icons.speed_rounded, color: AppColors.primaryLight),
+                    SizedBox(width: 8),
+                    Text('Vehicle Drive Condition', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                const Text('Free-text record of driving dynamics, transmission, steering, and engine behavior.', style: TextStyle(fontSize: 12, color: AppColors.textDarkSecondary)),
+                const SizedBox(height: 16),
+                _buildFieldPair(
+                  isNarrow,
+                  TextFormField(
                     controller: _driveConditionController,
                     decoration: const InputDecoration(labelText: 'Drive Condition (e.g. Smooth, Pulls to left, Stiff)'),
                   ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: TextFormField(
+                  TextFormField(
                     controller: _steeringController,
                     decoration: const InputDecoration(labelText: 'Steering Condition (e.g. Center alignment off, Vibration)'),
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
+                const SizedBox(height: 14),
+                _buildFieldPair(
+                  isNarrow,
+                  TextFormField(
                     controller: _brakeController,
                     decoration: const InputDecoration(labelText: 'Brake Condition (e.g. Squeaking, Spongy pedal, Good)'),
                   ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: TextFormField(
+                  TextFormField(
                     controller: _suspensionController,
                     decoration: const InputDecoration(labelText: 'Suspension Condition (e.g. Creaking over bumps, Firm)'),
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
+                const SizedBox(height: 14),
+                _buildFieldPair(
+                  isNarrow,
+                  TextFormField(
                     controller: _engineBehaviorController,
                     decoration: const InputDecoration(labelText: 'Engine Behavior (e.g. Normal idle, Hesitation, Ticking sound)'),
                   ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: TextFormField(
+                  TextFormField(
                     controller: _transmissionController,
                     decoration: const InputDecoration(labelText: 'Transmission Behavior (e.g. Smooth shifting, Delayed reverse)'),
                   ),
                 ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _unusualNoiseController,
+                  decoration: const InputDecoration(labelText: 'Any Unusual Noise Observed (e.g. Belt whine, Wheel bearing hum)'),
+                ),
               ],
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _unusualNoiseController,
-              decoration: const InputDecoration(labelText: 'Any Unusual Noise Observed (e.g. Belt whine, Wheel bearing hum)'),
-            ),
-          ],
+            );
+          },
         ),
       ),
     );
@@ -522,71 +582,58 @@ class _InspectionCreateScreenState extends State<InspectionCreateScreen> {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Row(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isNarrow = constraints.maxWidth < 550;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.tune_rounded, color: AppColors.primaryLight),
-                SizedBox(width: 8),
-                Text('Suspension & Electronics Inspection', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
+                const Row(
+                  children: [
+                    Icon(Icons.tune_rounded, color: AppColors.primaryLight),
+                    SizedBox(width: 8),
+                    Text('Suspension & Electronics Inspection', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _buildFieldPair(
+                  isNarrow,
+                  TextFormField(
                     controller: _frontSuspensionController,
                     decoration: const InputDecoration(labelText: 'Front Suspension (e.g. Bushing wear, Strut leakage)'),
                   ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: TextFormField(
+                  TextFormField(
                     controller: _rearSuspensionController,
                     decoration: const InputDecoration(labelText: 'Rear Suspension (e.g. Good condition, Sagging springs)'),
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
+                const SizedBox(height: 14),
+                _buildFieldPair(
+                  isNarrow,
+                  TextFormField(
                     controller: _lightsController,
                     decoration: const InputDecoration(labelText: 'Lights & Indicators (e.g. High beam bulb out, Fog light foggy)'),
                   ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: TextFormField(
+                  TextFormField(
                     controller: _acController,
                     decoration: const InputDecoration(labelText: 'AC & Climate (e.g. Cooling optimal, Odor from blower)'),
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
+                const SizedBox(height: 14),
+                _buildFieldPair(
+                  isNarrow,
+                  TextFormField(
                     controller: _audioController,
                     decoration: const InputDecoration(labelText: 'Audio & Displays (e.g. Touchscreen responsive, Speaker buzz)'),
                   ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: TextFormField(
+                  TextFormField(
                     controller: _camerasSensorsController,
                     decoration: const InputDecoration(labelText: 'Cameras & Reverse Sensors (e.g. Rear camera lens cloudy)'),
                   ),
                 ),
               ],
-            ),
-          ],
+            );
+          },
         ),
       ),
     );
@@ -639,10 +686,14 @@ class _InspectionCreateScreenState extends State<InspectionCreateScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 12,
+              runSpacing: 8,
               children: [
                 const Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(Icons.category_rounded, color: AppColors.primaryLight),
                     SizedBox(width: 8),
@@ -686,12 +737,62 @@ class _InspectionCreateScreenState extends State<InspectionCreateScreen> {
             ..._sectionControllers.entries.map((entry) {
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12),
-                child: TextFormField(
-                  controller: entry.value,
-                  decoration: InputDecoration(
-                    labelText: entry.key,
-                    hintText: 'Type condition observation for ${entry.key}...',
-                  ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: entry.value,
+                        decoration: InputDecoration(
+                          labelText: entry.key,
+                          hintText: 'Type condition observation for ${entry.key}...',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      icon: const Icon(Icons.edit_outlined, size: 18),
+                      tooltip: 'Rename Section',
+                      onPressed: () {
+                        final renameCtrl = TextEditingController(text: entry.key);
+                        showDialog(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('Rename Inspection Section'),
+                            content: TextField(
+                              controller: renameCtrl,
+                              decoration: const InputDecoration(labelText: 'New Section Name'),
+                            ),
+                            actions: [
+                              TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
+                              ElevatedButton(
+                                onPressed: () {
+                                  final newName = renameCtrl.text.trim();
+                                  if (newName.isNotEmpty && newName != entry.key) {
+                                    setState(() {
+                                      final existingText = entry.value.text;
+                                      _sectionControllers.remove(entry.key);
+                                      _sectionControllers[newName] = TextEditingController(text: existingText);
+                                    });
+                                    Get.back();
+                                  }
+                                },
+                                child: const Text('Save'),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline_rounded, size: 18, color: AppColors.error),
+                      tooltip: 'Remove Section',
+                      onPressed: () {
+                        setState(() {
+                          _sectionControllers.remove(entry.key);
+                        });
+                      },
+                    ),
+                  ],
                 ),
               );
             }),
@@ -709,10 +810,14 @@ class _InspectionCreateScreenState extends State<InspectionCreateScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 12,
+              runSpacing: 8,
               children: [
                 const Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(Icons.checklist_rounded, color: AppColors.primaryLight),
                     SizedBox(width: 8),
@@ -758,30 +863,60 @@ class _InspectionCreateScreenState extends State<InspectionCreateScreen> {
               itemBuilder: (context, index) {
                 final c = _checklistItems[index];
                 return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        flex: 2,
-                        child: Text(c.item, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                      ),
-                      Wrap(
-                        spacing: 4,
-                        children: ['Present', 'Missing', 'Damaged', 'N/A'].map((s) {
-                          final isSelected = c.status == s;
-                          return ChoiceChip(
-                            label: Text(s, style: TextStyle(fontSize: 10, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
-                            selected: isSelected,
-                            selectedColor: s == 'Present' ? AppColors.success : s == 'Missing' ? AppColors.error : AppColors.primary,
-                            onSelected: (_) {
-                              setState(() {
-                                _checklistItems[index] = ChecklistRecordItem(item: c.item, status: s, notes: c.notes);
-                              });
-                            },
-                          );
-                        }).toList(),
-                      ),
-                    ],
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isNarrow = constraints.maxWidth < 450;
+                      if (isNarrow) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(c.item, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                            const SizedBox(height: 6),
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 4,
+                              children: ['Present', 'Missing', 'Damaged', 'N/A'].map((s) {
+                                final isSelected = c.status == s;
+                                return ChoiceChip(
+                                  label: Text(s, style: TextStyle(fontSize: 10, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+                                  selected: isSelected,
+                                  selectedColor: s == 'Present' ? AppColors.success : s == 'Missing' ? AppColors.error : AppColors.primary,
+                                  onSelected: (_) {
+                                    setState(() {
+                                      _checklistItems[index] = ChecklistRecordItem(item: c.item, status: s, notes: c.notes);
+                                    });
+                                  },
+                                );
+                              }).toList(),
+                            ),
+                          ],
+                        );
+                      }
+                      return Row(
+                        children: [
+                          Expanded(
+                            child: Text(c.item, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                          ),
+                          Wrap(
+                            spacing: 4,
+                            children: ['Present', 'Missing', 'Damaged', 'N/A'].map((s) {
+                              final isSelected = c.status == s;
+                              return ChoiceChip(
+                                label: Text(s, style: TextStyle(fontSize: 10, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+                                selected: isSelected,
+                                selectedColor: s == 'Present' ? AppColors.success : s == 'Missing' ? AppColors.error : AppColors.primary,
+                                onSelected: (_) {
+                                  setState(() {
+                                    _checklistItems[index] = ChecklistRecordItem(item: c.item, status: s, notes: c.notes);
+                                  });
+                                },
+                              );
+                            }).toList(),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 );
               },
@@ -797,56 +932,79 @@ class _InspectionCreateScreenState extends State<InspectionCreateScreen> {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Remarks & Sign-off', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 14),
-            Row(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isNarrow = constraints.maxWidth < 600;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: TextFormField(
+                const Text('Remarks & Sign-off', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 14),
+                if (isNarrow) ...[
+                  TextFormField(
                     controller: _staffRemarksController,
                     maxLines: 2,
                     decoration: const InputDecoration(
                       labelText: 'Service Advisor / Inspector Remarks',
                     ),
                   ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: TextFormField(
+                  const SizedBox(height: 12),
+                  TextFormField(
                     controller: _customerRemarksController,
                     maxLines: 2,
                     decoration: const InputDecoration(
                       labelText: 'Customer Notes / Acknowledgement',
                     ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.backgroundDark,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.borderDark),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.verified_user_rounded, color: AppColors.success, size: 20),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Customer agrees that all pre-existing scratches, dents, and belongings listed above reflect the accurate condition of the vehicle prior to detailing.',
-                      style: TextStyle(fontSize: 11, color: AppColors.textDarkSecondary),
-                    ),
+                ] else ...[
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: _staffRemarksController,
+                          maxLines: 2,
+                          decoration: const InputDecoration(
+                            labelText: 'Service Advisor / Inspector Remarks',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: TextFormField(
+                          controller: _customerRemarksController,
+                          maxLines: 2,
+                          decoration: const InputDecoration(
+                            labelText: 'Customer Notes / Acknowledgement',
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
-              ),
-            ),
-          ],
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.backgroundDark,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.borderDark),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.verified_user_rounded, color: AppColors.success, size: 20),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Customer agrees that all pre-existing scratches, dents, and belongings listed above reflect the accurate condition of the vehicle prior to detailing.',
+                          style: TextStyle(fontSize: 11, color: AppColors.textDarkSecondary),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );

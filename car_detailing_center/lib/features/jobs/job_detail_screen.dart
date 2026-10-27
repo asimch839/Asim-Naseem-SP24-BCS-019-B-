@@ -173,66 +173,105 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(20),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isWide = constraints.maxWidth >= 650;
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
+                        Wrap(
+                          alignment: WrapAlignment.spaceBetween,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 12,
+                          runSpacing: 8,
                           children: [
-                            Text(_job.jobNumber, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                            const SizedBox(width: 12),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: AppColors.getJobStatusColor(_job.status).withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                _job.status,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.getJobStatusColor(_job.status),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(_job.jobNumber, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                                const SizedBox(width: 12),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.getJobStatusColor(_job.status).withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    _job.status,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.getJobStatusColor(_job.status),
+                                    ),
+                                  ),
                                 ),
-                              ),
+                              ],
+                            ),
+                            Text(
+                              'Total: ${Formatters.currency(_job.grandTotal, symbol: currency)}',
+                              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                             ),
                           ],
                         ),
-                        Text(
-                          'Total: ${Formatters.currency(_job.grandTotal, symbol: currency)}',
-                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
-                    const Divider(height: 24),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
+                        const Divider(height: 24),
+                        if (isWide)
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('Customer Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primaryLight)),
+                                    const SizedBox(height: 4),
+                                    Text(_job.customerName, style: const TextStyle(fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis),
+                                    Text('Phone: ${_job.customerPhone}', style: const TextStyle(fontSize: 12, color: AppColors.textDarkSecondary)),
+                                  ],
+                                ),
+                              ),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('Vehicle Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primaryLight)),
+                                    const SizedBox(height: 4),
+                                    Text(_job.vehicleDisplayName, style: const TextStyle(fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis),
+                                    Text('Plate #: ${_job.vehicleRegNumber}', style: const TextStyle(fontSize: 12, color: AppColors.textDarkSecondary)),
+                                  ],
+                                ),
+                              ),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('Financial Summary', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primaryLight)),
+                                    const SizedBox(height: 4),
+                                    Text('Paid: ${Formatters.currency(_job.paidAmount, symbol: currency)}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                                    Text(
+                                      'Remaining: ${Formatters.currency(_job.remainingAmount, symbol: currency)}',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: _job.remainingAmount > 0 ? AppColors.error : AppColors.success,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          )
+                        else ...[
+                          Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Text('Customer Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primaryLight)),
                               const SizedBox(height: 4),
                               Text(_job.customerName, style: const TextStyle(fontWeight: FontWeight.w600)),
                               Text('Phone: ${_job.customerPhone}', style: const TextStyle(fontSize: 12, color: AppColors.textDarkSecondary)),
-                            ],
-                          ),
-                        ),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
+                              const Divider(height: 16),
                               const Text('Vehicle Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primaryLight)),
                               const SizedBox(height: 4),
                               Text(_job.vehicleDisplayName, style: const TextStyle(fontWeight: FontWeight.w600)),
                               Text('Plate #: ${_job.vehicleRegNumber}', style: const TextStyle(fontSize: 12, color: AppColors.textDarkSecondary)),
-                            ],
-                          ),
-                        ),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
+                              const Divider(height: 16),
                               const Text('Financial Summary', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primaryLight)),
                               const SizedBox(height: 4),
                               Text('Paid: ${Formatters.currency(_job.paidAmount, symbol: currency)}', style: const TextStyle(fontWeight: FontWeight.w600)),
@@ -246,10 +285,10 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                               ),
                             ],
                           ),
-                        ),
+                        ],
                       ],
-                    ),
-                  ],
+                    );
+                  },
                 ),
               ),
             ),
@@ -286,8 +325,11 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             const SizedBox(height: 20),
 
             // Services Rendered
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 12,
+              runSpacing: 8,
               children: [
                 const Text('Services & Labour', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 ElevatedButton.icon(

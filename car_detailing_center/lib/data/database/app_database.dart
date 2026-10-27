@@ -35,6 +35,9 @@ class AppDatabase {
       },
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
+      onOpen: (db) async {
+        await _ensureAdditionalTables(db);
+      },
     );
   }
 
@@ -488,6 +491,27 @@ class AppDatabase {
       )
     ''');
 
+    // 26. Vendors Table
+    batch.execute('''
+      CREATE TABLE vendors (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        company TEXT,
+        phone TEXT NOT NULL,
+        whatsapp TEXT,
+        email TEXT,
+        address TEXT,
+        category TEXT DEFAULT 'General Supplies',
+        tax_number TEXT,
+        notes TEXT,
+        current_balance REAL DEFAULT 0,
+        status TEXT DEFAULT 'Active',
+        is_deleted INTEGER DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+
     // Performance Indexes
     batch.execute('CREATE INDEX idx_customers_phone ON customers(phone)');
     batch.execute('CREATE INDEX idx_vehicles_customer ON vehicles(customer_id)');
@@ -500,6 +524,8 @@ class AppDatabase {
     batch.execute('CREATE INDEX idx_inv_transactions_item ON inventory_transactions(item_id)');
     batch.execute('CREATE INDEX idx_invoices_status ON invoices(status)');
     batch.execute('CREATE INDEX idx_payments_invoice ON payments(invoice_id)');
+    batch.execute('CREATE INDEX idx_vendors_name ON vendors(name)');
+    batch.execute('CREATE INDEX idx_vendors_phone ON vendors(phone)');
 
     await batch.commit(noResult: true);
 
@@ -576,6 +602,118 @@ class AppDatabase {
       });
     }
 
+    await batch.commit(noResult: true);
+    await _seedDefaultVendors(db);
+  }
+
+  Future<void> _ensureAdditionalTables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS vendors (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        company TEXT,
+        phone TEXT NOT NULL,
+        whatsapp TEXT,
+        email TEXT,
+        address TEXT,
+        category TEXT DEFAULT 'General Supplies',
+        tax_number TEXT,
+        notes TEXT,
+        current_balance REAL DEFAULT 0,
+        status TEXT DEFAULT 'Active',
+        is_deleted INTEGER DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_vendors_name ON vendors(name)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_vendors_phone ON vendors(phone)');
+
+    // Seed default vendors if empty
+    final res = await db.rawQuery('SELECT COUNT(*) as c FROM vendors');
+    final count = (res.first['c'] as num?)?.toInt() ?? 0;
+    if (count == 0) {
+      await _seedDefaultVendors(db);
+    }
+  }
+
+  Future<void> _seedDefaultVendors(Database db) async {
+    final now = DateTime.now().toIso8601String();
+    final batch = db.batch();
+    final sampleVendors = [
+      {
+        'id': 'vnd_apex_chem_01',
+        'name': 'Kamran Chemicals',
+        'company': 'Apex Auto Chemical Supplies',
+        'phone': '+92 300 4567890',
+        'whatsapp': '+92 300 4567890',
+        'email': 'sales@apexchem.pk',
+        'address': 'Industrial Area, Lahore',
+        'category': 'Detailing Chemicals & Shampoos',
+        'tax_number': 'NTN-489210-4',
+        'notes': 'Supplies pH-neutral car foam shampoo, iron fall-out remover, and degreasers.',
+        'current_balance': 0.0,
+        'status': 'Active',
+        'is_deleted': 0,
+        'created_at': now,
+        'updated_at': now,
+      },
+      {
+        'id': 'vnd_ceramic_pro_02',
+        'name': 'Farhan Raza',
+        'company': 'ProCoat Detailing & PPF Hub',
+        'phone': '+92 321 8976543',
+        'whatsapp': '+92 321 8976543',
+        'email': 'farhan@procoat.com',
+        'address': 'Main Boulevard, Gulberg, Lahore',
+        'category': 'PPF & Tinting Films',
+        'tax_number': 'NTN-591204-1',
+        'notes': 'Official TPU self-healing PPF film and 9H Ceramic Coating distributor.',
+        'current_balance': 15000.0,
+        'status': 'Active',
+        'is_deleted': 0,
+        'created_at': now,
+        'updated_at': now,
+      },
+      {
+        'id': 'vnd_machinery_03',
+        'name': 'Tariq Mehmood',
+        'company': 'Precision Detailing Tools & Machinery',
+        'phone': '+92 333 5551234',
+        'whatsapp': '+92 333 5551234',
+        'email': 'tools@precisionauto.pk',
+        'address': 'Auto Market, Badami Bagh, Lahore',
+        'category': 'Equipment & Machinery',
+        'tax_number': 'NTN-312988-7',
+        'notes': 'Supplies dual-action rotary polishers, pressure washers, and backup pads.',
+        'current_balance': 0.0,
+        'status': 'Active',
+        'is_deleted': 0,
+        'created_at': now,
+        'updated_at': now,
+      },
+      {
+        'id': 'vnd_fiber_04',
+        'name': 'Asif Textile Impex',
+        'company': 'SuperFiber Microfibers Ltd.',
+        'phone': '+92 345 6789012',
+        'whatsapp': '+92 345 6789012',
+        'email': 'asif@superfiber.pk',
+        'address': 'Faisalabad / Lahore Branch',
+        'category': 'Microfiber & Accessories',
+        'tax_number': 'NTN-894120-2',
+        'notes': '800 GSM plush drying towels, edgeless buffing towels, and applicator pads.',
+        'current_balance': 0.0,
+        'status': 'Active',
+        'is_deleted': 0,
+        'created_at': now,
+        'updated_at': now,
+      },
+    ];
+
+    for (var v in sampleVendors) {
+      batch.insert('vendors', v);
+    }
     await batch.commit(noResult: true);
   }
 

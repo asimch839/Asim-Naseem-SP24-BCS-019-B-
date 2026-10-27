@@ -81,43 +81,90 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _searchController,
-                        decoration: const InputDecoration(
-                          hintText: 'Search by Customer Name or Phone Number...',
-                          prefixIcon: Icon(Icons.search_rounded),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isNarrow = constraints.maxWidth < 520;
+                    if (isNarrow) {
+                      return Column(
+                        children: [
+                          TextField(
+                            controller: _searchController,
+                            decoration: const InputDecoration(
+                              hintText: 'Search Name or Phone...',
+                              prefixIcon: Icon(Icons.search_rounded),
+                            ),
+                            onChanged: (val) {
+                              _searchQuery = val.trim();
+                              _fetchCustomers();
+                            },
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              DropdownButton<String>(
+                                value: _statusFilter,
+                                items: const [
+                                  DropdownMenuItem(value: 'All', child: Text('All Statuses')),
+                                  DropdownMenuItem(value: 'Active', child: Text('Active Only')),
+                                  DropdownMenuItem(value: 'Inactive', child: Text('Inactive Only')),
+                                ],
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    setState(() => _statusFilter = val);
+                                    _fetchCustomers();
+                                  }
+                                },
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.refresh_rounded),
+                                tooltip: 'Refresh',
+                                onPressed: _fetchCustomers,
+                              ),
+                            ],
+                          ),
+                        ],
+                      );
+                    }
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _searchController,
+                            decoration: const InputDecoration(
+                              hintText: 'Search by Customer Name or Phone Number...',
+                              prefixIcon: Icon(Icons.search_rounded),
+                            ),
+                            onChanged: (val) {
+                              _searchQuery = val.trim();
+                              _fetchCustomers();
+                            },
+                          ),
                         ),
-                        onChanged: (val) {
-                          _searchQuery = val.trim();
-                          _fetchCustomers();
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    DropdownButton<String>(
-                      value: _statusFilter,
-                      items: const [
-                        DropdownMenuItem(value: 'All', child: Text('All Statuses')),
-                        DropdownMenuItem(value: 'Active', child: Text('Active Only')),
-                        DropdownMenuItem(value: 'Inactive', child: Text('Inactive Only')),
+                        const SizedBox(width: 16),
+                        DropdownButton<String>(
+                          value: _statusFilter,
+                          items: const [
+                            DropdownMenuItem(value: 'All', child: Text('All Statuses')),
+                            DropdownMenuItem(value: 'Active', child: Text('Active Only')),
+                            DropdownMenuItem(value: 'Inactive', child: Text('Inactive Only')),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) {
+                              setState(() => _statusFilter = val);
+                              _fetchCustomers();
+                            }
+                          },
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          icon: const Icon(Icons.refresh_rounded),
+                          tooltip: 'Refresh',
+                          onPressed: _fetchCustomers,
+                        ),
                       ],
-                      onChanged: (val) {
-                        if (val != null) {
-                          setState(() => _statusFilter = val);
-                          _fetchCustomers();
-                        }
-                      },
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      icon: const Icon(Icons.refresh_rounded),
-                      tooltip: 'Refresh',
-                      onPressed: _fetchCustomers,
-                    ),
-                  ],
+                    );
+                  },
                 ),
               ),
             ),
@@ -151,7 +198,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                               final customer = _customers[index];
 
                               return ListTile(
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                 leading: CircleAvatar(
                                   backgroundColor: AppColors.primary.withValues(alpha: 0.15),
                                   child: Text(
@@ -161,7 +208,13 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                                 ),
                                 title: Row(
                                   children: [
-                                    Text(customer.fullName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                                    Flexible(
+                                      child: Text(
+                                        customer.fullName,
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
                                     const SizedBox(width: 8),
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -187,6 +240,8 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                                   child: Text(
                                     'Phone: ${customer.phone} • Registered: ${Formatters.date(customer.createdAt)} • Visits: ${customer.totalVisits}',
                                     style: const TextStyle(fontSize: 12, color: AppColors.textDarkSecondary),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                                 trailing: Row(
@@ -194,8 +249,8 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                                   children: [
                                     if (customer.outstandingBalance > 0)
                                       Container(
-                                        margin: const EdgeInsets.only(right: 12),
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        margin: const EdgeInsets.only(right: 8),
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                                         decoration: BoxDecoration(
                                           color: AppColors.error.withValues(alpha: 0.12),
                                           borderRadius: BorderRadius.circular(6),
@@ -205,7 +260,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                                           style: const TextStyle(
                                             color: AppColors.error,
                                             fontWeight: FontWeight.bold,
-                                            fontSize: 12,
+                                            fontSize: 11,
                                           ),
                                         ),
                                       ),

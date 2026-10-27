@@ -75,9 +75,16 @@ class _AddServiceRecordDialogState extends State<AddServiceRecordDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text('New Service: ${widget.vehicle.make} ${widget.vehicle.model} (${widget.vehicle.registrationNumber})'),
-      content: SizedBox(
-        width: 480,
+      title: Text(
+        'New Service: ${widget.vehicle.make} ${widget.vehicle.model} (${widget.vehicle.registrationNumber})',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      content: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 480,
+          maxHeight: MediaQuery.of(context).size.height * 0.88,
+        ),
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(

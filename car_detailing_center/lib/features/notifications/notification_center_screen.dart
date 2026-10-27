@@ -78,7 +78,13 @@ class NotificationCenterScreen extends StatelessWidget {
                   ),
                   title: Row(
                     children: [
-                      Text(title, style: TextStyle(fontWeight: isRead ? FontWeight.w600 : FontWeight.bold, fontSize: 14)),
+                      Flexible(
+                        child: Text(
+                          title,
+                          style: TextStyle(fontWeight: isRead ? FontWeight.w600 : FontWeight.bold, fontSize: 14),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                       const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -102,6 +108,8 @@ class NotificationCenterScreen extends StatelessWidget {
                     child: Text(
                       '$message • ${Formatters.dateTime(createdAt)}',
                       style: const TextStyle(fontSize: 12, color: AppColors.textDarkSecondary),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   trailing: IconButton(

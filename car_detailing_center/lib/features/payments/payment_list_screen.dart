@@ -102,8 +102,11 @@ class _PaymentListScreenState extends State<PaymentListScreen> {
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: Theme.of(context).dividerColor),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 12,
+                runSpacing: 6,
                 children: [
                   Text(
                     '${_payments.length} Payments Recorded',
@@ -161,7 +164,13 @@ class _PaymentListScreenState extends State<PaymentListScreen> {
                                 ),
                                 title: Row(
                                   children: [
-                                    Text(customerName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                                    Flexible(
+                                      child: Text(
+                                        customerName,
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
                                     const SizedBox(width: 8),
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -192,6 +201,8 @@ class _PaymentListScreenState extends State<PaymentListScreen> {
                                   child: Text(
                                     'Method: $method • Date: ${Formatters.dateTime(date)}${ref.isNotEmpty ? " • Ref: $ref" : ""}',
                                     style: const TextStyle(fontSize: 12, color: AppColors.textDarkSecondary),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                                 trailing: Text(

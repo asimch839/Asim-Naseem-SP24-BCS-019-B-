@@ -122,6 +122,25 @@ class _GlobalSearchDialogState extends State<GlobalSearchDialog> {
           'id': it['id'],
         });
       }
+
+      // 6. Search Vendors
+      final vendors = await db.rawQuery('''
+        SELECT id, name, company, phone, category FROM vendors
+        WHERE is_deleted = 0 AND (LOWER(name) LIKE ? OR LOWER(company) LIKE ? OR phone LIKE ?)
+        LIMIT 5
+      ''', [param, param, param]);
+
+      for (var vn in vendors) {
+        final comp = vn['company'] != null && (vn['company'] as String).isNotEmpty ? ' (${vn['company']})' : '';
+        searchHits.add({
+          'type': 'Vendor',
+          'title': '${vn['name']}$comp',
+          'subtitle': 'Category: ${vn['category']} • Phone: ${vn['phone']}',
+          'icon': Icons.storefront_rounded,
+          'route': AppRoutes.vendors,
+          'id': vn['id'],
+        });
+      }
     } catch (e) {
       debugPrint('SQLite Global Search error: $e');
     }
@@ -140,84 +159,95 @@ class _GlobalSearchDialogState extends State<GlobalSearchDialog> {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       backgroundColor: Theme.of(context).cardTheme.color,
-      child: Container(
-        width: 600,
-        height: 520,
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            // Search Input Header
-            Row(
-              children: [
-                const Icon(Icons.search_rounded, color: AppColors.primary, size: 28),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextField(
-                    controller: _queryController,
-                    autofocus: true,
-                    decoration: const InputDecoration(
-                      hintText: 'Search Plate, Customer, Phone, Job #, Invoice #...',
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                    onChanged: _performSearch,
-                  ),
-                ),
-                if (_isSearching)
-                  const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                else
-                  IconButton(
-                    icon: const Icon(Icons.close_rounded),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-              ],
-            ),
-            const Divider(),
-
-            // Search Results List
-            Expanded(
-              child: _queryController.text.trim().isEmpty
-                  ? const Center(
-                      child: Text(
-                        'Type something to start cross-module search...',
-                        style: TextStyle(color: AppColors.textDarkSecondary),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 600,
+          maxHeight: MediaQuery.of(context).size.height * 0.85,
+        ),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              // Search Input Header
+              Row(
+                children: [
+                  const Icon(Icons.search_rounded, color: AppColors.primary, size: 28),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextField(
+                      controller: _queryController,
+                      autofocus: true,
+                      decoration: const InputDecoration(
+                        hintText: 'Search Plate, Customer, Phone, Job #, Invoice #...',
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        contentPadding: EdgeInsets.zero,
                       ),
+                      onChanged: _performSearch,
+                    ),
+                  ),
+                  if (_isSearching)
+                    const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : _results.isEmpty && !_isSearching
-                      ? const Center(
-                          child: Text(
-                            'No matching records found across all modules.',
-                            style: TextStyle(color: AppColors.textDarkSecondary),
-                          ),
-                        )
-                      : ListView.separated(
-                          itemCount: _results.length,
-                          separatorBuilder: (_, __) => const Divider(height: 1),
-                          itemBuilder: (context, index) {
-                            final item = _results[index];
-                            return ListTile(
-                              leading: Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(8),
+                  else
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                ],
+              ),
+              const Divider(),
+
+              // Search Results List
+              Expanded(
+                child: _queryController.text.trim().isEmpty
+                    ? const Center(
+                        child: Text(
+                          'Type something to start cross-module search...',
+                          style: TextStyle(color: AppColors.textDarkSecondary),
+                        ),
+                      )
+                    : _results.isEmpty && !_isSearching
+                        ? const Center(
+                            child: Text(
+                              'No matching records found across all modules.',
+                              style: TextStyle(color: AppColors.textDarkSecondary),
+                            ),
+                          )
+                        : ListView.separated(
+                            itemCount: _results.length,
+                            separatorBuilder: (_, __) => const Divider(height: 1),
+                            itemBuilder: (context, index) {
+                              final item = _results[index];
+                              return ListTile(
+                                leading: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primary.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Icon(item['icon'] as IconData, color: AppColors.primary, size: 20),
                                 ),
-                                child: Icon(item['icon'] as IconData, color: AppColors.primary, size: 20),
-                              ),
-                              title: Text(item['title'] as String, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                              subtitle: Text(item['subtitle'] as String, style: const TextStyle(fontSize: 12, color: AppColors.textDarkSecondary)),
-                              trailing: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: AppColors.darkBorder,
-                                  borderRadius: BorderRadius.circular(6),
+                                title: Text(
+                                  item['title'] as String,
+                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
+                                subtitle: Text(
+                                  item['subtitle'] as String,
+                                  style: const TextStyle(fontSize: 12, color: AppColors.textDarkSecondary),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                trailing: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.darkBorder,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
                                 child: Text(item['type'] as String, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                               ),
                               onTap: () {
@@ -231,6 +261,7 @@ class _GlobalSearchDialogState extends State<GlobalSearchDialog> {
           ],
         ),
       ),
-    );
+    ),
+  );
   }
 }

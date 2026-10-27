@@ -81,9 +81,16 @@ class _InventoryFormDialogState extends State<InventoryFormDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(widget.item == null ? 'Add Stock Item' : 'Edit Stock Item'),
-      content: SizedBox(
-        width: 520,
+      title: Text(
+        widget.item == null ? 'Add Stock Item' : 'Edit Stock Item',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      content: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 520,
+          maxHeight: MediaQuery.of(context).size.height * 0.88,
+        ),
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(

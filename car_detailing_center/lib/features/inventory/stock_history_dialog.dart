@@ -23,9 +23,11 @@ class StockHistoryDialog extends StatelessWidget {
           Expanded(child: Text('Quantity Change History: ${item.name}', maxLines: 1, overflow: TextOverflow.ellipsis)),
         ],
       ),
-      content: SizedBox(
-        width: 600,
-        height: 480,
+      content: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 600,
+          maxHeight: MediaQuery.of(context).size.height * 0.75,
+        ),
         child: FutureBuilder<List<Map<String, dynamic>>>(
           future: inventoryRepo.getStockTransactions(item.id),
           builder: (context, snapshot) {
@@ -43,6 +45,7 @@ class StockHistoryDialog extends StatelessWidget {
             }
 
             return ListView.separated(
+              shrinkWrap: true,
               itemCount: list.length,
               separatorBuilder: (_, __) => const Divider(height: 1),
               itemBuilder: (context, index) {
@@ -66,8 +69,10 @@ class StockHistoryDialog extends StatelessWidget {
                       size: 20,
                     ),
                   ),
-                  title: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  title: Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    spacing: 8,
+                    runSpacing: 2,
                     children: [
                       Text(
                         '${isPositive ? "+" : ""}${change.toStringAsFixed(1)} ${item.unit} ($txType)',

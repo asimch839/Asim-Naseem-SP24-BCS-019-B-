@@ -542,87 +542,129 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(24),
-                  child: Column(
-                    children: [
-                      TextFormField(
-                        controller: _nameController,
-                        decoration: const InputDecoration(labelText: 'Business Name *', prefixIcon: Icon(Icons.store_rounded, size: 20)),
-                      ),
-                      const SizedBox(height: 14),
-                      Row(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isNarrow = constraints.maxWidth < 520;
+                      return Column(
                         children: [
-                          Expanded(
-                            child: TextFormField(
+                          TextFormField(
+                            controller: _nameController,
+                            decoration: const InputDecoration(labelText: 'Business Name *', prefixIcon: Icon(Icons.store_rounded, size: 20)),
+                          ),
+                          const SizedBox(height: 14),
+                          if (isNarrow) ...[
+                            TextFormField(
                               controller: _phoneController,
                               decoration: const InputDecoration(labelText: 'Phone Number *', prefixIcon: Icon(Icons.phone_rounded, size: 20)),
                             ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: TextFormField(
+                            const SizedBox(height: 14),
+                            TextFormField(
                               controller: _whatsAppController,
                               decoration: const InputDecoration(labelText: 'WhatsApp Number', prefixIcon: Icon(Icons.chat_bubble_outline_rounded, size: 20)),
                             ),
+                          ] else ...[
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextFormField(
+                                    controller: _phoneController,
+                                    decoration: const InputDecoration(labelText: 'Phone Number *', prefixIcon: Icon(Icons.phone_rounded, size: 20)),
+                                  ),
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: TextFormField(
+                                    controller: _whatsAppController,
+                                    decoration: const InputDecoration(labelText: 'WhatsApp Number', prefixIcon: Icon(Icons.chat_bubble_outline_rounded, size: 20)),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                          const SizedBox(height: 14),
+                          TextFormField(
+                            controller: _emailController,
+                            decoration: const InputDecoration(labelText: 'Business Email *', prefixIcon: Icon(Icons.email_outlined, size: 20)),
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      TextFormField(
-                        controller: _emailController,
-                        decoration: const InputDecoration(labelText: 'Business Email *', prefixIcon: Icon(Icons.email_outlined, size: 20)),
-                      ),
-                      const SizedBox(height: 14),
-                      TextFormField(
-                        controller: _addressController,
-                        maxLines: 2,
-                        decoration: const InputDecoration(labelText: 'Physical Studio Address *', prefixIcon: Icon(Icons.location_on_outlined, size: 20)),
-                      ),
-                      const SizedBox(height: 14),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
+                          const SizedBox(height: 14),
+                          TextFormField(
+                            controller: _addressController,
+                            maxLines: 2,
+                            decoration: const InputDecoration(labelText: 'Physical Studio Address *', prefixIcon: Icon(Icons.location_on_outlined, size: 20)),
+                          ),
+                          const SizedBox(height: 14),
+                          if (isNarrow) ...[
+                            TextFormField(
                               controller: _currencyController,
                               decoration: const InputDecoration(labelText: 'Currency Symbol (e.g. Rs., \$, AED)'),
                             ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: TextFormField(
+                            const SizedBox(height: 14),
+                            TextFormField(
                               controller: _taxRateController,
                               keyboardType: const TextInputType.numberWithOptions(decimal: true),
                               decoration: const InputDecoration(labelText: 'Tax Rate (%)'),
                             ),
+                          ] else ...[
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextFormField(
+                                    controller: _currencyController,
+                                    decoration: const InputDecoration(labelText: 'Currency Symbol (e.g. Rs., \$, AED)'),
+                                  ),
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: TextFormField(
+                                    controller: _taxRateController,
+                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                    decoration: const InputDecoration(labelText: 'Tax Rate (%)'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                          const SizedBox(height: 14),
+                          TextFormField(
+                            controller: _timezoneController,
+                            decoration: const InputDecoration(
+                              labelText: 'Business Timezone (e.g. Asia/Karachi PKT +05:00)',
+                              prefixIcon: Icon(Icons.access_time_rounded, size: 20),
+                            ),
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      TextFormField(
-                        controller: _timezoneController,
-                        decoration: const InputDecoration(
-                          labelText: 'Business Timezone (e.g. Asia/Karachi PKT +05:00)',
-                          prefixIcon: Icon(Icons.access_time_rounded, size: 20),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
+                          const SizedBox(height: 14),
+                          if (isNarrow) ...[
+                            TextFormField(
                               controller: _jobPrefixController,
                               decoration: const InputDecoration(labelText: 'Job Card Prefix (e.g. JOB-)'),
                             ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: TextFormField(
+                            const SizedBox(height: 14),
+                            TextFormField(
                               controller: _invoicePrefixController,
                               decoration: const InputDecoration(labelText: 'Invoice Prefix (e.g. INV-)'),
                             ),
-                          ),
+                          ] else ...[
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextFormField(
+                                    controller: _jobPrefixController,
+                                    decoration: const InputDecoration(labelText: 'Job Card Prefix (e.g. JOB-)'),
+                                  ),
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: TextFormField(
+                                    controller: _invoicePrefixController,
+                                    decoration: const InputDecoration(labelText: 'Invoice Prefix (e.g. INV-)'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ],
-                      ),
-                    ],
+                      );
+                    },
                   ),
                 ),
               ),
@@ -811,8 +853,11 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      Wrap(
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 8,
+                        runSpacing: 8,
                         children: [
                           const Text('Inspection Sections (Editable)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                           TextButton.icon(
@@ -868,8 +913,11 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      Wrap(
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 8,
+                        runSpacing: 8,
                         children: [
                           const Text('Belongings & Inventory Checklist Items', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                           TextButton.icon(
@@ -1051,7 +1099,12 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                         icon: _isBackingUp
                             ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                             : const Icon(Icons.download_rounded),
-                        label: Text(_isBackingUp ? 'Generating Backup Archive...' : 'Choose Destination & Backup Now (.ZIP)'),
+                        label: Flexible(
+                          child: Text(
+                            _isBackingUp ? 'Generating Backup Archive...' : 'Choose Destination & Backup Now (.ZIP)',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
                           foregroundColor: Colors.white,
@@ -1105,7 +1158,12 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                         icon: _isRestoring
                             ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                             : const Icon(Icons.upload_file_rounded),
-                        label: Text(_isRestoring ? 'Restoring System...' : 'Select Backup Archive (.ZIP) to Restore'),
+                        label: Flexible(
+                          child: Text(
+                            _isRestoring ? 'Restoring System...' : 'Select Backup Archive (.ZIP) to Restore',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.warning,
                           side: const BorderSide(color: AppColors.warning),

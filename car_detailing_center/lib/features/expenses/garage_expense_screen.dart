@@ -76,9 +76,46 @@ class _GarageExpenseScreenState extends State<GarageExpenseScreen> {
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    Row(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isNarrow = constraints.maxWidth < 600;
+                    if (isNarrow) {
+                      return Column(
+                        children: [
+                          TextField(
+                            controller: _searchController,
+                            decoration: const InputDecoration(
+                              hintText: 'Search by category or notes...',
+                              prefixIcon: Icon(Icons.search_rounded),
+                            ),
+                            onChanged: (val) => setState(() => _searchQuery = val.trim()),
+                          ),
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: _vendorController,
+                            decoration: const InputDecoration(
+                              hintText: 'Filter by vendor...',
+                              prefixIcon: Icon(Icons.storefront_rounded),
+                            ),
+                            onChanged: (val) => setState(() => _vendorQuery = val.trim()),
+                          ),
+                          if (_categories.length > 1) ...[
+                            const SizedBox(height: 10),
+                            DropdownButton<String>(
+                              isExpanded: true,
+                              value: _selectedCategory,
+                              underline: const SizedBox(),
+                              items: _categories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                              onChanged: (val) {
+                                if (val != null) setState(() => _selectedCategory = val);
+                              },
+                            ),
+                          ],
+                        ],
+                      );
+                    }
+
+                    return Row(
                       children: [
                         Expanded(
                           flex: 2,
@@ -114,8 +151,8 @@ class _GarageExpenseScreenState extends State<GarageExpenseScreen> {
                             },
                           ),
                       ],
-                    ),
-                  ],
+                    );
+                  },
                 ),
               ),
             ),
@@ -158,14 +195,22 @@ class _GarageExpenseScreenState extends State<GarageExpenseScreen> {
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(color: AppColors.borderDark),
                         ),
-                        child: Row(
+                        child: Wrap(
+                          alignment: WrapAlignment.spaceBetween,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 12,
+                          runSpacing: 6,
                           children: [
                             Text('Found ${list.length} expense records', style: const TextStyle(fontWeight: FontWeight.w600)),
-                            const Spacer(),
-                            const Text('Total: ', style: TextStyle(color: AppColors.textDarkSecondary)),
-                            Text(
-                              Formatters.currency(totalAmount, symbol: currency),
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.error),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Text('Total: ', style: TextStyle(color: AppColors.textDarkSecondary)),
+                                Text(
+                                  Formatters.currency(totalAmount, symbol: currency),
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.error),
+                                ),
+                              ],
                             ),
                           ],
                         ),
@@ -187,15 +232,18 @@ class _GarageExpenseScreenState extends State<GarageExpenseScreen> {
                                     Text(exp.category, style: const TextStyle(fontWeight: FontWeight.bold)),
                                     if (exp.vendorName != null && exp.vendorName!.isNotEmpty) ...[
                                       const SizedBox(width: 8),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.primary.withValues(alpha: 0.12),
-                                          borderRadius: BorderRadius.circular(6),
-                                        ),
-                                        child: Text(
-                                          'Vendor: ${exp.vendorName}${exp.vendorCompany != null && exp.vendorCompany!.isNotEmpty ? " (${exp.vendorCompany})" : ""}',
-                                          style: const TextStyle(fontSize: 11, color: AppColors.primaryLight),
+                                      Flexible(
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.primary.withValues(alpha: 0.12),
+                                            borderRadius: BorderRadius.circular(6),
+                                          ),
+                                          child: Text(
+                                            'Vendor: ${exp.vendorName}${exp.vendorCompany != null && exp.vendorCompany!.isNotEmpty ? " (${exp.vendorCompany})" : ""}',
+                                            style: const TextStyle(fontSize: 11, color: AppColors.primaryLight),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
                                         ),
                                       ),
                                     ],
@@ -279,7 +327,19 @@ class _GarageExpenseScreenState extends State<GarageExpenseScreen> {
 
 class GarageExpenseFormDialog extends StatefulWidget {
   final ExpenseModel? existing;
-  const GarageExpenseFormDialog({super.key, this.existing});
+  final String? prefillVendorName;
+  final String? prefillVendorCompany;
+  final String? prefillVendorPhone;
+  final String? prefillVendorAddress;
+
+  const GarageExpenseFormDialog({
+    super.key,
+    this.existing,
+    this.prefillVendorName,
+    this.prefillVendorCompany,
+    this.prefillVendorPhone,
+    this.prefillVendorAddress,
+  });
 
   @override
   State<GarageExpenseFormDialog> createState() => _GarageExpenseFormDialogState();
@@ -314,10 +374,10 @@ class _GarageExpenseFormDialogState extends State<GarageExpenseFormDialog> {
     _categoryController = TextEditingController(text: e?.category ?? '');
     _descController = TextEditingController(text: e?.description ?? '');
     _amountController = TextEditingController(text: e != null ? e.amount.toStringAsFixed(0) : '');
-    _vendorNameController = TextEditingController(text: e?.vendorName ?? '');
-    _vendorCompanyController = TextEditingController(text: e?.vendorCompany ?? '');
-    _vendorPhoneController = TextEditingController(text: e?.vendorPhone ?? '');
-    _vendorAddressController = TextEditingController(text: e?.vendorAddress ?? '');
+    _vendorNameController = TextEditingController(text: e?.vendorName ?? widget.prefillVendorName ?? '');
+    _vendorCompanyController = TextEditingController(text: e?.vendorCompany ?? widget.prefillVendorCompany ?? '');
+    _vendorPhoneController = TextEditingController(text: e?.vendorPhone ?? widget.prefillVendorPhone ?? '');
+    _vendorAddressController = TextEditingController(text: e?.vendorAddress ?? widget.prefillVendorAddress ?? '');
     _vendorInvoiceRefController = TextEditingController(text: e?.referenceNumber ?? '');
     _notesController = TextEditingController(text: e?.notes ?? '');
     if (e != null) {
@@ -394,9 +454,16 @@ class _GarageExpenseFormDialogState extends State<GarageExpenseFormDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(widget.existing == null ? 'Add Garage Expense' : 'Edit Garage Expense'),
-      content: SizedBox(
-        width: 580,
+      title: Text(
+        widget.existing == null ? 'Add Garage Expense' : 'Edit Garage Expense',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      content: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 580,
+          maxHeight: MediaQuery.of(context).size.height * 0.88,
+        ),
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(

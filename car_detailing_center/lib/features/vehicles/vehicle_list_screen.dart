@@ -145,11 +145,14 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                                 title: Row(
                                   children: [
                                     // Vehicle Name & Model Year
-                                    Text(
-                                      '${v.make} ${v.model} ($modelYear)',
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                    Flexible(
+                                      child: Text(
+                                        '${v.make} ${v.model} ($modelYear)',
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
                                     ),
-                                    const SizedBox(width: 10),
+                                    const SizedBox(width: 8),
                                     // Vehicle Number / Plate Number
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -173,77 +176,142 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                                   child: Text(
                                     'Owner: $customerName ($customerPhone) • Mileage: ${odo.toInt()} KM ${v.color != null && v.color!.isNotEmpty ? "• Color: ${v.color}" : ""}',
                                     style: const TextStyle(fontSize: 12, color: AppColors.textDarkSecondary),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    OutlinedButton.icon(
-                                      icon: const Icon(Icons.history_rounded, size: 16),
-                                      label: const Text('Service History'),
-                                      onPressed: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) => VehicleHistoryScreen(vehicle: v),
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                    const SizedBox(width: 8),
-                                    ElevatedButton.icon(
-                                      icon: const Icon(Icons.fact_check_rounded, size: 16),
-                                      label: const Text('Inspect'),
-                                      onPressed: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) => InspectionCreateScreen(
-                                              preselectedVehicle: v,
-                                              preselectedCustomerId: v.customerId,
-                                              preselectedCustomerName: customerName,
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                    const SizedBox(width: 4),
-                                    PopupMenuButton<String>(
-                                      onSelected: (val) async {
-                                        if (val == 'edit') {
-                                          final res = await showDialog(
-                                            context: context,
-                                            builder: (_) => VehicleFormDialog(vehicle: v),
-                                          );
-                                          if (res == true) _fetchVehicles();
-                                        } else if (val == 'delete') {
-                                          final conf = await showDialog<bool>(
-                                            context: context,
-                                            builder: (ctx) => AlertDialog(
-                                              title: const Text('Delete Vehicle'),
-                                              content: Text('Delete ${v.displayName} from garage records?'),
-                                              actions: [
-                                                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-                                                ElevatedButton(
-                                                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-                                                  onPressed: () => Navigator.pop(ctx, true),
-                                                  child: const Text('Delete'),
+                                trailing: LayoutBuilder(
+                                  builder: (context, constraints) {
+                                    final isCompact = MediaQuery.of(context).size.width < 680;
+                                    if (isCompact) {
+                                      return PopupMenuButton<String>(
+                                        onSelected: (val) async {
+                                          if (val == 'history') {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (_) => VehicleHistoryScreen(vehicle: v),
+                                              ),
+                                            );
+                                          } else if (val == 'inspect') {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (_) => InspectionCreateScreen(
+                                                  preselectedVehicle: v,
+                                                  preselectedCustomerId: v.customerId,
+                                                  preselectedCustomerName: customerName,
                                                 ),
-                                              ],
-                                            ),
-                                          );
-                                          if (conf == true) {
-                                            await _vehicleRepo.deleteVehicle(v.id);
-                                            _fetchVehicles();
+                                              ),
+                                            );
+                                          } else if (val == 'edit') {
+                                            final res = await showDialog(
+                                              context: context,
+                                              builder: (_) => VehicleFormDialog(vehicle: v),
+                                            );
+                                            if (res == true) _fetchVehicles();
+                                          } else if (val == 'delete') {
+                                            final conf = await showDialog<bool>(
+                                              context: context,
+                                              builder: (ctx) => AlertDialog(
+                                                title: const Text('Delete Vehicle'),
+                                                content: Text('Delete ${v.displayName} from garage records?'),
+                                                actions: [
+                                                  TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                                                  ElevatedButton(
+                                                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+                                                    onPressed: () => Navigator.pop(ctx, true),
+                                                    child: const Text('Delete'),
+                                                  ),
+                                                ],
+                                              ),
+                                            );
+                                            if (conf == true) {
+                                              await _vehicleRepo.deleteVehicle(v.id);
+                                              _fetchVehicles();
+                                            }
                                           }
-                                        }
-                                      },
-                                      itemBuilder: (_) => [
-                                        const PopupMenuItem(value: 'edit', child: Text('Edit Vehicle')),
-                                        const PopupMenuItem(value: 'delete', child: Text('Delete Vehicle', style: TextStyle(color: AppColors.error))),
+                                        },
+                                        itemBuilder: (_) => [
+                                          const PopupMenuItem(value: 'history', child: Text('Service History')),
+                                          const PopupMenuItem(value: 'inspect', child: Text('Inspect Vehicle')),
+                                          const PopupMenuItem(value: 'edit', child: Text('Edit Vehicle')),
+                                          const PopupMenuItem(value: 'delete', child: Text('Delete Vehicle', style: TextStyle(color: AppColors.error))),
+                                        ],
+                                      );
+                                    }
+
+                                    return Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        OutlinedButton.icon(
+                                          icon: const Icon(Icons.history_rounded, size: 16),
+                                          label: const Text('Service History'),
+                                          onPressed: () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (_) => VehicleHistoryScreen(vehicle: v),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                        const SizedBox(width: 8),
+                                        ElevatedButton.icon(
+                                          icon: const Icon(Icons.fact_check_rounded, size: 16),
+                                          label: const Text('Inspect'),
+                                          onPressed: () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (_) => InspectionCreateScreen(
+                                                  preselectedVehicle: v,
+                                                  preselectedCustomerId: v.customerId,
+                                                  preselectedCustomerName: customerName,
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                        const SizedBox(width: 4),
+                                        PopupMenuButton<String>(
+                                          onSelected: (val) async {
+                                            if (val == 'edit') {
+                                              final res = await showDialog(
+                                                context: context,
+                                                builder: (_) => VehicleFormDialog(vehicle: v),
+                                              );
+                                              if (res == true) _fetchVehicles();
+                                            } else if (val == 'delete') {
+                                              final conf = await showDialog<bool>(
+                                                context: context,
+                                                builder: (ctx) => AlertDialog(
+                                                  title: const Text('Delete Vehicle'),
+                                                  content: Text('Delete ${v.displayName} from garage records?'),
+                                                  actions: [
+                                                    TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                                                    ElevatedButton(
+                                                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+                                                      onPressed: () => Navigator.pop(ctx, true),
+                                                      child: const Text('Delete'),
+                                                    ),
+                                                  ],
+                                                ),
+                                              );
+                                              if (conf == true) {
+                                                await _vehicleRepo.deleteVehicle(v.id);
+                                                _fetchVehicles();
+                                              }
+                                            }
+                                          },
+                                          itemBuilder: (_) => [
+                                            const PopupMenuItem(value: 'edit', child: Text('Edit Vehicle')),
+                                            const PopupMenuItem(value: 'delete', child: Text('Delete Vehicle', style: TextStyle(color: AppColors.error))),
+                                          ],
+                                        ),
                                       ],
-                                    ),
-                                  ],
+                                    );
+                                  },
                                 ),
                               );
                             },

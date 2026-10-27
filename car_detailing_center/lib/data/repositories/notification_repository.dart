@@ -139,5 +139,30 @@ class NotificationRepository {
         );
       }
     }
+
+    // 4. Pending Salary Due Reminder (Section 22)
+    final pendingSalaries = await db.rawQuery('''
+      SELECT sal.id, sal.pay_period, sal.remaining_amount, s.name as staff_name
+      FROM salaries sal
+      INNER JOIN staff s ON sal.staff_id = s.id
+      WHERE sal.status != 'Paid' AND sal.remaining_amount > 0
+    ''');
+
+    for (final sal in pendingSalaries) {
+      final existing = await db.query(
+        'notifications',
+        where: 'type = ? AND related_id = ? AND date_time LIKE ?',
+        whereArgs: ['salary_due', sal['id'], '$todayStr%'],
+      );
+
+      if (existing.isEmpty) {
+        await addNotification(
+          title: 'Staff Salary Due',
+          message: 'Salary for ${sal['staff_name']} (${sal['pay_period']}) has remaining balance of PKR ${sal['remaining_amount']}.',
+          type: 'salary_due',
+          relatedId: sal['id'] as String,
+        );
+      }
+    }
   }
 }

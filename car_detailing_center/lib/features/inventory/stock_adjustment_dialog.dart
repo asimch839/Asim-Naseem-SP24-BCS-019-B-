@@ -79,12 +79,20 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
     final title = widget.isAdding ? '+ Add Quantity to ${widget.item.name}' : '- Remove Quantity from ${widget.item.name}';
 
     return AlertDialog(
-      title: Text(title),
-      content: SizedBox(
-        width: 440,
-        child: Form(
-          key: _formKey,
-          child: Column(
+      title: Text(
+        title,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      content: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 440,
+          maxHeight: MediaQuery.of(context).size.height * 0.88,
+        ),
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -131,6 +139,7 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
           ),
         ),
       ),
+    ),
       actions: [
         TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
         ElevatedButton(

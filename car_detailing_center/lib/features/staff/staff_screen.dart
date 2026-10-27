@@ -29,15 +29,24 @@ class StaffScreen extends StatefulWidget {
 
 class _StaffScreenState extends State<StaffScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  int _currentTabIndex = 0;
 
   @override
   void initState() {
     super.initState();
+    _currentTabIndex = widget.initialTabIndex.clamp(0, 3);
     _tabController = TabController(
       length: 4,
       vsync: this,
-      initialIndex: widget.initialTabIndex.clamp(0, 3),
+      initialIndex: _currentTabIndex,
     );
+    _tabController.addListener(() {
+      if (_tabController.index != _currentTabIndex) {
+        setState(() {
+          _currentTabIndex = _tabController.index;
+        });
+      }
+    });
   }
 
   @override
@@ -46,28 +55,66 @@ class _StaffScreenState extends State<StaffScreen> with SingleTickerProviderStat
     super.dispose();
   }
 
+  String get _currentSubItem {
+    switch (_currentTabIndex) {
+      case 0:
+        return 'Staff List';
+      case 1:
+        return 'Attendance';
+      case 2:
+        return 'Salaries';
+      case 3:
+        return 'Staff Expenses';
+      default:
+        return 'Staff List';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return AppScaffold(
       currentRoute: AppRoutes.staff,
+      currentSubItem: _currentSubItem,
+      onSubItemSelect: (sub) {
+        if (sub.tabIndex >= 0 && sub.tabIndex < 4) {
+          _tabController.animateTo(sub.tabIndex);
+        }
+      },
       title: 'Staff Management System',
       body: Column(
         children: [
           // Sub-navigation Tabs (Staff List, Attendance, Salaries, Staff Expenses)
           Container(
-            color: Theme.of(context).cardColor,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: Theme.of(context).cardColor,
+              border: Border(bottom: BorderSide(color: AppColors.borderDark)),
+            ),
             child: TabBar(
               controller: _tabController,
               isScrollable: true,
-              indicatorColor: AppColors.primary,
-              indicatorWeight: 3,
-              labelColor: AppColors.primaryLight,
+              indicatorSize: TabBarIndicatorSize.tab,
+              indicator: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                color: AppColors.primary.withValues(alpha: 0.25),
+                border: Border.all(color: AppColors.primaryLight, width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.25),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              labelColor: Colors.white,
+              labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
               unselectedLabelColor: AppColors.textDarkSecondary,
+              unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 13),
               tabs: const [
-                Tab(icon: Icon(Icons.people_alt_rounded), text: 'Staff List'),
-                Tab(icon: Icon(Icons.event_available_rounded), text: 'Attendance'),
-                Tab(icon: Icon(Icons.payments_rounded), text: 'Salaries'),
-                Tab(icon: Icon(Icons.account_balance_wallet_rounded), text: 'Staff Expenses'),
+                Tab(icon: Icon(Icons.people_alt_rounded, size: 20), text: 'Staff List'),
+                Tab(icon: Icon(Icons.event_available_rounded, size: 20), text: 'Attendance'),
+                Tab(icon: Icon(Icons.payments_rounded, size: 20), text: 'Salaries'),
+                Tab(icon: Icon(Icons.account_balance_wallet_rounded, size: 20), text: 'Staff Expenses'),
               ],
             ),
           ),
@@ -465,29 +512,34 @@ class _StaffSalariesSubViewState extends State<StaffSalariesSubView> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              title: Text('Disburse Salary: $staffName'),
-              content: SizedBox(
-                width: 400,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('Total Net Due: Rs. ${remainingAmount.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: amountController,
-                      decoration: const InputDecoration(labelText: 'Disbursement Amount (Rs.) *'),
-                      keyboardType: TextInputType.number,
-                    ),
-                    const SizedBox(height: 16),
-                    DropdownButtonFormField<String>(
-                      value: paymentMethod,
-                      decoration: const InputDecoration(labelText: 'Payment Method'),
-                      items: AppConstants.paymentMethods.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
-                      onChanged: (val) {
-                        if (val != null) setDialogState(() => paymentMethod = val);
-                      },
-                    ),
-                  ],
+              title: Text('Disburse Salary: $staffName', maxLines: 1, overflow: TextOverflow.ellipsis),
+              content: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: 400,
+                  maxHeight: MediaQuery.of(context).size.height * 0.8,
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('Total Net Due: Rs. ${remainingAmount.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: amountController,
+                        decoration: const InputDecoration(labelText: 'Disbursement Amount (Rs.) *'),
+                        keyboardType: TextInputType.number,
+                      ),
+                      const SizedBox(height: 16),
+                      DropdownButtonFormField<String>(
+                        value: paymentMethod,
+                        decoration: const InputDecoration(labelText: 'Payment Method'),
+                        items: AppConstants.paymentMethods.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+                        onChanged: (val) {
+                          if (val != null) setDialogState(() => paymentMethod = val);
+                        },
+                      ),
+                    ],
+                  ),
                 ),
               ),
               actions: [
@@ -964,9 +1016,16 @@ class _StaffExpenseFormDialogState extends State<StaffExpenseFormDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(widget.existing == null ? 'Add Staff Expense' : 'Edit Staff Expense'),
-      content: SizedBox(
-        width: 500,
+      title: Text(
+        widget.existing == null ? 'Add Staff Expense' : 'Edit Staff Expense',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      content: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 500,
+          maxHeight: MediaQuery.of(context).size.height * 0.88,
+        ),
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(

@@ -128,10 +128,15 @@ class _InspectionListScreenState extends State<InspectionListScreen> {
                                     color: AppColors.primary,
                                   ),
                                 ),
-                                title: Row(
+                                title: Wrap(
+                                  spacing: 8,
+                                  runSpacing: 4,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
                                   children: [
-                                    Text('$vehicleName ($plateNumber)', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                                    const SizedBox(width: 8),
+                                    Text(
+                                      '$vehicleName ($plateNumber)',
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                    ),
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                       decoration: BoxDecoration(
@@ -143,8 +148,7 @@ class _InspectionListScreenState extends State<InspectionListScreen> {
                                         style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primaryLight),
                                       ),
                                     ),
-                                    if (photosCount > 0) ...[
-                                      const SizedBox(width: 6),
+                                    if (photosCount > 0)
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                         decoration: BoxDecoration(
@@ -156,7 +160,6 @@ class _InspectionListScreenState extends State<InspectionListScreen> {
                                           style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.accent),
                                         ),
                                       ),
-                                    ],
                                   ],
                                 ),
                                 subtitle: Padding(
@@ -164,46 +167,87 @@ class _InspectionListScreenState extends State<InspectionListScreen> {
                                   child: Text(
                                     'Customer: $customerName • Inspector: $inspector • Date: ${Formatters.dateTime(date)}',
                                     style: const TextStyle(fontSize: 12, color: AppColors.textDarkSecondary),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
-                                trailing: ElevatedButton.icon(
-                                  onPressed: () async {
-                                    final details = await _inspectionRepo.getInspectionDetails(id);
-                                    if (details != null) {
-                                      final business = AuthService.to.currentBusiness.value;
-                                      if (business != null) {
-                                        final inspModel = InspectionModel(
-                                          id: id,
-                                          businessId: 'local',
-                                          vehicleId: details['vehicle_id'],
-                                          customerId: details['customer_id'],
-                                          inspectorStaffName: details['inspector_name'] ?? 'Advisor',
-                                          inspectionDate: DateTime.tryParse(details['inspection_date'] ?? '') ?? DateTime.now(),
-                                          diagramParts: (details['items'] as List<dynamic>? ?? []).map((i) {
-                                            return InspectionPartItem(
-                                              partName: i['part_name'] ?? '',
-                                              view: i['view_type'] ?? 'General',
-                                              condition: i['condition'] ?? 'Good',
-                                              damageDescription: i['damage_description'],
-                                              notes: i['notes'],
-                                              hasDamage: (i['damage_description'] as String?)?.isNotEmpty == true,
-                                            );
-                                          }).toList(),
-                                        );
+                                trailing: MediaQuery.of(context).size.width < 620
+                                    ? IconButton(
+                                        icon: const Icon(Icons.print_rounded, color: AppColors.primaryLight),
+                                        tooltip: 'Print PDF',
+                                        onPressed: () async {
+                                          final details = await _inspectionRepo.getInspectionDetails(id);
+                                          if (details != null) {
+                                            final business = AuthService.to.currentBusiness.value;
+                                            if (business != null) {
+                                              final inspModel = InspectionModel(
+                                                id: id,
+                                                businessId: 'local',
+                                                vehicleId: details['vehicle_id'],
+                                                customerId: details['customer_id'],
+                                                inspectorStaffName: details['inspector_name'] ?? 'Advisor',
+                                                inspectionDate: DateTime.tryParse(details['inspection_date'] ?? '') ?? DateTime.now(),
+                                                diagramParts: (details['items'] as List<dynamic>? ?? []).map((i) {
+                                                  return InspectionPartItem(
+                                                    partName: i['part_name'] ?? '',
+                                                    view: i['view_type'] ?? 'General',
+                                                    condition: i['condition'] ?? 'Good',
+                                                    damageDescription: i['damage_description'],
+                                                    notes: i['notes'],
+                                                    hasDamage: (i['damage_description'] as String?)?.isNotEmpty == true,
+                                                  );
+                                                }).toList(),
+                                              );
 
-                                        await PdfService.printInspectionReport(
-                                          business: business,
-                                          inspection: inspModel,
-                                          vehicleReg: details['registration_number'] ?? '',
-                                          vehicleName: details['vehicle_name'] ?? '',
-                                          customerName: details['customer_name'] ?? '',
-                                        );
-                                      }
-                                    }
-                                  },
-                                  icon: const Icon(Icons.print_rounded, size: 16),
-                                  label: const Text('Print PDF'),
-                                ),
+                                              await PdfService.printInspectionReport(
+                                                business: business,
+                                                inspection: inspModel,
+                                                vehicleReg: details['registration_number'] ?? '',
+                                                vehicleName: details['vehicle_name'] ?? '',
+                                                customerName: details['customer_name'] ?? '',
+                                              );
+                                            }
+                                          }
+                                        },
+                                      )
+                                    : ElevatedButton.icon(
+                                        onPressed: () async {
+                                          final details = await _inspectionRepo.getInspectionDetails(id);
+                                          if (details != null) {
+                                            final business = AuthService.to.currentBusiness.value;
+                                            if (business != null) {
+                                              final inspModel = InspectionModel(
+                                                id: id,
+                                                businessId: 'local',
+                                                vehicleId: details['vehicle_id'],
+                                                customerId: details['customer_id'],
+                                                inspectorStaffName: details['inspector_name'] ?? 'Advisor',
+                                                inspectionDate: DateTime.tryParse(details['inspection_date'] ?? '') ?? DateTime.now(),
+                                                diagramParts: (details['items'] as List<dynamic>? ?? []).map((i) {
+                                                  return InspectionPartItem(
+                                                    partName: i['part_name'] ?? '',
+                                                    view: i['view_type'] ?? 'General',
+                                                    condition: i['condition'] ?? 'Good',
+                                                    damageDescription: i['damage_description'],
+                                                    notes: i['notes'],
+                                                    hasDamage: (i['damage_description'] as String?)?.isNotEmpty == true,
+                                                  );
+                                                }).toList(),
+                                              );
+
+                                              await PdfService.printInspectionReport(
+                                                business: business,
+                                                inspection: inspModel,
+                                                vehicleReg: details['registration_number'] ?? '',
+                                                vehicleName: details['vehicle_name'] ?? '',
+                                                customerName: details['customer_name'] ?? '',
+                                              );
+                                            }
+                                          }
+                                        },
+                                        icon: const Icon(Icons.print_rounded, size: 16),
+                                        label: const Text('Print PDF'),
+                                      ),
                               );
                             },
                           ),

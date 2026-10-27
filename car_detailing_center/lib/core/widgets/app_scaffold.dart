@@ -38,6 +38,8 @@ class MainModuleItem {
 
 class AppScaffold extends StatefulWidget {
   final String currentRoute;
+  final String? currentSubItem;
+  final void Function(NavSubItem subItem)? onSubItemSelect;
   final String title;
   final Widget body;
   final List<Widget>? actions;
@@ -46,6 +48,8 @@ class AppScaffold extends StatefulWidget {
   const AppScaffold({
     super.key,
     required this.currentRoute,
+    this.currentSubItem,
+    this.onSubItemSelect,
     required this.title,
     required this.body,
     this.actions,
@@ -57,7 +61,10 @@ class AppScaffold extends StatefulWidget {
 }
 
 class _AppScaffoldState extends State<AppScaffold> {
-  bool _staffExpanded = true;
+  static final Map<String, bool> _expandedModules = {
+    'Staff': false,
+    'Inventory': false,
+  };
 
   // The 11 Strict Main Navigation Modules per Section 6
   static const List<MainModuleItem> _modules = [
@@ -88,6 +95,7 @@ class _AppScaffoldState extends State<AppScaffold> {
       route: AppRoutes.inventory,
       subItems: [
         NavSubItem(title: 'Stock Details', icon: Icons.format_list_bulleted_rounded, tabIndex: 0),
+        NavSubItem(title: 'Vendors', icon: Icons.storefront_rounded, tabIndex: 1),
       ],
     ),
     MainModuleItem(
@@ -139,7 +147,11 @@ class _AppScaffoldState extends State<AppScaffold> {
               child: _buildSidebarContent(context),
             ),
       appBar: AppBar(
-        title: Text(widget.title),
+        title: Text(
+          widget.title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
         actions: [
           // Global Search trigger
           IconButton(
@@ -152,11 +164,13 @@ class _AppScaffoldState extends State<AppScaffold> {
               );
             },
           ),
-          const SizedBox(width: 8),
 
-          // Sync Badge
-          const SyncBadge(),
-          const SizedBox(width: 12),
+          // Sync Badge (shown on tablet & desktop)
+          if (!ResponsiveLayout.isMobile(context)) ...[
+            const SizedBox(width: 8),
+            const SyncBadge(),
+            const SizedBox(width: 8),
+          ],
 
           // Notification Bell with Unread Badge
           Obx(() {
@@ -192,22 +206,23 @@ class _AppScaffoldState extends State<AppScaffold> {
               ],
             );
           }),
-          const SizedBox(width: 8),
 
-          // Role Badge & User Profile
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+          // Role Badge (shown on tablet & desktop)
+          if (!ResponsiveLayout.isMobile(context)) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+              ),
+              child: Text(
+                userRole.toUpperCase(),
+                style: const TextStyle(color: AppColors.primaryLight, fontSize: 10, fontWeight: FontWeight.bold),
+              ),
             ),
-            child: Text(
-              userRole.toUpperCase(),
-              style: const TextStyle(color: AppColors.primaryLight, fontSize: 10, fontWeight: FontWeight.bold),
-            ),
-          ),
-          const SizedBox(width: 8),
+          ],
 
           // Logout Button
           IconButton(
@@ -215,7 +230,7 @@ class _AppScaffoldState extends State<AppScaffold> {
             tooltip: 'Logout',
             onPressed: () => _confirmLogout(context),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 8),
           ...?widget.actions,
         ],
       ),
@@ -291,69 +306,187 @@ class _AppScaffoldState extends State<AppScaffold> {
               itemCount: _modules.length,
               itemBuilder: (context, index) {
                 final module = _modules[index];
-                final isSelected = widget.currentRoute == module.route;
+                final isDirectSelected = widget.currentRoute == module.route;
 
                 if (module.subItems != null && module.subItems!.isNotEmpty) {
-                  // Collapsible or expandable menu for Staff / Inventory
+                  final isExpanded = _expandedModules[module.title] ?? false;
+                  final hasActiveSubItem = module.subItems!.any((sub) {
+                    if (widget.currentSubItem != null && widget.currentSubItem!.isNotEmpty) {
+                      return sub.title.toLowerCase() == widget.currentSubItem!.toLowerCase();
+                    }
+                    return (sub.title == 'Vendors' && widget.currentRoute == AppRoutes.vendors) ||
+                        (sub.title == 'Stock Details' && widget.currentRoute == AppRoutes.inventory) ||
+                        (sub.title == 'Staff List' && widget.currentRoute == AppRoutes.staff);
+                  });
+                  final isModuleActive = isDirectSelected || hasActiveSubItem;
+                  final showHeaderIndicator = !isExpanded && isModuleActive;
+
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 2),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        ListTile(
-                          dense: true,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          selected: isSelected,
-                          selectedTileColor: AppColors.primary.withValues(alpha: 0.15),
-                          leading: Icon(
-                            module.icon,
-                            size: 20,
-                            color: isSelected ? AppColors.primaryLight : AppColors.textDarkSecondary,
+                        Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(8),
+                            color: showHeaderIndicator
+                                ? AppColors.primary.withValues(alpha: 0.18)
+                                : Colors.transparent,
+                            border: showHeaderIndicator
+                                ? Border.all(color: AppColors.primary.withValues(alpha: 0.45), width: 1.2)
+                                : null,
                           ),
-                          title: Text(
-                            module.title,
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                              color: isSelected ? AppColors.primaryLight : null,
+                          child: ListTile(
+                            dense: true,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                            leading: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  width: showHeaderIndicator ? 3.5 : 0,
+                                  height: 20,
+                                  margin: EdgeInsets.only(right: showHeaderIndicator ? 8 : 0),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primaryLight,
+                                    borderRadius: BorderRadius.circular(2),
+                                    boxShadow: showHeaderIndicator
+                                        ? [
+                                            BoxShadow(
+                                              color: AppColors.primaryLight.withValues(alpha: 0.8),
+                                              blurRadius: 6,
+                                              spreadRadius: 1,
+                                            ),
+                                          ]
+                                        : null,
+                                  ),
+                                ),
+                                Icon(
+                                  module.icon,
+                                  size: 20,
+                                  color: isModuleActive ? AppColors.primaryLight : AppColors.textDarkSecondary,
+                                ),
+                              ],
                             ),
+                            title: Text(
+                              module.title,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: isModuleActive ? FontWeight.bold : FontWeight.normal,
+                                color: isModuleActive ? Colors.white : AppColors.textDark,
+                              ),
+                            ),
+                            trailing: Icon(
+                              isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                              size: 18,
+                              color: isModuleActive ? AppColors.primaryLight : AppColors.textDarkMuted,
+                            ),
+                            onTap: () {
+                              setState(() {
+                                _expandedModules[module.title] = !isExpanded;
+                              });
+                            },
                           ),
-                          trailing: Icon(
-                            _staffExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                            size: 18,
-                            color: AppColors.textDarkMuted,
-                          ),
-                          onTap: () {
-                            if (module.route == AppRoutes.staff) {
-                              setState(() => _staffExpanded = !_staffExpanded);
-                              if (widget.currentRoute != AppRoutes.staff) {
-                                Get.offNamed(AppRoutes.staff);
-                              }
-                            } else {
-                              Get.offNamed(module.route);
-                            }
-                          },
                         ),
-                        if (_staffExpanded)
+                        if (isExpanded)
                           Padding(
-                            padding: const EdgeInsets.only(left: 28),
+                            padding: const EdgeInsets.only(left: 14),
                             child: Column(
                               children: module.subItems!.map((sub) {
-                                return ListTile(
-                                  dense: true,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                                  leading: Icon(sub.icon, size: 16, color: AppColors.textDarkMuted),
-                                  title: Text(
-                                    sub.title,
-                                    style: const TextStyle(fontSize: 12),
+                                final bool isSubSelected;
+                                if (widget.currentSubItem != null && widget.currentSubItem!.isNotEmpty) {
+                                  isSubSelected = sub.title.toLowerCase() == widget.currentSubItem!.toLowerCase();
+                                } else {
+                                  isSubSelected = (sub.title == 'Vendors' && widget.currentRoute == AppRoutes.vendors) ||
+                                      (sub.title == 'Stock Details' && widget.currentRoute == AppRoutes.inventory) ||
+                                      (sub.title == 'Staff List' && widget.currentRoute == AppRoutes.staff);
+                                }
+
+                                return Container(
+                                  margin: const EdgeInsets.symmetric(vertical: 2),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(8),
+                                    color: isSubSelected
+                                        ? AppColors.primary.withValues(alpha: 0.22)
+                                        : Colors.transparent,
+                                    border: isSubSelected
+                                        ? Border.all(color: AppColors.primaryLight.withValues(alpha: 0.55), width: 1.2)
+                                        : Border.all(color: Colors.transparent, width: 1.2),
                                   ),
-                                  onTap: () {
-                                    if (module.route == AppRoutes.staff) {
-                                      Get.offAll(() => StaffScreen(initialTabIndex: sub.tabIndex));
-                                    } else {
-                                      Get.offNamed(module.route);
-                                    }
-                                  },
+                                  child: ListTile(
+                                    dense: true,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                                    leading: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        AnimatedContainer(
+                                          duration: const Duration(milliseconds: 200),
+                                          width: isSubSelected ? 3.5 : 0,
+                                          height: 16,
+                                          margin: EdgeInsets.only(right: isSubSelected ? 6 : 0),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.primaryLight,
+                                            borderRadius: BorderRadius.circular(2),
+                                            boxShadow: isSubSelected
+                                                ? [
+                                                    BoxShadow(
+                                                      color: AppColors.primaryLight.withValues(alpha: 0.9),
+                                                      blurRadius: 6,
+                                                      spreadRadius: 1,
+                                                    ),
+                                                  ]
+                                                : null,
+                                          ),
+                                        ),
+                                        Icon(
+                                          sub.icon,
+                                          size: 16,
+                                          color: isSubSelected ? AppColors.primaryLight : AppColors.textDarkMuted,
+                                        ),
+                                      ],
+                                    ),
+                                    title: Text(
+                                      sub.title,
+                                      style: TextStyle(
+                                        fontSize: 12.5,
+                                        color: isSubSelected ? Colors.white : AppColors.textDarkSecondary,
+                                        fontWeight: isSubSelected ? FontWeight.bold : FontWeight.w500,
+                                      ),
+                                    ),
+                                    trailing: isSubSelected
+                                        ? Container(
+                                            width: 7,
+                                            height: 7,
+                                            decoration: BoxDecoration(
+                                              color: AppColors.primaryLight,
+                                              shape: BoxShape.circle,
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: AppColors.primaryLight.withValues(alpha: 0.9),
+                                                  blurRadius: 5,
+                                                ),
+                                              ],
+                                            ),
+                                          )
+                                        : null,
+                                    onTap: () {
+                                      if (module.route == AppRoutes.staff) {
+                                        if (widget.currentRoute == AppRoutes.staff && widget.onSubItemSelect != null) {
+                                          widget.onSubItemSelect!(sub);
+                                        } else {
+                                          Get.offAll(() => StaffScreen(initialTabIndex: sub.tabIndex));
+                                        }
+                                      } else if (sub.title == 'Vendors') {
+                                        Get.offNamed(AppRoutes.vendors);
+                                      } else if (sub.title == 'Stock Details') {
+                                        Get.offNamed(AppRoutes.inventory);
+                                      } else {
+                                        Get.offNamed(module.route);
+                                      }
+                                    },
+                                  ),
                                 );
                               }).toList(),
                             ),
@@ -363,26 +496,73 @@ class _AppScaffoldState extends State<AppScaffold> {
                   );
                 }
 
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 2),
+                final isSelected = widget.currentRoute == module.route;
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 2),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    color: isSelected ? AppColors.primary.withValues(alpha: 0.2) : Colors.transparent,
+                    border: isSelected
+                        ? Border.all(color: AppColors.primaryLight.withValues(alpha: 0.5), width: 1.2)
+                        : Border.all(color: Colors.transparent, width: 1.2),
+                  ),
                   child: ListTile(
                     dense: true,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    selected: isSelected,
-                    selectedTileColor: AppColors.primary.withValues(alpha: 0.15),
-                    leading: Icon(
-                      module.icon,
-                      size: 20,
-                      color: isSelected ? AppColors.primaryLight : AppColors.textDarkSecondary,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                    leading: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          width: isSelected ? 3.5 : 0,
+                          height: 20,
+                          margin: EdgeInsets.only(right: isSelected ? 8 : 0),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryLight,
+                            borderRadius: BorderRadius.circular(2),
+                            boxShadow: isSelected
+                                ? [
+                                    BoxShadow(
+                                      color: AppColors.primaryLight.withValues(alpha: 0.8),
+                                      blurRadius: 6,
+                                      spreadRadius: 1,
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                        ),
+                        Icon(
+                          module.icon,
+                          size: 20,
+                          color: isSelected ? AppColors.primaryLight : AppColors.textDarkSecondary,
+                        ),
+                      ],
                     ),
                     title: Text(
                       module.title,
                       style: TextStyle(
                         fontSize: 13,
-                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                        color: isSelected ? AppColors.primaryLight : null,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                        color: isSelected ? Colors.white : AppColors.textDark,
                       ),
                     ),
+                    trailing: isSelected
+                        ? Container(
+                            width: 7,
+                            height: 7,
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryLight,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.primaryLight.withValues(alpha: 0.9),
+                                  blurRadius: 5,
+                                ),
+                              ],
+                            ),
+                          )
+                        : null,
                     onTap: () {
                       if (!isSelected) {
                         Get.offNamed(module.route);

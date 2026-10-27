@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -225,6 +226,25 @@ class PdfService {
     required BusinessModel business,
     required JobModel job,
   }) async {
+    pw.MemoryImage? custSigImage;
+    if (job.customerSignature != null && job.customerSignature!.isNotEmpty && File(job.customerSignature!).existsSync()) {
+      try {
+        custSigImage = pw.MemoryImage(File(job.customerSignature!).readAsBytesSync());
+      } catch (_) {}
+    }
+    pw.MemoryImage? advSigImage;
+    if (job.serviceAdvisorSignature != null && job.serviceAdvisorSignature!.isNotEmpty && File(job.serviceAdvisorSignature!).existsSync()) {
+      try {
+        advSigImage = pw.MemoryImage(File(job.serviceAdvisorSignature!).readAsBytesSync());
+      } catch (_) {}
+    }
+    pw.MemoryImage? authSigImage;
+    if (job.authorizedSignature != null && job.authorizedSignature!.isNotEmpty && File(job.authorizedSignature!).existsSync()) {
+      try {
+        authSigImage = pw.MemoryImage(File(job.authorizedSignature!).readAsBytesSync());
+      } catch (_) {}
+    }
+
     final doc = pw.Document();
 
     doc.addPage(
@@ -406,18 +426,30 @@ class PdfService {
               children: [
                 pw.Column(
                   children: [
+                    if (custSigImage != null)
+                      pw.Container(height: 35, width: 120, child: pw.Image(custSigImage, fit: pw.BoxFit.contain))
+                    else
+                      pw.SizedBox(height: 35),
                     pw.Container(width: 140, child: pw.Divider(color: PdfColors.grey700)),
                     pw.Text('Customer Signature', style: const pw.TextStyle(fontSize: 9)),
                   ],
                 ),
                 pw.Column(
                   children: [
+                    if (advSigImage != null)
+                      pw.Container(height: 35, width: 120, child: pw.Image(advSigImage, fit: pw.BoxFit.contain))
+                    else
+                      pw.SizedBox(height: 35),
                     pw.Container(width: 140, child: pw.Divider(color: PdfColors.grey700)),
                     pw.Text('Service Advisor', style: const pw.TextStyle(fontSize: 9)),
                   ],
                 ),
                 pw.Column(
                   children: [
+                    if (authSigImage != null)
+                      pw.Container(height: 35, width: 120, child: pw.Image(authSigImage, fit: pw.BoxFit.contain))
+                    else
+                      pw.SizedBox(height: 35),
                     pw.Container(width: 140, child: pw.Divider(color: PdfColors.grey700)),
                     pw.Text('Authorized Signature', style: const pw.TextStyle(fontSize: 9)),
                   ],

@@ -48,6 +48,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
     return AppScaffold(
       currentRoute: AppRoutes.inventory,
+      currentSubItem: 'Stock Details',
       title: 'Stock Details',
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
@@ -74,45 +75,89 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 final outOfStock = data['out_of_stock'] ?? 0;
                 final purchaseVal = (data['stock_purchase_value'] as num?)?.toDouble() ?? 0.0;
 
-                return Row(
-                  children: [
-                    Expanded(
-                      child: _kpiCard(
-                        title: 'Total Stock Items',
-                        value: '$totalItems',
-                        icon: Icons.inventory_2_rounded,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: _kpiCard(
-                        title: 'Low Stock Items',
-                        value: '$lowStock',
-                        icon: Icons.warning_amber_rounded,
-                        color: AppColors.warning,
-                        subtitle: 'Threshold: ≤ ${_lowStockThreshold.toStringAsFixed(0)}',
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: _kpiCard(
-                        title: 'Out-of-Stock Items',
-                        value: '$outOfStock',
-                        icon: Icons.remove_circle_outline_rounded,
-                        color: AppColors.error,
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: _kpiCard(
-                        title: 'Stock Purchase Value',
-                        value: Formatters.currency(purchaseVal, symbol: currency),
-                        icon: Icons.account_balance_wallet_rounded,
-                        color: AppColors.success,
-                      ),
-                    ),
-                  ],
+                return LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isDesktop = constraints.maxWidth > 900;
+                    final isTablet = constraints.maxWidth > 580;
+                    if (isDesktop) {
+                      return Row(
+                        children: [
+                          Expanded(
+                            child: _kpiCard(
+                              title: 'Total Stock Items',
+                              value: '$totalItems',
+                              icon: Icons.inventory_2_rounded,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: _kpiCard(
+                              title: 'Low Stock Items',
+                              value: '$lowStock',
+                              icon: Icons.warning_amber_rounded,
+                              color: AppColors.warning,
+                              subtitle: 'Threshold: ≤ ${_lowStockThreshold.toStringAsFixed(0)}',
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: _kpiCard(
+                              title: 'Out-of-Stock Items',
+                              value: '$outOfStock',
+                              icon: Icons.remove_circle_outline_rounded,
+                              color: AppColors.error,
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: _kpiCard(
+                              title: 'Stock Purchase Value',
+                              value: Formatters.currency(purchaseVal, symbol: currency),
+                              icon: Icons.account_balance_wallet_rounded,
+                              color: AppColors.success,
+                            ),
+                          ),
+                        ],
+                      );
+                    }
+                    final count = isTablet ? 2 : 1;
+                    return GridView.count(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      crossAxisCount: count,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      childAspectRatio: isTablet ? 2.3 : 3.2,
+                      children: [
+                        _kpiCard(
+                          title: 'Total Stock Items',
+                          value: '$totalItems',
+                          icon: Icons.inventory_2_rounded,
+                          color: AppColors.primary,
+                        ),
+                        _kpiCard(
+                          title: 'Low Stock Items',
+                          value: '$lowStock',
+                          icon: Icons.warning_amber_rounded,
+                          color: AppColors.warning,
+                          subtitle: 'Threshold: ≤ ${_lowStockThreshold.toStringAsFixed(0)}',
+                        ),
+                        _kpiCard(
+                          title: 'Out-of-Stock Items',
+                          value: '$outOfStock',
+                          icon: Icons.remove_circle_outline_rounded,
+                          color: AppColors.error,
+                        ),
+                        _kpiCard(
+                          title: 'Stock Purchase Value',
+                          value: Formatters.currency(purchaseVal, symbol: currency),
+                          icon: Icons.account_balance_wallet_rounded,
+                          color: AppColors.success,
+                        ),
+                      ],
+                    );
+                  },
                 );
               },
             ),
@@ -216,7 +261,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
                           ),
                           title: Row(
                             children: [
-                              Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                              Flexible(
+                                child: Text(
+                                  item.name,
+                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
                               if (item.brand != null && item.brand!.isNotEmpty) ...[
                                 const SizedBox(width: 8),
                                 Container(
@@ -255,84 +306,149 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                 Text('Notes: ${item.notes}', style: const TextStyle(fontSize: 11, color: AppColors.textDarkMuted)),
                             ],
                           ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              // + Add Quantity
-                              IconButton(
-                                icon: const Icon(Icons.add_circle_outline_rounded, color: AppColors.success, size: 22),
-                                tooltip: '+ Increase Quantity',
-                                onPressed: () async {
-                                  final res = await showDialog<bool>(
-                                    context: context,
-                                    builder: (_) => StockAdjustmentDialog(item: item, isAdding: true),
-                                  );
-                                  if (res == true && mounted) setState(() {});
-                                },
-                              ),
-                              // - Remove Quantity
-                              IconButton(
-                                icon: const Icon(Icons.remove_circle_outline_rounded, color: AppColors.error, size: 22),
-                                tooltip: '- Decrease Quantity',
-                                onPressed: () async {
-                                  final res = await showDialog<bool>(
-                                    context: context,
-                                    builder: (_) => StockAdjustmentDialog(item: item, isAdding: false),
-                                  );
-                                  if (res == true && mounted) setState(() {});
-                                },
-                              ),
-                              // History
-                              IconButton(
-                                icon: const Icon(Icons.history_rounded, size: 20),
-                                tooltip: 'Quantity History',
-                                onPressed: () {
-                                  showDialog(
-                                    context: context,
-                                    builder: (_) => StockHistoryDialog(item: item),
-                                  );
-                                },
-                              ),
-                              // Edit
-                              IconButton(
-                                icon: const Icon(Icons.edit_outlined, size: 20),
-                                tooltip: 'Edit Item',
-                                onPressed: () async {
-                                  final res = await showDialog<bool>(
-                                    context: context,
-                                    builder: (_) => InventoryFormDialog(item: item),
-                                  );
-                                  if (res == true && mounted) setState(() {});
-                                },
-                              ),
-                              // Delete
-                              IconButton(
-                                icon: const Icon(Icons.delete_outline_rounded, size: 20, color: AppColors.error),
-                                tooltip: 'Delete',
-                                onPressed: () async {
-                                  final confirm = await Get.dialog<bool>(
-                                    AlertDialog(
-                                      title: const Text('Delete Stock Item'),
-                                      content: Text('Are you sure you want to delete "${item.name}" from inventory?'),
-                                      actions: [
-                                        TextButton(onPressed: () => Get.back(result: false), child: const Text('Cancel')),
-                                        ElevatedButton(
-                                          style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-                                          onPressed: () => Get.back(result: true),
-                                          child: const Text('Delete'),
-                                        ),
+                          trailing: MediaQuery.of(context).size.width < 700
+                              ? Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.add_circle_outline_rounded, color: AppColors.success, size: 22),
+                                      tooltip: '+ Increase',
+                                      onPressed: () async {
+                                        final res = await showDialog<bool>(
+                                          context: context,
+                                          builder: (_) => StockAdjustmentDialog(item: item, isAdding: true),
+                                        );
+                                        if (res == true && mounted) setState(() {});
+                                      },
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.remove_circle_outline_rounded, color: AppColors.error, size: 22),
+                                      tooltip: '- Decrease',
+                                      onPressed: () async {
+                                        final res = await showDialog<bool>(
+                                          context: context,
+                                          builder: (_) => StockAdjustmentDialog(item: item, isAdding: false),
+                                        );
+                                        if (res == true && mounted) setState(() {});
+                                      },
+                                    ),
+                                    PopupMenuButton<String>(
+                                      icon: const Icon(Icons.more_vert_rounded),
+                                      onSelected: (val) async {
+                                        if (val == 'history') {
+                                          showDialog(
+                                            context: context,
+                                            builder: (_) => StockHistoryDialog(item: item),
+                                          );
+                                        } else if (val == 'edit') {
+                                          final res = await showDialog<bool>(
+                                            context: context,
+                                            builder: (_) => InventoryFormDialog(item: item),
+                                          );
+                                          if (res == true && mounted) setState(() {});
+                                        } else if (val == 'delete') {
+                                          final confirm = await Get.dialog<bool>(
+                                            AlertDialog(
+                                              title: const Text('Delete Stock Item'),
+                                              content: Text('Are you sure you want to delete "${item.name}" from inventory?'),
+                                              actions: [
+                                                TextButton(onPressed: () => Get.back(result: false), child: const Text('Cancel')),
+                                                ElevatedButton(
+                                                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+                                                  onPressed: () => Get.back(result: true),
+                                                  child: const Text('Delete'),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                          if (confirm == true) {
+                                            await _inventoryRepo.deleteItem(item.id);
+                                            Get.snackbar('Deleted', '${item.name} removed from inventory');
+                                            if (mounted) setState(() {});
+                                          }
+                                        }
+                                      },
+                                      itemBuilder: (ctx) => [
+                                        const PopupMenuItem(value: 'history', child: Text('Quantity History')),
+                                        const PopupMenuItem(value: 'edit', child: Text('Edit Item')),
+                                        const PopupMenuItem(value: 'delete', child: Text('Delete Item', style: TextStyle(color: AppColors.error))),
                                       ],
                                     ),
-                                  );
-                                  if (confirm == true) {
-                                    await _inventoryRepo.deleteItem(item.id);
-                                    Get.snackbar('Deleted', '${item.name} removed from inventory');
-                                    if (mounted) setState(() {});
-                                  }
-                                },
-                              ),
-                            ],
-                          ),
+                                  ],
+                                )
+                              : Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.add_circle_outline_rounded, color: AppColors.success, size: 22),
+                                      tooltip: '+ Increase Quantity',
+                                      onPressed: () async {
+                                        final res = await showDialog<bool>(
+                                          context: context,
+                                          builder: (_) => StockAdjustmentDialog(item: item, isAdding: true),
+                                        );
+                                        if (res == true && mounted) setState(() {});
+                                      },
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.remove_circle_outline_rounded, color: AppColors.error, size: 22),
+                                      tooltip: '- Decrease Quantity',
+                                      onPressed: () async {
+                                        final res = await showDialog<bool>(
+                                          context: context,
+                                          builder: (_) => StockAdjustmentDialog(item: item, isAdding: false),
+                                        );
+                                        if (res == true && mounted) setState(() {});
+                                      },
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.history_rounded, size: 20),
+                                      tooltip: 'Quantity History',
+                                      onPressed: () {
+                                        showDialog(
+                                          context: context,
+                                          builder: (_) => StockHistoryDialog(item: item),
+                                        );
+                                      },
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.edit_outlined, size: 20),
+                                      tooltip: 'Edit Item',
+                                      onPressed: () async {
+                                        final res = await showDialog<bool>(
+                                          context: context,
+                                          builder: (_) => InventoryFormDialog(item: item),
+                                        );
+                                        if (res == true && mounted) setState(() {});
+                                      },
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.delete_outline_rounded, size: 20, color: AppColors.error),
+                                      tooltip: 'Delete',
+                                      onPressed: () async {
+                                        final confirm = await Get.dialog<bool>(
+                                          AlertDialog(
+                                            title: const Text('Delete Stock Item'),
+                                            content: Text('Are you sure you want to delete "${item.name}" from inventory?'),
+                                            actions: [
+                                              TextButton(onPressed: () => Get.back(result: false), child: const Text('Cancel')),
+                                              ElevatedButton(
+                                                style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+                                                onPressed: () => Get.back(result: true),
+                                                child: const Text('Delete'),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                        if (confirm == true) {
+                                          await _inventoryRepo.deleteItem(item.id);
+                                          Get.snackbar('Deleted', '${item.name} removed from inventory');
+                                          if (mounted) setState(() {});
+                                        }
+                                      },
+                                    ),
+                                  ],
+                                ),
                         );
                       },
                     ),
@@ -372,12 +488,16 @@ class _InventoryScreenState extends State<InventoryScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(title, style: const TextStyle(fontSize: 11, color: AppColors.textDarkSecondary), maxLines: 1),
+                Text(title, style: const TextStyle(fontSize: 11, color: AppColors.textDarkSecondary), maxLines: 1, overflow: TextOverflow.ellipsis),
                 const SizedBox(height: 4),
-                Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color), maxLines: 1),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color), maxLines: 1),
+                ),
                 if (subtitle != null) ...[
                   const SizedBox(height: 2),
-                  Text(subtitle, style: const TextStyle(fontSize: 10, color: AppColors.textDarkMuted)),
+                  Text(subtitle, style: const TextStyle(fontSize: 10, color: AppColors.textDarkMuted), maxLines: 1, overflow: TextOverflow.ellipsis),
                 ],
               ],
             ),

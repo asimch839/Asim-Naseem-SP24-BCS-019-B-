@@ -106,63 +106,60 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                   Card(
                     child: Padding(
                       padding: const EdgeInsets.all(20),
-                      child: Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 36,
-                            backgroundColor: AppColors.primary.withValues(alpha: 0.15),
-                            child: Text(
-                              _currentCustomer.fullName.isNotEmpty ? _currentCustomer.fullName[0].toUpperCase() : 'C',
-                              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppColors.primaryLight),
-                            ),
-                          ),
-                          const SizedBox(width: 20),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Text(_currentCustomer.fullName, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                                    const SizedBox(width: 8),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: _currentCustomer.status == 'Active'
-                                            ? AppColors.success.withValues(alpha: 0.15)
-                                            : AppColors.error.withValues(alpha: 0.15),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: Text(
-                                        _currentCustomer.status,
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                          color: _currentCustomer.status == 'Active' ? AppColors.success : AppColors.error,
-                                        ),
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final isWide = constraints.maxWidth >= 650;
+                          final infoColumn = Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      _currentCustomer.fullName,
+                                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: _currentCustomer.status == 'Active'
+                                          ? AppColors.success.withValues(alpha: 0.15)
+                                          : AppColors.error.withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      _currentCustomer.status,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: _currentCustomer.status == 'Active' ? AppColors.success : AppColors.error,
                                       ),
                                     ),
-                                  ],
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Phone: ${_currentCustomer.phone} • Registered: ${Formatters.date(_currentCustomer.createdAt)}',
-                                  style: const TextStyle(fontSize: 13, color: AppColors.textDarkSecondary),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Address: ${_currentCustomer.address ?? "Not specified"}',
-                                  style: const TextStyle(fontSize: 12, color: AppColors.textDarkMuted),
-                                ),
-                                if (_currentCustomer.notes != null && _currentCustomer.notes!.isNotEmpty) ...[
-                                  const SizedBox(height: 4),
-                                  Text('Notes: ${_currentCustomer.notes}', style: const TextStyle(fontSize: 12, color: AppColors.accent)),
+                                  ),
                                 ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Phone: ${_currentCustomer.phone} • Registered: ${Formatters.date(_currentCustomer.createdAt)}',
+                                style: const TextStyle(fontSize: 13, color: AppColors.textDarkSecondary),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Address: ${_currentCustomer.address ?? "Not specified"}',
+                                style: const TextStyle(fontSize: 12, color: AppColors.textDarkMuted),
+                              ),
+                              if (_currentCustomer.notes != null && _currentCustomer.notes!.isNotEmpty) ...[
+                                const SizedBox(height: 4),
+                                Text('Notes: ${_currentCustomer.notes}', style: const TextStyle(fontSize: 12, color: AppColors.accent)),
                               ],
-                            ),
-                          ),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
+                            ],
+                          );
+
+                          final balanceColumn = Column(
+                            crossAxisAlignment: isWide ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                             children: [
                               const Text('Outstanding Balance', style: TextStyle(fontSize: 11, color: AppColors.textDarkSecondary)),
                               Text(
@@ -178,8 +175,49 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                               const SizedBox(height: 2),
                               Text('Jobs: ${_jobs.length} • Inspections: ${_inspections.length}', style: const TextStyle(fontSize: 11, color: AppColors.textDarkSecondary)),
                             ],
-                          ),
-                        ],
+                          );
+
+                          if (isWide) {
+                            return Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 36,
+                                  backgroundColor: AppColors.primary.withValues(alpha: 0.15),
+                                  child: Text(
+                                    _currentCustomer.fullName.isNotEmpty ? _currentCustomer.fullName[0].toUpperCase() : 'C',
+                                    style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppColors.primaryLight),
+                                  ),
+                                ),
+                                const SizedBox(width: 20),
+                                Expanded(child: infoColumn),
+                                const SizedBox(width: 16),
+                                balanceColumn,
+                              ],
+                            );
+                          } else {
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 28,
+                                      backgroundColor: AppColors.primary.withValues(alpha: 0.15),
+                                      child: Text(
+                                        _currentCustomer.fullName.isNotEmpty ? _currentCustomer.fullName[0].toUpperCase() : 'C',
+                                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.primaryLight),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 14),
+                                    Expanded(child: infoColumn),
+                                  ],
+                                ),
+                                const Divider(height: 20),
+                                balanceColumn,
+                              ],
+                            );
+                          }
+                        },
                       ),
                     ),
                   ),
@@ -235,31 +273,64 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                               ),
                               child: const Icon(Icons.directions_car_rounded, color: AppColors.primary),
                             ),
-                            title: Text('${v.make} ${v.model} (${v.year ?? "N/A"})', style: const TextStyle(fontWeight: FontWeight.bold)),
-                            subtitle: Text('Plate #: ${v.registrationNumber} • Mileage: ${v.mileage ?? 0} KM ${v.color != null && v.color!.isNotEmpty ? "• Color: ${v.color}" : ""}'),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                OutlinedButton.icon(
-                                  icon: const Icon(Icons.history_rounded, size: 14),
-                                  label: const Text('History'),
-                                  onPressed: () {
-                                    Get.to(() => VehicleHistoryScreen(vehicle: v));
-                                  },
-                                ),
-                                const SizedBox(width: 8),
-                                ElevatedButton.icon(
-                                  icon: const Icon(Icons.fact_check_rounded, size: 14),
-                                  label: const Text('Inspect'),
-                                  onPressed: () {
-                                    Get.to(() => InspectionCreateScreen(
-                                          preselectedVehicle: v,
-                                          preselectedCustomerId: _currentCustomer.id,
-                                          preselectedCustomerName: _currentCustomer.fullName,
-                                        ));
-                                  },
-                                ),
-                              ],
+                            title: Text(
+                              '${v.make} ${v.model} (${v.year ?? "N/A"})',
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: Text(
+                              'Plate #: ${v.registrationNumber} • Mileage: ${v.mileage ?? 0} KM ${v.color != null && v.color!.isNotEmpty ? "• Color: ${v.color}" : ""}',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            trailing: LayoutBuilder(
+                              builder: (context, trailConstraints) {
+                                final isCompact = MediaQuery.of(context).size.width < 600;
+                                if (isCompact) {
+                                  return PopupMenuButton<String>(
+                                    onSelected: (val) {
+                                      if (val == 'history') {
+                                        Get.to(() => VehicleHistoryScreen(vehicle: v));
+                                      } else if (val == 'inspect') {
+                                        Get.to(() => InspectionCreateScreen(
+                                              preselectedVehicle: v,
+                                              preselectedCustomerId: _currentCustomer.id,
+                                              preselectedCustomerName: _currentCustomer.fullName,
+                                            ));
+                                      }
+                                    },
+                                    itemBuilder: (_) => const [
+                                      PopupMenuItem(value: 'history', child: Text('View History')),
+                                      PopupMenuItem(value: 'inspect', child: Text('Inspect Vehicle')),
+                                    ],
+                                  );
+                                }
+                                return Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    OutlinedButton.icon(
+                                      icon: const Icon(Icons.history_rounded, size: 14),
+                                      label: const Text('History'),
+                                      onPressed: () {
+                                        Get.to(() => VehicleHistoryScreen(vehicle: v));
+                                      },
+                                    ),
+                                    const SizedBox(width: 8),
+                                    ElevatedButton.icon(
+                                      icon: const Icon(Icons.fact_check_rounded, size: 14),
+                                      label: const Text('Inspect'),
+                                      onPressed: () {
+                                        Get.to(() => InspectionCreateScreen(
+                                              preselectedVehicle: v,
+                                              preselectedCustomerId: _currentCustomer.id,
+                                              preselectedCustomerName: _currentCustomer.fullName,
+                                            ));
+                                      },
+                                    ),
+                                  ],
+                                );
+                              },
                             ),
                           ),
                         );
@@ -315,83 +386,96 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                   const SizedBox(height: 24),
 
                   // 4. Invoices & Payments Summary
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Invoices
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Invoices', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                            const SizedBox(height: 8),
-                            if (_invoices.isEmpty)
-                              const Card(child: Padding(padding: EdgeInsets.all(16), child: Text('No invoices issued.')))
-                            else
-                              Card(
-                                child: ListView.separated(
-                                  shrinkWrap: true,
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  itemCount: _invoices.length,
-                                  separatorBuilder: (_, __) => const Divider(height: 1),
-                                  itemBuilder: (ctx, i) {
-                                    final inv = _invoices[i];
-                                    final total = (inv['grand_total'] as num?)?.toDouble() ?? 0.0;
-                                    final rem = (inv['remaining_amount'] as num?)?.toDouble() ?? 0.0;
-                                    return ListTile(
-                                      title: Text(inv['invoice_number'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
-                                      subtitle: Text(Formatters.date(DateTime.tryParse(inv['date'] ?? '') ?? DateTime.now())),
-                                      trailing: Column(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        crossAxisAlignment: CrossAxisAlignment.end,
-                                        children: [
-                                          Text(Formatters.currency(total, symbol: currency), style: const TextStyle(fontWeight: FontWeight.bold)),
-                                          Text(
-                                            rem > 0 ? 'Remaining: ${Formatters.currency(rem, symbol: currency)}' : 'Paid',
-                                            style: TextStyle(fontSize: 11, color: rem > 0 ? AppColors.error : AppColors.success),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  },
-                                ),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isWide = constraints.maxWidth >= 700;
+                      final invoicesWidget = Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Invoices', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 8),
+                          if (_invoices.isEmpty)
+                            const Card(child: Padding(padding: EdgeInsets.all(16), child: Text('No invoices issued.')))
+                          else
+                            Card(
+                              child: ListView.separated(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                itemCount: _invoices.length,
+                                separatorBuilder: (_, __) => const Divider(height: 1),
+                                itemBuilder: (ctx, i) {
+                                  final inv = _invoices[i];
+                                  final total = (inv['grand_total'] as num?)?.toDouble() ?? 0.0;
+                                  final rem = (inv['remaining_amount'] as num?)?.toDouble() ?? 0.0;
+                                  return ListTile(
+                                    title: Text(inv['invoice_number'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
+                                    subtitle: Text(Formatters.date(DateTime.tryParse(inv['date'] ?? '') ?? DateTime.now())),
+                                    trailing: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      children: [
+                                        Text(Formatters.currency(total, symbol: currency), style: const TextStyle(fontWeight: FontWeight.bold)),
+                                        Text(
+                                          rem > 0 ? 'Remaining: ${Formatters.currency(rem, symbol: currency)}' : 'Paid',
+                                          style: TextStyle(fontSize: 11, color: rem > 0 ? AppColors.error : AppColors.success),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
                               ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 16),
+                            ),
+                        ],
+                      );
 
-                      // Payments
-                      Expanded(
-                        child: Column(
+                      final paymentsWidget = Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Payments Received', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 8),
+                          if (_payments.isEmpty)
+                            const Card(child: Padding(padding: EdgeInsets.all(16), child: Text('No payments recorded.')))
+                          else
+                            Card(
+                              child: ListView.separated(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                itemCount: _payments.length,
+                                separatorBuilder: (_, __) => const Divider(height: 1),
+                                itemBuilder: (ctx, i) {
+                                  final p = _payments[i];
+                                  final amount = (p['amount'] as num?)?.toDouble() ?? 0.0;
+                                  return ListTile(
+                                    title: Text(Formatters.currency(amount, symbol: currency), style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.success)),
+                                    subtitle: Text('${p['payment_method']} • ${Formatters.date(DateTime.tryParse(p['payment_date'] ?? '') ?? DateTime.now())}'),
+                                    trailing: Text(p['invoice_number'] != null ? 'Inv: ${p['invoice_number']}' : ''),
+                                  );
+                                },
+                              ),
+                            ),
+                        ],
+                      );
+
+                      if (isWide) {
+                        return Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('Payments Received', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                            const SizedBox(height: 8),
-                            if (_payments.isEmpty)
-                              const Card(child: Padding(padding: EdgeInsets.all(16), child: Text('No payments recorded.')))
-                            else
-                              Card(
-                                child: ListView.separated(
-                                  shrinkWrap: true,
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  itemCount: _payments.length,
-                                  separatorBuilder: (_, __) => const Divider(height: 1),
-                                  itemBuilder: (ctx, i) {
-                                    final p = _payments[i];
-                                    final amount = (p['amount'] as num?)?.toDouble() ?? 0.0;
-                                    return ListTile(
-                                      title: Text(Formatters.currency(amount, symbol: currency), style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.success)),
-                                      subtitle: Text('${p['payment_method']} • ${Formatters.date(DateTime.tryParse(p['payment_date'] ?? '') ?? DateTime.now())}'),
-                                      trailing: Text(p['invoice_number'] != null ? 'Inv: ${p['invoice_number']}' : ''),
-                                    );
-                                  },
-                                ),
-                              ),
+                            Expanded(child: invoicesWidget),
+                            const SizedBox(width: 16),
+                            Expanded(child: paymentsWidget),
                           ],
-                        ),
-                      ),
-                    ],
+                        );
+                      } else {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            invoicesWidget,
+                            const SizedBox(height: 16),
+                            paymentsWidget,
+                          ],
+                        );
+                      }
+                    },
                   ),
                 ],
               ),

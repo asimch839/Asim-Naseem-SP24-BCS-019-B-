@@ -174,7 +174,13 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                                   children: [
                                     Text(invoice.invoiceNumber, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                                     const SizedBox(width: 8),
-                                    Text('• ${invoice.customerName}', style: const TextStyle(fontSize: 14)),
+                                    Flexible(
+                                      child: Text(
+                                        '• ${invoice.customerName}',
+                                        style: const TextStyle(fontSize: 14),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
                                     const SizedBox(width: 8),
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -198,6 +204,8 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                                   child: Text(
                                     '${invoice.vehicleDisplayName ?? "General Detailing"} ${invoice.vehicleRegNumber != null && invoice.vehicleRegNumber!.isNotEmpty ? "(${invoice.vehicleRegNumber})" : ""} • Date: ${Formatters.date(invoice.createdAt)}',
                                     style: const TextStyle(fontSize: 12, color: AppColors.textDarkSecondary),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                                 trailing: Row(
