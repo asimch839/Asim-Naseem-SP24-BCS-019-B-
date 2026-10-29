@@ -294,34 +294,8 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             ),
             const SizedBox(height: 20),
 
-            // Workflow Status Progression Bar
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Update Workflow Status', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: AppConstants.allJobStatuses.map((st) {
-                        final isCurrent = _job.status == st;
-                        return ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: isCurrent ? AppColors.getJobStatusColor(st) : Colors.grey.withValues(alpha: 0.15),
-                            foregroundColor: isCurrent ? Colors.white : AppColors.textDark,
-                          ),
-                          onPressed: _isProcessing ? null : () => _updateStatus(st),
-                          child: Text(st),
-                        );
-                      }).toList(),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            // Interactive Workflow Status Progression Pipeline
+            _buildWorkflowStatusCard(),
             const SizedBox(height: 20),
 
             // Services Rendered
@@ -390,6 +364,176 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                   ],
                 ),
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String? get _nextLogicalStatus {
+    switch (_job.status) {
+      case 'New':
+      case 'Inspection Pending':
+      case 'Waiting':
+        return 'In Progress';
+      case 'In Progress':
+        return 'Ready for Delivery';
+      case 'Ready for Delivery':
+        return 'Delivered';
+      case 'Delivered':
+        return 'Completed';
+      default:
+        return null;
+    }
+  }
+
+  Widget _buildWorkflowStatusCard() {
+    final nextStatus = _nextLogicalStatus;
+    const primaryStages = ['New', 'In Progress', 'Ready for Delivery', 'Completed'];
+    final currentStatusIdx = primaryStages.indexOf(_job.status);
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: const BorderSide(color: AppColors.primaryLight, width: 1.2),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.alt_route_rounded, color: AppColors.primaryLight, size: 20),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text('Service Progression & Floor Status', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.getJobStatusColor(_job.status).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.getJobStatusColor(_job.status).withValues(alpha: 0.4)),
+                  ),
+                  child: Text(
+                    'Current: ${_job.status}',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.getJobStatusColor(_job.status)),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Visual Pipeline Stepper
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: List.generate(primaryStages.length, (i) {
+                  final stage = primaryStages[i];
+                  final isDone = currentStatusIdx >= i || (_job.status == 'Delivered' && i <= 2);
+                  final isCurrent = _job.status == stage || (_job.status == 'Delivered' && stage == 'Ready for Delivery');
+                  final color = isCurrent
+                      ? AppColors.getJobStatusColor(stage)
+                      : isDone
+                          ? AppColors.success
+                          : AppColors.textDarkMuted;
+
+                  return Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      InkWell(
+                        onTap: _isProcessing ? null : () => _updateStatus(stage),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: isCurrent ? color.withValues(alpha: 0.2) : Colors.transparent,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: color, width: isCurrent ? 1.5 : 1),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                isDone ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                                size: 16,
+                                color: color,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                stage,
+                                style: TextStyle(
+                                  fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
+                                  fontSize: 12,
+                                  color: isCurrent ? Colors.white : AppColors.textDarkSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      if (i < primaryStages.length - 1)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          child: Icon(Icons.arrow_forward_rounded, size: 14, color: isDone ? AppColors.success : AppColors.textDarkMuted),
+                        ),
+                    ],
+                  );
+                }),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // 1-Click Fast Advance Button
+            if (nextStatus != null) ...[
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _isProcessing ? null : () => _updateStatus(nextStatus),
+                  icon: _isProcessing
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Icon(Icons.fast_forward_rounded, size: 18),
+                  label: Text('Advance to Next Stage ➔ $nextStatus'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.getJobStatusColor(nextStatus),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+
+            // Other statuses (Dropdown / chips)
+            Row(
+              children: [
+                const Text('More Actions / Override: ', style: TextStyle(fontSize: 11, color: AppColors.textDarkSecondary)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: AppConstants.allJobStatuses.where((s) => s != _job.status && s != nextStatus).map((st) {
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              visualDensity: VisualDensity.compact,
+                            ),
+                            onPressed: _isProcessing ? null : () => _updateStatus(st),
+                            child: Text(st, style: const TextStyle(fontSize: 11)),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

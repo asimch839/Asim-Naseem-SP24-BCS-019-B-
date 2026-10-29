@@ -77,44 +77,74 @@ class _JobListScreenState extends State<JobListScreen> {
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
-            // Filter Bar
+            // Filter Bar with Quick Status Chips
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _searchController,
-                        decoration: const InputDecoration(
-                          hintText: 'Search by Job #, Vehicle Plate, or Customer Name...',
-                          prefixIcon: Icon(Icons.search_rounded),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _searchController,
+                            decoration: InputDecoration(
+                              hintText: 'Search by Job #, Vehicle Plate, or Customer...',
+                              prefixIcon: const Icon(Icons.search_rounded),
+                              suffixIcon: _searchController.text.isNotEmpty
+                                  ? IconButton(
+                                      icon: const Icon(Icons.clear_rounded, size: 18),
+                                      onPressed: () {
+                                        _searchController.clear();
+                                        _searchQuery = '';
+                                        _fetchJobs();
+                                      },
+                                    )
+                                  : null,
+                            ),
+                            onChanged: (val) {
+                              _searchQuery = val.trim();
+                              _fetchJobs();
+                            },
+                          ),
                         ),
-                        onChanged: (val) {
-                          _searchQuery = val.trim();
-                          _fetchJobs();
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    DropdownButton<String>(
-                      value: _selectedStatus,
-                      items: [
-                        const DropdownMenuItem(value: 'All', child: Text('All Job Statuses')),
-                        ...AppConstants.allJobStatuses.map((s) => DropdownMenuItem(value: s, child: Text(s))),
+                        const SizedBox(width: 10),
+                        IconButton(
+                          icon: const Icon(Icons.refresh_rounded),
+                          tooltip: 'Refresh',
+                          onPressed: _fetchJobs,
+                        ),
                       ],
-                      onChanged: (val) {
-                        if (val != null) {
-                          setState(() => _selectedStatus = val);
-                          _fetchJobs();
-                        }
-                      },
                     ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      icon: const Icon(Icons.refresh_rounded),
-                      tooltip: 'Refresh',
-                      onPressed: _fetchJobs,
+                    const SizedBox(height: 12),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          'All',
+                          AppConstants.jobStatusInProgress,
+                          AppConstants.jobStatusReadyForDelivery,
+                          AppConstants.jobStatusCompleted,
+                          AppConstants.jobStatusNew,
+                          AppConstants.jobStatusWaiting,
+                          AppConstants.jobStatusCancelled,
+                        ].map((st) {
+                          final isSelected = _selectedStatus == st;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: ChoiceChip(
+                              label: Text(st, style: TextStyle(fontSize: 12, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+                              selected: isSelected,
+                              selectedColor: st == 'All' ? AppColors.primary : AppColors.getJobStatusColor(st),
+                              onSelected: (_) {
+                                setState(() => _selectedStatus = st);
+                                _fetchJobs();
+                              },
+                            ),
+                          );
+                        }).toList(),
+                      ),
                     ),
                   ],
                 ),
@@ -177,6 +207,15 @@ class _JobListScreenState extends State<JobListScreen> {
                               );
 
                               return ListTile(
+                                onTap: () async {
+                                  await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => JobDetailScreen(job: jobModel),
+                                    ),
+                                  );
+                                  _fetchJobs();
+                                },
                                 contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                                 leading: Container(
                                   padding: const EdgeInsets.all(10),

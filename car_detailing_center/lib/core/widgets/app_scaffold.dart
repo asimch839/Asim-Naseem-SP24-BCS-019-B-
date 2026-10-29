@@ -74,6 +74,11 @@ class _AppScaffoldState extends State<AppScaffold> {
       route: AppRoutes.dashboard,
     ),
     MainModuleItem(
+      title: 'Job Cards & Orders',
+      icon: Icons.assignment_rounded,
+      route: AppRoutes.jobs,
+    ),
+    MainModuleItem(
       title: 'Staff',
       icon: Icons.badge_rounded,
       route: AppRoutes.staff,

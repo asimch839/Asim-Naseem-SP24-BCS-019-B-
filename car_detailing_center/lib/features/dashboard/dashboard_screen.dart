@@ -16,8 +16,15 @@ import '../jobs/job_create_dialog.dart';
 import '../invoices/invoice_create_dialog.dart';
 import 'dashboard_controller.dart';
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
+
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  int _activeTab = 0; // 0: Workshop Floor, 1: Financials, 2: Analytics, 3: All
 
   @override
   Widget build(BuildContext context) {
@@ -55,72 +62,293 @@ class DashboardScreen extends StatelessWidget {
             );
 
         return SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1. Executive Top Header with Date Range Filters & Quick Action Buttons
+              // 1. Executive Top Header with Quick Action Buttons & Date Filters
               _buildExecutiveHeader(context, controller),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
 
-              // 2. Section: 18 KPI CARDS (Grouped into Financial, Operations, Team, Inventory)
-              _buildKPISectionTitle('1. Financial Health (Period Recognized)'),
-              const SizedBox(height: 10),
-              _buildFinancialKPIs(context, m, currency),
-              const SizedBox(height: 20),
+              // 2. High-Impact Core Metric Ribbon (At-A-Glance Overview)
+              _buildCoreSummaryRibbon(context, m, currency),
+              const SizedBox(height: 18),
 
-              _buildKPISectionTitle('2. Customers, Vehicles & Workshop Floor'),
-              const SizedBox(height: 10),
-              _buildOperationalKPIs(context, m),
-              const SizedBox(height: 20),
+              // 3. Clean Segmented Category Switcher
+              _buildTabSwitcher(),
+              const SizedBox(height: 16),
 
-              _buildKPISectionTitle('3. Team Attendance & Inventory Health'),
-              const SizedBox(height: 10),
-              _buildStaffAndInventoryKPIs(context, m, currency),
-              const SizedBox(height: 24),
-
-              // 3. Section: 8 SQLite-Driven Professional Graphs
-              const Text(
-                'Business Analytics & Historical Trends',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: -0.3),
-              ),
-              const SizedBox(height: 14),
-
-              // Graph Pair 1: Daily & Monthly Income vs Expenses
-              _buildGraphRow(
-                context: context,
-                leftWidget: _buildDailyIncomeExpenseGraph(context, controller, currency),
-                rightWidget: _buildMonthlyIncomeExpenseGraph(context, controller, currency),
-              ),
-              const SizedBox(height: 20),
-
-              // Graph Pair 2: Net Income Trend & Payment Collection Breakdown
-              _buildGraphRow(
-                context: context,
-                leftWidget: _buildNetIncomeTrendGraph(context, controller, currency),
-                rightWidget: _buildPaymentCollectionGraph(context, controller, currency),
-              ),
-              const SizedBox(height: 20),
-
-              // Graph Pair 3: Jobs Trend & Staff Attendance 30 Days
-              _buildGraphRow(
-                context: context,
-                leftWidget: _buildJobsTrendGraph(context, controller),
-                rightWidget: _buildAttendanceDonutGraph(context, controller),
-              ),
-              const SizedBox(height: 20),
-
-              // Graph Pair 4: Inventory Quantity Overview & Top Outstanding Receivables
-              _buildGraphRow(
-                context: context,
-                leftWidget: _buildInventoryDistributionGraph(context, controller),
-                rightWidget: _buildOutstandingDebtorsGraph(context, controller, currency),
-              ),
+              // 4. Tabbed Content
+              if (_activeTab == 0) ...[
+                // Workshop Floor
+                _buildKPISectionTitle('Workshop Floor & Customer Activity'),
+                const SizedBox(height: 10),
+                _buildOperationalKPIs(context, m),
+                const SizedBox(height: 20),
+                _buildKPISectionTitle('Team Attendance & Inventory Alerts'),
+                const SizedBox(height: 10),
+                _buildStaffAndInventoryKPIs(context, m, currency),
+                const SizedBox(height: 20),
+                _buildGraphRow(
+                  context: context,
+                  leftWidget: _buildJobsTrendGraph(context, controller),
+                  rightWidget: _buildAttendanceDonutGraph(context, controller),
+                ),
+              ] else if (_activeTab == 1) ...[
+                // Financial Health
+                _buildKPISectionTitle('Financial Performance (Period Recognized)'),
+                const SizedBox(height: 10),
+                _buildFinancialKPIs(context, m, currency),
+                const SizedBox(height: 20),
+                _buildGraphRow(
+                  context: context,
+                  leftWidget: _buildDailyIncomeExpenseGraph(context, controller, currency),
+                  rightWidget: _buildMonthlyIncomeExpenseGraph(context, controller, currency),
+                ),
+                const SizedBox(height: 20),
+                _buildGraphRow(
+                  context: context,
+                  leftWidget: _buildNetIncomeTrendGraph(context, controller, currency),
+                  rightWidget: _buildPaymentCollectionGraph(context, controller, currency),
+                ),
+                const SizedBox(height: 20),
+                _buildOutstandingDebtorsGraph(context, controller, currency),
+              ] else if (_activeTab == 2) ...[
+                // Trends & Analytics
+                _buildKPISectionTitle('Historical Trends & Analytics'),
+                const SizedBox(height: 10),
+                _buildGraphRow(
+                  context: context,
+                  leftWidget: _buildNetIncomeTrendGraph(context, controller, currency),
+                  rightWidget: _buildPaymentCollectionGraph(context, controller, currency),
+                ),
+                const SizedBox(height: 20),
+                _buildGraphRow(
+                  context: context,
+                  leftWidget: _buildJobsTrendGraph(context, controller),
+                  rightWidget: _buildAttendanceDonutGraph(context, controller),
+                ),
+                const SizedBox(height: 20),
+                _buildGraphRow(
+                  context: context,
+                  leftWidget: _buildInventoryDistributionGraph(context, controller),
+                  rightWidget: _buildOutstandingDebtorsGraph(context, controller, currency),
+                ),
+              ] else ...[
+                // All Sections (Full View)
+                _buildKPISectionTitle('1. Financial Health (Period Recognized)'),
+                const SizedBox(height: 10),
+                _buildFinancialKPIs(context, m, currency),
+                const SizedBox(height: 20),
+                _buildKPISectionTitle('2. Customers, Vehicles & Workshop Floor'),
+                const SizedBox(height: 10),
+                _buildOperationalKPIs(context, m),
+                const SizedBox(height: 20),
+                _buildKPISectionTitle('3. Team Attendance & Inventory Health'),
+                const SizedBox(height: 10),
+                _buildStaffAndInventoryKPIs(context, m, currency),
+                const SizedBox(height: 24),
+                const Text(
+                  'Business Analytics & Historical Trends',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: -0.3),
+                ),
+                const SizedBox(height: 14),
+                _buildGraphRow(
+                  context: context,
+                  leftWidget: _buildDailyIncomeExpenseGraph(context, controller, currency),
+                  rightWidget: _buildMonthlyIncomeExpenseGraph(context, controller, currency),
+                ),
+                const SizedBox(height: 20),
+                _buildGraphRow(
+                  context: context,
+                  leftWidget: _buildNetIncomeTrendGraph(context, controller, currency),
+                  rightWidget: _buildPaymentCollectionGraph(context, controller, currency),
+                ),
+                const SizedBox(height: 20),
+                _buildGraphRow(
+                  context: context,
+                  leftWidget: _buildJobsTrendGraph(context, controller),
+                  rightWidget: _buildAttendanceDonutGraph(context, controller),
+                ),
+                const SizedBox(height: 20),
+                _buildGraphRow(
+                  context: context,
+                  leftWidget: _buildInventoryDistributionGraph(context, controller),
+                  rightWidget: _buildOutstandingDebtorsGraph(context, controller, currency),
+                ),
+              ],
               const SizedBox(height: 24),
             ],
           ),
         );
       }),
+    );
+  }
+
+  // --- CORE SUMMARY RIBBON (4 AT-A-GLANCE METRICS) ---
+  Widget _buildCoreSummaryRibbon(BuildContext context, DashboardMetrics m, String currency) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final count = constraints.maxWidth > 950 ? 4 : constraints.maxWidth > 520 ? 2 : 1;
+        final ratio = count == 1 ? 3.6 : (constraints.maxWidth < 620 ? 1.8 : 2.2);
+        return GridView.count(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: count,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: ratio,
+          children: [
+            _heroMetricCard(
+              title: 'Period Revenue',
+              value: Formatters.currency(m.totalIncome, symbol: currency),
+              subtitle: 'Net: ${Formatters.currency(m.netIncome, symbol: currency)}',
+              icon: Icons.account_balance_wallet_rounded,
+              color: const Color(0xFF3B82F6),
+              onTap: () => setState(() => _activeTab = 1),
+            ),
+            _heroMetricCard(
+              title: 'Active Workshop Jobs',
+              value: '${m.inProgressJobs} In Bay',
+              subtitle: '${m.readyForDeliveryJobs} Ready • ${m.todaysJobs} Today',
+              icon: Icons.directions_car_filled_rounded,
+              color: const Color(0xFF14B8A6),
+              onTap: () => Get.toNamed(AppRoutes.jobs),
+            ),
+            _heroMetricCard(
+              title: 'Unpaid Receivables',
+              value: Formatters.currency(m.outstandingPayments, symbol: currency),
+              subtitle: 'Outstanding on invoices',
+              icon: Icons.pending_actions_rounded,
+              color: const Color(0xFFF59E0B),
+              onTap: () => Get.toNamed(AppRoutes.invoices),
+            ),
+            _heroMetricCard(
+              title: 'Inventory Alerts',
+              value: '${m.lowStockItems + m.outOfStockItems} Items',
+              subtitle: '${m.lowStockItems} Low • ${m.outOfStockItems} Out of Stock',
+              icon: Icons.warning_amber_rounded,
+              color: (m.lowStockItems + m.outOfStockItems > 0) ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+              onTap: () => Get.toNamed(AppRoutes.inventory),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _heroMetricCard({
+    required String title,
+    required String value,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+    VoidCallback? onTap,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.darkCard : Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: color.withValues(alpha: 0.35), width: 1.2),
+            boxShadow: [
+              BoxShadow(
+                color: color.withValues(alpha: isDark ? 0.08 : 0.06),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(icon, size: 16, color: color),
+                  ),
+                ],
+              ),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  value,
+                  style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
+                  maxLines: 1,
+                ),
+              ),
+              Text(
+                subtitle,
+                style: const TextStyle(fontSize: 11, color: AppColors.textDarkSecondary),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --- SEGMENTED CATEGORY SWITCHER ---
+  Widget _buildTabSwitcher() {
+    final tabs = [
+      {'title': 'Workshop Floor', 'icon': Icons.engineering_rounded},
+      {'title': 'Financial Health', 'icon': Icons.account_balance_rounded},
+      {'title': 'Trends & Analytics', 'icon': Icons.insights_rounded},
+      {'title': 'All Sections', 'icon': Icons.dashboard_customize_rounded},
+    ];
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: List.generate(tabs.length, (idx) {
+          final isSelected = _activeTab == idx;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: ChoiceChip(
+              avatar: Icon(
+                tabs[idx]['icon'] as IconData,
+                size: 15,
+                color: isSelected ? Colors.white : AppColors.primaryLight,
+              ),
+              label: Text(
+                tabs[idx]['title'] as String,
+                style: TextStyle(
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                  fontSize: 12.5,
+                  color: isSelected ? Colors.white : null,
+                ),
+              ),
+              selected: isSelected,
+              selectedColor: AppColors.primary,
+              onSelected: (_) => setState(() => _activeTab = idx),
+            ),
+          );
+        }),
+      ),
     );
   }
 

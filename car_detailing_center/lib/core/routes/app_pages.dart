@@ -16,6 +16,7 @@ import '../../features/reports/reports_screen.dart';
 import '../../features/notifications/notification_center_screen.dart';
 import '../../features/settings/settings_screen.dart';
 import '../../features/vendors/vendor_list_screen.dart';
+import '../../features/jobs/job_list_screen.dart';
 
 class AppPages {
   static const initial = AppRoutes.splash;
@@ -25,8 +26,9 @@ class AppPages {
     GetPage(name: AppRoutes.login, page: () => const LoginScreen()),
     GetPage(name: AppRoutes.forgotPassword, page: () => const ForgotPasswordScreen()),
 
-    // 11 Main Navigation Modules + Vendors
+    // Main Navigation Modules + Vendors + Jobs
     GetPage(name: AppRoutes.dashboard, page: () => const DashboardScreen()),
+    GetPage(name: AppRoutes.jobs, page: () => const JobListScreen()),
     GetPage(name: AppRoutes.staff, page: () => const StaffScreen()),
     GetPage(name: AppRoutes.staffAttendance, page: () => const StaffScreen(initialTabIndex: 1)),
     GetPage(name: AppRoutes.staffSalaries, page: () => const StaffScreen(initialTabIndex: 2)),

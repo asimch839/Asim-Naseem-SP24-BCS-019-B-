@@ -77,63 +77,31 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
-            // Filter Bar
+            // Filter Bar with Choice Chips
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final isNarrow = constraints.maxWidth < 520;
-                    if (isNarrow) {
-                      return Column(
-                        children: [
-                          TextField(
-                            controller: _searchController,
-                            decoration: const InputDecoration(
-                              hintText: 'Search Name or Phone...',
-                              prefixIcon: Icon(Icons.search_rounded),
-                            ),
-                            onChanged: (val) {
-                              _searchQuery = val.trim();
-                              _fetchCustomers();
-                            },
-                          ),
-                          const SizedBox(height: 10),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              DropdownButton<String>(
-                                value: _statusFilter,
-                                items: const [
-                                  DropdownMenuItem(value: 'All', child: Text('All Statuses')),
-                                  DropdownMenuItem(value: 'Active', child: Text('Active Only')),
-                                  DropdownMenuItem(value: 'Inactive', child: Text('Inactive Only')),
-                                ],
-                                onChanged: (val) {
-                                  if (val != null) {
-                                    setState(() => _statusFilter = val);
-                                    _fetchCustomers();
-                                  }
-                                },
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.refresh_rounded),
-                                tooltip: 'Refresh',
-                                onPressed: _fetchCustomers,
-                              ),
-                            ],
-                          ),
-                        ],
-                      );
-                    }
-                    return Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       children: [
                         Expanded(
                           child: TextField(
                             controller: _searchController,
-                            decoration: const InputDecoration(
+                            decoration: InputDecoration(
                               hintText: 'Search by Customer Name or Phone Number...',
-                              prefixIcon: Icon(Icons.search_rounded),
+                              prefixIcon: const Icon(Icons.search_rounded),
+                              suffixIcon: _searchController.text.isNotEmpty
+                                  ? IconButton(
+                                      icon: const Icon(Icons.clear_rounded, size: 18),
+                                      onPressed: () {
+                                        _searchController.clear();
+                                        _searchQuery = '';
+                                        _fetchCustomers();
+                                      },
+                                    )
+                                  : null,
                             ),
                             onChanged: (val) {
                               _searchQuery = val.trim();
@@ -141,30 +109,33 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                             },
                           ),
                         ),
-                        const SizedBox(width: 16),
-                        DropdownButton<String>(
-                          value: _statusFilter,
-                          items: const [
-                            DropdownMenuItem(value: 'All', child: Text('All Statuses')),
-                            DropdownMenuItem(value: 'Active', child: Text('Active Only')),
-                            DropdownMenuItem(value: 'Inactive', child: Text('Inactive Only')),
-                          ],
-                          onChanged: (val) {
-                            if (val != null) {
-                              setState(() => _statusFilter = val);
-                              _fetchCustomers();
-                            }
-                          },
-                        ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 10),
                         IconButton(
                           icon: const Icon(Icons.refresh_rounded),
                           tooltip: 'Refresh',
                           onPressed: _fetchCustomers,
                         ),
                       ],
-                    );
-                  },
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: ['All', 'Active', 'Inactive'].map((s) {
+                        final isSelected = _statusFilter == s;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: ChoiceChip(
+                            label: Text(s, style: TextStyle(fontSize: 12, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+                            selected: isSelected,
+                            selectedColor: s == 'Active' ? AppColors.success : s == 'Inactive' ? AppColors.error : AppColors.primary,
+                            onSelected: (_) {
+                              setState(() => _statusFilter = s);
+                              _fetchCustomers();
+                            },
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -198,6 +169,15 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                               final customer = _customers[index];
 
                               return ListTile(
+                                onTap: () async {
+                                  await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => CustomerDetailScreen(customer: customer),
+                                    ),
+                                  );
+                                  _fetchCustomers();
+                                },
                                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                 leading: CircleAvatar(
                                   backgroundColor: AppColors.primary.withValues(alpha: 0.15),
