@@ -40,23 +40,31 @@ class DashboardController extends GetxController {
 
   DateTimeRange get _currentDateRange {
     final now = DateTime.now();
+    final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59);
     switch (selectedFilter.value) {
       case DateFilter.today:
         final start = DateTime(now.year, now.month, now.day);
-        final end = DateTime(now.year, now.month, now.day, 23, 59, 59);
-        return DateTimeRange(start: start, end: end);
+        return DateTimeRange(start: start, end: endOfDay);
       case DateFilter.thisWeek:
-        final start = now.subtract(Duration(days: now.weekday - 1));
-        return DateTimeRange(start: DateTime(start.year, start.month, start.day), end: now);
+        final startWeekday = now.subtract(Duration(days: now.weekday - 1));
+        final start = DateTime(startWeekday.year, startWeekday.month, startWeekday.day);
+        return DateTimeRange(start: start, end: endOfDay);
       case DateFilter.thisMonth:
         final start = DateTime(now.year, now.month, 1);
-        return DateTimeRange(start: start, end: now);
+        return DateTimeRange(start: start, end: endOfDay);
       case DateFilter.lastMonth:
         final prevMonth = DateTime(now.year, now.month - 1, 1);
         final lastDayPrevMonth = DateTime(now.year, now.month, 0, 23, 59, 59);
         return DateTimeRange(start: prevMonth, end: lastDayPrevMonth);
       case DateFilter.custom:
-        return customDateRange.value ?? DateTimeRange(start: DateTime(now.year, now.month, 1), end: now);
+        if (customDateRange.value != null) {
+          final c = customDateRange.value!;
+          return DateTimeRange(
+            start: DateTime(c.start.year, c.start.month, c.start.day),
+            end: DateTime(c.end.year, c.end.month, c.end.day, 23, 59, 59),
+          );
+        }
+        return DateTimeRange(start: DateTime(now.year, now.month, 1), end: endOfDay);
     }
   }
 
@@ -64,25 +72,39 @@ class DashboardController extends GetxController {
     isLoading.value = true;
     try {
       final range = _currentDateRange;
+      final filterMode = selectedFilter.value.name;
 
-      // 1. Fetch 18 KPIs
+      // 1. Fetch KPIs for the selected period
       final kpis = await _reportRepo.getDashboardKPIs(range.start, range.end);
       metrics.value = kpis;
 
-      // 2. Fetch all 8 real graphs from SQLite
-      final gDaily = await _reportRepo.getDailyIncomeVsExpense();
-      dailyIncomeVsExpense.assignAll(gDaily);
+      // 2. Fetch Period-Filtered Income vs Expenses (Bar Chart 1)
+      final gPeriod = await _reportRepo.getFilteredIncomeVsExpense(range.start, range.end, filterMode);
+      dailyIncomeVsExpense.assignAll(gPeriod);
 
+      // 3. Line Chart: Net Income & Revenue Trend Curve for selected period
+      final List<Map<String, dynamic>> gNet = gPeriod.map((m) {
+        final inc = (m['income'] as num?)?.toDouble() ?? 0.0;
+        final exp = (m['expense'] as num?)?.toDouble() ?? 0.0;
+        return {
+          'label': m['label'],
+          'net_income': inc - exp,
+          'income': inc,
+          'expense': exp,
+        };
+      }).toList();
+      netIncomeTrend.assignAll(gNet);
+
+      // Monthly comparative baseline
       final gMonthly = await _reportRepo.getMonthlyIncomeVsExpense();
       monthlyIncomeVsExpense.assignAll(gMonthly);
 
-      final gNet = await _reportRepo.getNetIncomeTrend();
-      netIncomeTrend.assignAll(gNet);
-
-      final gPay = await _reportRepo.getPaymentCollectionByMethod();
+      // 4. Circle / Donut Chart: Payment Collection for the selected period
+      final gPay = await _reportRepo.getPaymentCollectionByMethod(range.start, range.end);
       paymentCollection.assignAll(gPay);
 
-      final gJobs = await _reportRepo.getJobsByStatus();
+      // 5. Bar Chart 2: Jobs Trend / Distribution for the selected period
+      final gJobs = await _reportRepo.getJobsByStatus(range.start, range.end);
       jobsByStatus.assignAll(gJobs);
 
       final gAtt = await _reportRepo.getAttendanceOverview30Days();

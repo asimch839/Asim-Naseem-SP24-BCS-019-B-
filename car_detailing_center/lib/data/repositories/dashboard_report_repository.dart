@@ -250,22 +250,161 @@ class DashboardReportRepository {
     return monthlyData;
   }
 
-  /// Graph 3: Net Income Trend (Last 6 Months)
-  Future<List<Map<String, dynamic>>> getNetIncomeTrend() async {
-    final monthly = await getMonthlyIncomeVsExpense();
-    return monthly.map((m) {
-      final inc = m['income'] as double;
-      final exp = m['expense'] as double;
-      return {
-        'label': m['label'],
-        'net_income': inc - exp,
-      };
-    }).toList();
+  /// Graph: Dynamically Filtered Income vs Expenses by Date Range & Mode (Daily, Weekly, Monthly, Custom)
+  Future<List<Map<String, dynamic>>> getFilteredIncomeVsExpense(DateTime start, DateTime end, String filterMode) async {
+    final db = await _db;
+    final List<Map<String, dynamic>> result = [];
+
+    if (filterMode == 'today') {
+      final dayStr = DateFormat('yyyy-MM-dd').format(start);
+      final slots = [
+        {'label': 'Morning', 'start': '${dayStr}T06:00:00', 'end': '${dayStr}T11:59:59'},
+        {'label': 'Afternoon', 'start': '${dayStr}T12:00:00', 'end': '${dayStr}T15:59:59'},
+        {'label': 'Evening', 'start': '${dayStr}T16:00:00', 'end': '${dayStr}T19:59:59'},
+        {'label': 'Night', 'start': '${dayStr}T20:00:00', 'end': '${dayStr}T23:59:59'},
+      ];
+
+      for (var slot in slots) {
+        final incRes = await db.rawQuery('''
+          SELECT COALESCE(SUM(amount), 0.0) as val
+          FROM payments
+          WHERE payment_date >= ? AND payment_date <= ? AND is_refund = 0
+        ''', [slot['start'], slot['end']]);
+        final inc = (incRes.first['val'] as num?)?.toDouble() ?? 0.0;
+
+        final gExpRes = await db.rawQuery('''
+          SELECT COALESCE(SUM(amount), 0.0) as val
+          FROM garage_expenses
+          WHERE date >= ? AND date <= ?
+        ''', [slot['start'], slot['end']]);
+        final sExpRes = await db.rawQuery('''
+          SELECT COALESCE(SUM(amount), 0.0) as val
+          FROM staff_expenses
+          WHERE date >= ? AND date <= ?
+        ''', [slot['start'], slot['end']]);
+        final exp = ((gExpRes.first['val'] as num?)?.toDouble() ?? 0.0) + ((sExpRes.first['val'] as num?)?.toDouble() ?? 0.0);
+
+        result.add({
+          'label': slot['label'],
+          'income': inc,
+          'expense': exp,
+        });
+      }
+
+      final totalInc = result.fold<double>(0.0, (sum, i) => sum + (i['income'] as double));
+      final totalExp = result.fold<double>(0.0, (sum, i) => sum + (i['expense'] as double));
+      if (totalInc == 0 && totalExp == 0) {
+        final incRes = await db.rawQuery("SELECT COALESCE(SUM(amount), 0.0) as val FROM payments WHERE payment_date LIKE '$dayStr%' AND is_refund = 0");
+        final gExpRes = await db.rawQuery("SELECT COALESCE(SUM(amount), 0.0) as val FROM garage_expenses WHERE date LIKE '$dayStr%'");
+        final sExpRes = await db.rawQuery("SELECT COALESCE(SUM(amount), 0.0) as val FROM staff_expenses WHERE date LIKE '$dayStr%'");
+        final dayInc = (incRes.first['val'] as num?)?.toDouble() ?? 0.0;
+        final dayExp = ((gExpRes.first['val'] as num?)?.toDouble() ?? 0.0) + ((sExpRes.first['val'] as num?)?.toDouble() ?? 0.0);
+        if (dayInc > 0 || dayExp > 0) {
+          result.clear();
+          result.add({'label': 'Today', 'income': dayInc, 'expense': dayExp});
+        }
+      }
+    } else if (filterMode == 'thisWeek' || end.difference(start).inDays <= 7) {
+      final daysCount = end.difference(start).inDays + 1;
+      final totalDays = (daysCount > 0 && daysCount <= 8) ? daysCount : 7;
+      for (var i = 0; i < totalDays; i++) {
+        final d = start.add(Duration(days: i));
+        final dayStr = DateFormat('yyyy-MM-dd').format(d);
+        final dayLabel = DateFormat('EEE').format(d);
+
+        final incRes = await db.rawQuery("SELECT COALESCE(SUM(amount), 0.0) as val FROM payments WHERE payment_date LIKE '$dayStr%' AND is_refund = 0");
+        final inc = (incRes.first['val'] as num?)?.toDouble() ?? 0.0;
+
+        final gExpRes = await db.rawQuery("SELECT COALESCE(SUM(amount), 0.0) as val FROM garage_expenses WHERE date LIKE '$dayStr%'");
+        final sExpRes = await db.rawQuery("SELECT COALESCE(SUM(amount), 0.0) as val FROM staff_expenses WHERE date LIKE '$dayStr%'");
+        final exp = ((gExpRes.first['val'] as num?)?.toDouble() ?? 0.0) + ((sExpRes.first['val'] as num?)?.toDouble() ?? 0.0);
+
+        result.add({
+          'label': dayLabel,
+          'date': dayStr,
+          'income': inc,
+          'expense': exp,
+        });
+      }
+    } else if (filterMode == 'thisMonth' || filterMode == 'lastMonth' || end.difference(start).inDays <= 32) {
+      final totalDays = end.difference(start).inDays + 1;
+      final step = (totalDays / 4).ceil().clamp(1, 8);
+
+      for (var i = 0; i < totalDays; i += step) {
+        final chunkStart = start.add(Duration(days: i));
+        var chunkEnd = chunkStart.add(Duration(days: step - 1, hours: 23, minutes: 59, seconds: 59));
+        if (chunkEnd.isAfter(end)) chunkEnd = end;
+
+        final label = '${DateFormat('d').format(chunkStart)}-${DateFormat('d MMM').format(chunkEnd)}';
+        final startIso = chunkStart.toIso8601String();
+        final endIso = chunkEnd.toIso8601String();
+
+        final incRes = await db.rawQuery('''
+          SELECT COALESCE(SUM(amount), 0.0) as val
+          FROM payments
+          WHERE payment_date >= ? AND payment_date <= ? AND is_refund = 0
+        ''', [startIso, endIso]);
+        final inc = (incRes.first['val'] as num?)?.toDouble() ?? 0.0;
+
+        final gExpRes = await db.rawQuery('''
+          SELECT COALESCE(SUM(amount), 0.0) as val
+          FROM garage_expenses
+          WHERE date >= ? AND date <= ?
+        ''', [startIso, endIso]);
+        final sExpRes = await db.rawQuery('''
+          SELECT COALESCE(SUM(amount), 0.0) as val
+          FROM staff_expenses
+          WHERE date >= ? AND date <= ?
+        ''', [startIso, endIso]);
+        final exp = ((gExpRes.first['val'] as num?)?.toDouble() ?? 0.0) + ((sExpRes.first['val'] as num?)?.toDouble() ?? 0.0);
+
+        result.add({
+          'label': label,
+          'income': inc,
+          'expense': exp,
+        });
+      }
+    } else {
+      final monthsCount = ((end.year - start.year) * 12 + end.month - start.month) + 1;
+      final safeCount = monthsCount.clamp(1, 12);
+      for (var i = 0; i < safeCount; i++) {
+        final mDate = DateTime(start.year, start.month + i, 1);
+        final mStr = DateFormat('yyyy-MM').format(mDate);
+        final mLabel = DateFormat('MMM').format(mDate);
+
+        final incRes = await db.rawQuery("SELECT COALESCE(SUM(amount), 0.0) as val FROM payments WHERE payment_date LIKE '$mStr%' AND is_refund = 0");
+        final inc = (incRes.first['val'] as num?)?.toDouble() ?? 0.0;
+
+        final gExpRes = await db.rawQuery("SELECT COALESCE(SUM(amount), 0.0) as val FROM garage_expenses WHERE date LIKE '$mStr%'");
+        final sExpRes = await db.rawQuery("SELECT COALESCE(SUM(amount), 0.0) as val FROM staff_expenses WHERE date LIKE '$mStr%'");
+        final exp = ((gExpRes.first['val'] as num?)?.toDouble() ?? 0.0) + ((sExpRes.first['val'] as num?)?.toDouble() ?? 0.0);
+
+        result.add({
+          'label': mLabel,
+          'income': inc,
+          'expense': exp,
+        });
+      }
+    }
+
+    return result;
   }
 
-  /// Graph 4: Payment Collection by Method
-  Future<List<Map<String, dynamic>>> getPaymentCollectionByMethod() async {
+  /// Graph 4: Payment Collection by Method (Optional Date Range)
+  Future<List<Map<String, dynamic>>> getPaymentCollectionByMethod([DateTime? start, DateTime? end]) async {
     final db = await _db;
+    if (start != null && end != null) {
+      final startStr = start.toIso8601String();
+      final endStr = end.toIso8601String();
+      final res = await db.rawQuery('''
+        SELECT payment_method, COALESCE(SUM(amount), 0.0) as total_amount
+        FROM payments
+        WHERE payment_date >= ? AND payment_date <= ? AND is_refund = 0
+        GROUP BY payment_method
+        ORDER BY total_amount DESC
+      ''', [startStr, endStr]);
+      if (res.isNotEmpty) return res;
+    }
     final res = await db.rawQuery('''
       SELECT payment_method, COALESCE(SUM(amount), 0.0) as total_amount
       FROM payments
@@ -276,9 +415,20 @@ class DashboardReportRepository {
     return res;
   }
 
-  /// Graph 5: Jobs Trend by Status
-  Future<List<Map<String, dynamic>>> getJobsByStatus() async {
+  /// Graph 5: Jobs Trend by Status (Optional Date Range)
+  Future<List<Map<String, dynamic>>> getJobsByStatus([DateTime? start, DateTime? end]) async {
     final db = await _db;
+    if (start != null && end != null) {
+      final startStr = start.toIso8601String();
+      final endStr = end.toIso8601String();
+      final res = await db.rawQuery('''
+        SELECT status, COUNT(*) as count
+        FROM jobs
+        WHERE receiving_date >= ? AND receiving_date <= ?
+        GROUP BY status
+      ''', [startStr, endStr]);
+      if (res.isNotEmpty) return res;
+    }
     final res = await db.rawQuery('''
       SELECT status, COUNT(*) as count
       FROM jobs
