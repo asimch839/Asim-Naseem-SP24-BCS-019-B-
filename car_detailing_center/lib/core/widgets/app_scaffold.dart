@@ -260,7 +260,17 @@ class _AppScaffoldState extends State<AppScaffold> {
   }
 
   Widget _buildSidebarContent(BuildContext context) {
-    return Container(
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textPrimary = isDark ? AppColors.textDarkPrimary : AppColors.textLightPrimary;
+    final textSecondary = isDark ? AppColors.textDarkSecondary : AppColors.textLightSecondary;
+    final textMuted = isDark ? AppColors.textDarkMuted : AppColors.textLightMuted;
+
+    final activeText = isDark ? Colors.white : AppColors.primaryDark;
+    final activeIcon = isDark ? AppColors.primaryLight : AppColors.primary;
+    final activeBg = isDark ? AppColors.primary.withValues(alpha: 0.22) : AppColors.primary.withValues(alpha: 0.12);
+    final activeBorder = isDark ? AppColors.primaryLight.withValues(alpha: 0.5) : AppColors.primary.withValues(alpha: 0.4);
+
+    return Material(
       color: Theme.of(context).cardTheme.color,
       child: Column(
         children: [
@@ -281,19 +291,19 @@ class _AppScaffoldState extends State<AppScaffold> {
                   child: const Icon(Icons.directions_car_filled_rounded, color: Colors.white, size: 24),
                 ),
                 const SizedBox(width: 12),
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         AppConstants.appName,
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: textPrimary),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       Text(
                         'Car Detailing Center Management',
-                        style: TextStyle(fontSize: 11, color: AppColors.textDarkSecondary),
+                        style: TextStyle(fontSize: 11, color: textSecondary),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -334,64 +344,65 @@ class _AppScaffoldState extends State<AppScaffold> {
                         Container(
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(8),
-                            color: showHeaderIndicator
-                                ? AppColors.primary.withValues(alpha: 0.18)
-                                : Colors.transparent,
+                            color: showHeaderIndicator ? activeBg : Colors.transparent,
                             border: showHeaderIndicator
-                                ? Border.all(color: AppColors.primary.withValues(alpha: 0.45), width: 1.2)
+                                ? Border.all(color: activeBorder, width: 1.2)
                                 : null,
                           ),
-                          child: ListTile(
-                            dense: true,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
-                            leading: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                AnimatedContainer(
-                                  duration: const Duration(milliseconds: 200),
-                                  width: showHeaderIndicator ? 3.5 : 0,
-                                  height: 20,
-                                  margin: EdgeInsets.only(right: showHeaderIndicator ? 8 : 0),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.primaryLight,
-                                    borderRadius: BorderRadius.circular(2),
-                                    boxShadow: showHeaderIndicator
-                                        ? [
-                                            BoxShadow(
-                                              color: AppColors.primaryLight.withValues(alpha: 0.8),
-                                              blurRadius: 6,
-                                              spreadRadius: 1,
-                                            ),
-                                          ]
-                                        : null,
+                          child: Material(
+                            color: Colors.transparent,
+                            child: ListTile(
+                              dense: true,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                              leading: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  AnimatedContainer(
+                                    duration: const Duration(milliseconds: 200),
+                                    width: showHeaderIndicator ? 3.5 : 0,
+                                    height: 20,
+                                    margin: EdgeInsets.only(right: showHeaderIndicator ? 8 : 0),
+                                    decoration: BoxDecoration(
+                                      color: activeIcon,
+                                      borderRadius: BorderRadius.circular(2),
+                                      boxShadow: showHeaderIndicator
+                                          ? [
+                                              BoxShadow(
+                                                color: activeIcon.withValues(alpha: 0.8),
+                                                blurRadius: 6,
+                                                spreadRadius: 1,
+                                              ),
+                                            ]
+                                          : null,
+                                    ),
                                   ),
-                                ),
-                                Icon(
-                                  module.icon,
-                                  size: 20,
-                                  color: isModuleActive ? AppColors.primaryLight : AppColors.textDarkSecondary,
-                                ),
-                              ],
-                            ),
-                            title: Text(
-                              module.title,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: isModuleActive ? FontWeight.bold : FontWeight.normal,
-                                color: isModuleActive ? Colors.white : AppColors.textDark,
+                                  Icon(
+                                    module.icon,
+                                    size: 20,
+                                    color: isModuleActive ? activeIcon : textSecondary,
+                                  ),
+                                ],
                               ),
+                              title: Text(
+                                module.title,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: isModuleActive ? FontWeight.bold : FontWeight.w500,
+                                  color: isModuleActive ? activeText : textPrimary,
+                                ),
+                              ),
+                              trailing: Icon(
+                                isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                                size: 18,
+                                color: isModuleActive ? activeIcon : textMuted,
+                              ),
+                              onTap: () {
+                                setState(() {
+                                  _expandedModules[module.title] = !isExpanded;
+                                });
+                              },
                             ),
-                            trailing: Icon(
-                              isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                              size: 18,
-                              color: isModuleActive ? AppColors.primaryLight : AppColors.textDarkMuted,
-                            ),
-                            onTap: () {
-                              setState(() {
-                                _expandedModules[module.title] = !isExpanded;
-                              });
-                            },
                           ),
                         ),
                         if (isExpanded)
@@ -412,85 +423,86 @@ class _AppScaffoldState extends State<AppScaffold> {
                                   margin: const EdgeInsets.symmetric(vertical: 2),
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(8),
-                                    color: isSubSelected
-                                        ? AppColors.primary.withValues(alpha: 0.22)
-                                        : Colors.transparent,
+                                    color: isSubSelected ? activeBg : Colors.transparent,
                                     border: isSubSelected
-                                        ? Border.all(color: AppColors.primaryLight.withValues(alpha: 0.55), width: 1.2)
+                                        ? Border.all(color: activeBorder, width: 1.2)
                                         : Border.all(color: Colors.transparent, width: 1.2),
                                   ),
-                                  child: ListTile(
-                                    dense: true,
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
-                                    leading: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        AnimatedContainer(
-                                          duration: const Duration(milliseconds: 200),
-                                          width: isSubSelected ? 3.5 : 0,
-                                          height: 16,
-                                          margin: EdgeInsets.only(right: isSubSelected ? 6 : 0),
-                                          decoration: BoxDecoration(
-                                            color: AppColors.primaryLight,
-                                            borderRadius: BorderRadius.circular(2),
-                                            boxShadow: isSubSelected
-                                                ? [
-                                                    BoxShadow(
-                                                      color: AppColors.primaryLight.withValues(alpha: 0.9),
-                                                      blurRadius: 6,
-                                                      spreadRadius: 1,
-                                                    ),
-                                                  ]
-                                                : null,
-                                          ),
-                                        ),
-                                        Icon(
-                                          sub.icon,
-                                          size: 16,
-                                          color: isSubSelected ? AppColors.primaryLight : AppColors.textDarkMuted,
-                                        ),
-                                      ],
-                                    ),
-                                    title: Text(
-                                      sub.title,
-                                      style: TextStyle(
-                                        fontSize: 12.5,
-                                        color: isSubSelected ? Colors.white : AppColors.textDarkSecondary,
-                                        fontWeight: isSubSelected ? FontWeight.bold : FontWeight.w500,
-                                      ),
-                                    ),
-                                    trailing: isSubSelected
-                                        ? Container(
-                                            width: 7,
-                                            height: 7,
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: ListTile(
+                                      dense: true,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                                      leading: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          AnimatedContainer(
+                                            duration: const Duration(milliseconds: 200),
+                                            width: isSubSelected ? 3.5 : 0,
+                                            height: 16,
+                                            margin: EdgeInsets.only(right: isSubSelected ? 6 : 0),
                                             decoration: BoxDecoration(
-                                              color: AppColors.primaryLight,
-                                              shape: BoxShape.circle,
-                                              boxShadow: [
-                                                BoxShadow(
-                                                  color: AppColors.primaryLight.withValues(alpha: 0.9),
-                                                  blurRadius: 5,
-                                                ),
-                                              ],
+                                              color: activeIcon,
+                                              borderRadius: BorderRadius.circular(2),
+                                              boxShadow: isSubSelected
+                                                  ? [
+                                                      BoxShadow(
+                                                        color: activeIcon.withValues(alpha: 0.9),
+                                                        blurRadius: 6,
+                                                        spreadRadius: 1,
+                                                      ),
+                                                    ]
+                                                  : null,
                                             ),
-                                          )
-                                        : null,
-                                    onTap: () {
-                                      if (module.route == AppRoutes.staff) {
-                                        if (widget.currentRoute == AppRoutes.staff && widget.onSubItemSelect != null) {
-                                          widget.onSubItemSelect!(sub);
+                                          ),
+                                          Icon(
+                                            sub.icon,
+                                            size: 16,
+                                            color: isSubSelected ? activeIcon : textMuted,
+                                          ),
+                                        ],
+                                      ),
+                                      title: Text(
+                                        sub.title,
+                                        style: TextStyle(
+                                          fontSize: 12.5,
+                                          color: isSubSelected ? activeText : textSecondary,
+                                          fontWeight: isSubSelected ? FontWeight.bold : FontWeight.w500,
+                                        ),
+                                      ),
+                                      trailing: isSubSelected
+                                          ? Container(
+                                              width: 7,
+                                              height: 7,
+                                              decoration: BoxDecoration(
+                                                color: activeIcon,
+                                                shape: BoxShape.circle,
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: activeIcon.withValues(alpha: 0.9),
+                                                    blurRadius: 5,
+                                                  ),
+                                                ],
+                                              ),
+                                            )
+                                          : null,
+                                      onTap: () {
+                                        if (module.route == AppRoutes.staff) {
+                                          if (widget.currentRoute == AppRoutes.staff && widget.onSubItemSelect != null) {
+                                            widget.onSubItemSelect!(sub);
+                                          } else {
+                                            Get.offAll(() => StaffScreen(initialTabIndex: sub.tabIndex));
+                                          }
+                                        } else if (sub.title == 'Vendors') {
+                                          Get.offNamed(AppRoutes.vendors);
+                                        } else if (sub.title == 'Stock Details') {
+                                          Get.offNamed(AppRoutes.inventory);
                                         } else {
-                                          Get.offAll(() => StaffScreen(initialTabIndex: sub.tabIndex));
+                                          Get.offNamed(module.route);
                                         }
-                                      } else if (sub.title == 'Vendors') {
-                                        Get.offNamed(AppRoutes.vendors);
-                                      } else if (sub.title == 'Stock Details') {
-                                        Get.offNamed(AppRoutes.inventory);
-                                      } else {
-                                        Get.offNamed(module.route);
-                                      }
-                                    },
+                                      },
+                                    ),
                                   ),
                                 );
                               }).toList(),
@@ -506,73 +518,76 @@ class _AppScaffoldState extends State<AppScaffold> {
                   margin: const EdgeInsets.only(bottom: 2),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(8),
-                    color: isSelected ? AppColors.primary.withValues(alpha: 0.2) : Colors.transparent,
+                    color: isSelected ? activeBg : Colors.transparent,
                     border: isSelected
-                        ? Border.all(color: AppColors.primaryLight.withValues(alpha: 0.5), width: 1.2)
+                        ? Border.all(color: activeBorder, width: 1.2)
                         : Border.all(color: Colors.transparent, width: 1.2),
                   ),
-                  child: ListTile(
-                    dense: true,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
-                    leading: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          width: isSelected ? 3.5 : 0,
-                          height: 20,
-                          margin: EdgeInsets.only(right: isSelected ? 8 : 0),
-                          decoration: BoxDecoration(
-                            color: AppColors.primaryLight,
-                            borderRadius: BorderRadius.circular(2),
-                            boxShadow: isSelected
-                                ? [
-                                    BoxShadow(
-                                      color: AppColors.primaryLight.withValues(alpha: 0.8),
-                                      blurRadius: 6,
-                                      spreadRadius: 1,
-                                    ),
-                                  ]
-                                : null,
-                          ),
-                        ),
-                        Icon(
-                          module.icon,
-                          size: 20,
-                          color: isSelected ? AppColors.primaryLight : AppColors.textDarkSecondary,
-                        ),
-                      ],
-                    ),
-                    title: Text(
-                      module.title,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                        color: isSelected ? Colors.white : AppColors.textDark,
-                      ),
-                    ),
-                    trailing: isSelected
-                        ? Container(
-                            width: 7,
-                            height: 7,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: ListTile(
+                      dense: true,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                      leading: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            width: isSelected ? 3.5 : 0,
+                            height: 20,
+                            margin: EdgeInsets.only(right: isSelected ? 8 : 0),
                             decoration: BoxDecoration(
-                              color: AppColors.primaryLight,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppColors.primaryLight.withValues(alpha: 0.9),
-                                  blurRadius: 5,
-                                ),
-                              ],
+                              color: activeIcon,
+                              borderRadius: BorderRadius.circular(2),
+                              boxShadow: isSelected
+                                  ? [
+                                      BoxShadow(
+                                        color: activeIcon.withValues(alpha: 0.8),
+                                        blurRadius: 6,
+                                        spreadRadius: 1,
+                                      ),
+                                    ]
+                                  : null,
                             ),
-                          )
-                        : null,
-                    onTap: () {
-                      if (!isSelected) {
-                        Get.offNamed(module.route);
-                      }
-                    },
+                          ),
+                          Icon(
+                            module.icon,
+                            size: 20,
+                            color: isSelected ? activeIcon : textSecondary,
+                          ),
+                        ],
+                      ),
+                      title: Text(
+                        module.title,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                          color: isSelected ? activeText : textPrimary,
+                        ),
+                      ),
+                      trailing: isSelected
+                          ? Container(
+                              width: 7,
+                              height: 7,
+                              decoration: BoxDecoration(
+                                color: activeIcon,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: activeIcon.withValues(alpha: 0.9),
+                                    blurRadius: 5,
+                                  ),
+                                ],
+                              ),
+                            )
+                          : null,
+                      onTap: () {
+                        if (!isSelected) {
+                          Get.offNamed(module.route);
+                        }
+                      },
+                    ),
                   ),
                 );
               },
@@ -594,7 +609,7 @@ class _AppScaffoldState extends State<AppScaffold> {
                     AuthService.to.currentUser.value?.fullName.isNotEmpty == true
                         ? AuthService.to.currentUser.value!.fullName[0].toUpperCase()
                         : 'A',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primaryLight),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: activeIcon),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -604,13 +619,13 @@ class _AppScaffoldState extends State<AppScaffold> {
                     children: [
                       Text(
                         AuthService.to.currentUser.value?.fullName ?? 'Administrator',
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textPrimary),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       Text(
                         AuthService.to.currentUser.value?.email ?? 'admin@autodetail.com',
-                        style: const TextStyle(fontSize: 10, color: AppColors.textDarkMuted),
+                        style: TextStyle(fontSize: 10, color: textMuted),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),

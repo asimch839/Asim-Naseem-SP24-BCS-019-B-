@@ -1,8 +1,10 @@
 import 'package:intl/intl.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
+import 'package:get/get.dart';
 import '../database/app_database.dart';
 import '../models/staff_model.dart';
+import '../../features/dashboard/dashboard_controller.dart';
 
 class StaffRepository {
   Future<Database> get _db async => await AppDatabase.instance.database;
@@ -407,7 +409,39 @@ class StaffRepository {
           );
         }
       }
+
+      // Automatically register disbursement into garage_expenses ledger
+      final staffRes = await txn.query('staff', columns: ['name'], where: 'id = ?', whereArgs: [staffId]);
+      final staffName = staffRes.isNotEmpty ? (staffRes.first['name'] as String? ?? 'Staff') : 'Staff';
+      final expenseCategory = isAdvance ? 'Staff Advance' : 'Staff Salary';
+      final expenseDesc = isAdvance ? 'Advance paid to $staffName' : 'Salary disbursement to $staffName';
+
+      await txn.insert(
+        'garage_expenses',
+        {
+          'id': 'gexp_$paymentId',
+          'category': expenseCategory,
+          'description': notes != null && notes.isNotEmpty ? '$expenseDesc ($notes)' : expenseDesc,
+          'amount': amount,
+          'date': now,
+          'payment_method': paymentMethod,
+          'vendor_name': staffName,
+          'vendor_company': 'Internal Staff',
+          'vendor_contact': '',
+          'vendor_address': '',
+          'vendor_invoice_ref': reference?.isNotEmpty == true ? reference : paymentId,
+          'receipt_path': '',
+          'notes': notes ?? '',
+          'created_at': now,
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
     });
+
+    // Notify DashboardController to update graphs and KPIs in real time
+    if (Get.isRegistered<DashboardController>()) {
+      Get.find<DashboardController>().refreshData();
+    }
   }
 
   Future<List<Map<String, dynamic>>> getSalaryPayments(String salaryId) async {
@@ -454,29 +488,137 @@ class StaffRepository {
   }) async {
     final db = await _db;
     final expId = id ?? 'stf_exp_${const Uuid().v4().substring(0, 8)}';
+    final now = DateTime.now().toIso8601String();
 
-    await db.insert(
-      'staff_expenses',
-      {
-        'id': expId,
-        'staff_id': staffId,
-        'category': category.trim(),
-        'description': description.trim(),
-        'amount': amount,
-        'date': date.toIso8601String(),
-        'payment_method': paymentMethod,
-        'vendor_details': vendorDetails ?? '',
-        'reference': reference ?? '',
-        'receipt_path': receiptPath ?? '',
-        'notes': notes ?? '',
-        'created_at': DateTime.now().toIso8601String(),
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await db.transaction((txn) async {
+      await txn.insert(
+        'staff_expenses',
+        {
+          'id': expId,
+          'staff_id': staffId,
+          'category': category.trim(),
+          'description': description.trim(),
+          'amount': amount,
+          'date': date.toIso8601String(),
+          'payment_method': paymentMethod,
+          'vendor_details': vendorDetails ?? '',
+          'reference': reference ?? '',
+          'receipt_path': receiptPath ?? '',
+          'notes': notes ?? '',
+          'created_at': now,
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+
+      final staffRes = await txn.query('staff', columns: ['name'], where: 'id = ?', whereArgs: [staffId]);
+      final staffName = staffRes.isNotEmpty ? (staffRes.first['name'] as String? ?? 'Staff') : 'Staff';
+
+      await txn.insert(
+        'garage_expenses',
+        {
+          'id': 'gexp_$expId',
+          'category': 'Staff - ${category.trim()}',
+          'description': '$staffName: ${description.trim()}',
+          'amount': amount,
+          'date': date.toIso8601String(),
+          'payment_method': paymentMethod,
+          'vendor_name': staffName,
+          'vendor_company': vendorDetails ?? 'Internal Staff',
+          'vendor_contact': '',
+          'vendor_address': '',
+          'vendor_invoice_ref': reference?.isNotEmpty == true ? reference : expId,
+          'receipt_path': receiptPath ?? '',
+          'notes': notes ?? '',
+          'created_at': now,
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    });
+
+    if (Get.isRegistered<DashboardController>()) {
+      Get.find<DashboardController>().refreshData();
+    }
   }
 
   Future<void> deleteStaffExpense(String id) async {
     final db = await _db;
     await db.delete('staff_expenses', where: 'id = ?', whereArgs: [id]);
+    await db.delete('garage_expenses', where: 'id = ?', whereArgs: ['gexp_$id']);
+    if (Get.isRegistered<DashboardController>()) {
+      Get.find<DashboardController>().refreshData();
+    }
+  }
+
+  /// Retroactively sync any existing salary_payments or staff_expenses into garage_expenses ledger
+  Future<void> syncStaffPaymentsToExpenses() async {
+    try {
+      final db = await _db;
+      final existingSalPayments = await db.rawQuery('''
+        SELECT sp.*, s.name as staff_name
+        FROM salary_payments sp
+        LEFT JOIN staff s ON sp.staff_id = s.id
+        WHERE ('gexp_' || sp.id) NOT IN (SELECT id FROM garage_expenses)
+      ''');
+
+      for (var p in existingSalPayments) {
+        final pId = p['id'] as String;
+        final isAdv = (p['is_advance'] as int? ?? 0) == 1;
+        final sName = p['staff_name'] as String? ?? 'Staff';
+        await db.insert(
+          'garage_expenses',
+          {
+            'id': 'gexp_$pId',
+            'category': isAdv ? 'Staff Advance' : 'Staff Salary',
+            'description': isAdv ? 'Advance paid to $sName' : 'Salary disbursement to $sName',
+            'amount': (p['amount'] as num?)?.toDouble() ?? 0.0,
+            'date': p['payment_date'] as String,
+            'payment_method': p['payment_method'] as String? ?? 'Cash',
+            'vendor_name': sName,
+            'vendor_company': 'Internal Staff',
+            'vendor_contact': '',
+            'vendor_address': '',
+            'vendor_invoice_ref': p['reference'] as String? ?? pId,
+            'receipt_path': '',
+            'notes': p['notes'] as String? ?? '',
+            'created_at': p['created_at'] as String? ?? DateTime.now().toIso8601String(),
+          },
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
+      }
+
+      final existingStaffExpenses = await db.rawQuery('''
+        SELECT se.*, s.name as staff_name
+        FROM staff_expenses se
+        LEFT JOIN staff s ON se.staff_id = s.id
+        WHERE ('gexp_' || se.id) NOT IN (SELECT id FROM garage_expenses)
+      ''');
+
+      for (var e in existingStaffExpenses) {
+        final eId = e['id'] as String;
+        final sName = e['staff_name'] as String? ?? 'Staff';
+        final cat = e['category'] as String? ?? 'Expense';
+        final desc = e['description'] as String? ?? '';
+        await db.insert(
+          'garage_expenses',
+          {
+            'id': 'gexp_$eId',
+            'category': 'Staff - $cat',
+            'description': '$sName: $desc',
+            'amount': (e['amount'] as num?)?.toDouble() ?? 0.0,
+            'date': e['date'] as String,
+            'payment_method': e['payment_method'] as String? ?? 'Cash',
+            'vendor_name': sName,
+            'vendor_company': e['vendor_details'] as String? ?? 'Internal Staff',
+            'vendor_contact': '',
+            'vendor_address': '',
+            'vendor_invoice_ref': e['reference'] as String? ?? eId,
+            'receipt_path': e['receipt_path'] as String? ?? '',
+            'notes': e['notes'] as String? ?? '',
+            'created_at': e['created_at'] as String? ?? DateTime.now().toIso8601String(),
+          },
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
+      }
+    } catch (_) {}
   }
 }

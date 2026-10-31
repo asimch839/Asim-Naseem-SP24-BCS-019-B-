@@ -74,7 +74,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
         label: const Text('Add Customer'),
       ),
       body: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(MediaQuery.of(context).size.width < 600 ? 12 : 20),
         child: Column(
           children: [
             // Filter Bar with Choice Chips
@@ -118,20 +118,19 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    Row(
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
                       children: ['All', 'Active', 'Inactive'].map((s) {
                         final isSelected = _statusFilter == s;
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: ChoiceChip(
-                            label: Text(s, style: TextStyle(fontSize: 12, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
-                            selected: isSelected,
-                            selectedColor: s == 'Active' ? AppColors.success : s == 'Inactive' ? AppColors.error : AppColors.primary,
-                            onSelected: (_) {
-                              setState(() => _statusFilter = s);
-                              _fetchCustomers();
-                            },
-                          ),
+                        return ChoiceChip(
+                          label: Text(s, style: TextStyle(fontSize: 12, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+                          selected: isSelected,
+                          selectedColor: s == 'Active' ? AppColors.success : s == 'Inactive' ? AppColors.error : AppColors.primary,
+                          onSelected: (_) {
+                            setState(() => _statusFilter = s);
+                            _fetchCustomers();
+                          },
                         );
                       }).toList(),
                     ),

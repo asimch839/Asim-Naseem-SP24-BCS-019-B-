@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/responsive/responsive_layout.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/services/storage_service.dart';
@@ -13,6 +14,8 @@ import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/loading_indicator.dart';
 import '../../data/models/expense_model.dart';
 import '../../data/repositories/garage_expense_repository.dart';
+import '../../data/repositories/staff_repository.dart';
+import '../dashboard/dashboard_controller.dart';
 
 class GarageExpenseScreen extends StatefulWidget {
   const GarageExpenseScreen({super.key});
@@ -37,6 +40,9 @@ class _GarageExpenseScreenState extends State<GarageExpenseScreen> {
   }
 
   void _loadCategories() async {
+    try {
+      await StaffRepository().syncStaffPaymentsToExpenses();
+    } catch (_) {}
     final cats = await _expenseRepo.getUniqueCategories();
     if (mounted) {
       setState(() {
@@ -69,7 +75,7 @@ class _GarageExpenseScreenState extends State<GarageExpenseScreen> {
         label: const Text('Add Garage Expense'),
       ),
       body: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(ResponsiveLayout.isMobile(context) ? 12 : 24),
         child: Column(
           children: [
             // Search & Filter Header
@@ -222,10 +228,16 @@ class _GarageExpenseScreenState extends State<GarageExpenseScreen> {
                             separatorBuilder: (_, __) => const Divider(height: 1),
                             itemBuilder: (context, index) {
                               final exp = list[index];
+                              final isStaff = exp.category.toLowerCase().contains('staff');
+
                               return ListTile(
                                 leading: CircleAvatar(
-                                  backgroundColor: AppColors.primary.withValues(alpha: 0.15),
-                                  child: const Icon(Icons.receipt_long_rounded, color: AppColors.primaryLight, size: 20),
+                                  backgroundColor: isStaff ? AppColors.warning.withValues(alpha: 0.15) : AppColors.primary.withValues(alpha: 0.15),
+                                  child: Icon(
+                                    isStaff ? Icons.badge_outlined : Icons.receipt_long_rounded,
+                                    color: isStaff ? AppColors.warning : AppColors.primaryLight,
+                                    size: 20,
+                                  ),
                                 ),
                                 title: Row(
                                   children: [
@@ -236,12 +248,18 @@ class _GarageExpenseScreenState extends State<GarageExpenseScreen> {
                                         child: Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                           decoration: BoxDecoration(
-                                            color: AppColors.primary.withValues(alpha: 0.12),
+                                            color: isStaff ? AppColors.warning.withValues(alpha: 0.12) : AppColors.primary.withValues(alpha: 0.12),
                                             borderRadius: BorderRadius.circular(6),
                                           ),
                                           child: Text(
-                                            'Vendor: ${exp.vendorName}${exp.vendorCompany != null && exp.vendorCompany!.isNotEmpty ? " (${exp.vendorCompany})" : ""}',
-                                            style: const TextStyle(fontSize: 11, color: AppColors.primaryLight),
+                                            isStaff
+                                                ? 'Staff: ${exp.vendorName}'
+                                                : 'Vendor: ${exp.vendorName}${exp.vendorCompany != null && exp.vendorCompany!.isNotEmpty ? " (${exp.vendorCompany})" : ""}',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: isStaff ? AppColors.warning : AppColors.primaryLight,
+                                              fontWeight: isStaff ? FontWeight.w600 : FontWeight.normal,
+                                            ),
                                             overflow: TextOverflow.ellipsis,
                                           ),
                                         ),
@@ -301,6 +319,9 @@ class _GarageExpenseScreenState extends State<GarageExpenseScreen> {
                                         if (confirm == true) {
                                           await _expenseRepo.deleteExpense(exp.id);
                                           _loadCategories();
+                                          if (Get.isRegistered<DashboardController>()) {
+                                            Get.find<DashboardController>().refreshData();
+                                          }
                                           Get.snackbar('Deleted', 'Garage expense deleted', backgroundColor: AppColors.error.withValues(alpha: 0.2));
                                           if (mounted) setState(() {});
                                         }
@@ -352,11 +373,6 @@ class _GarageExpenseFormDialogState extends State<GarageExpenseFormDialog> {
   late final TextEditingController _categoryController;
   late final TextEditingController _descController;
   late final TextEditingController _amountController;
-  late final TextEditingController _vendorNameController;
-  late final TextEditingController _vendorCompanyController;
-  late final TextEditingController _vendorPhoneController;
-  late final TextEditingController _vendorAddressController;
-  late final TextEditingController _vendorInvoiceRefController;
   late final TextEditingController _notesController;
 
   DateTime _selectedDate = DateTime.now();
@@ -374,11 +390,6 @@ class _GarageExpenseFormDialogState extends State<GarageExpenseFormDialog> {
     _categoryController = TextEditingController(text: e?.category ?? '');
     _descController = TextEditingController(text: e?.description ?? '');
     _amountController = TextEditingController(text: e != null ? e.amount.toStringAsFixed(0) : '');
-    _vendorNameController = TextEditingController(text: e?.vendorName ?? widget.prefillVendorName ?? '');
-    _vendorCompanyController = TextEditingController(text: e?.vendorCompany ?? widget.prefillVendorCompany ?? '');
-    _vendorPhoneController = TextEditingController(text: e?.vendorPhone ?? widget.prefillVendorPhone ?? '');
-    _vendorAddressController = TextEditingController(text: e?.vendorAddress ?? widget.prefillVendorAddress ?? '');
-    _vendorInvoiceRefController = TextEditingController(text: e?.referenceNumber ?? '');
     _notesController = TextEditingController(text: e?.notes ?? '');
     if (e != null) {
       _selectedDate = e.date;
@@ -430,11 +441,11 @@ class _GarageExpenseFormDialogState extends State<GarageExpenseFormDialog> {
       amount: amount,
       date: _selectedDate,
       paymentMethod: _paymentMethod,
-      vendorName: _vendorNameController.text.trim().isNotEmpty ? _vendorNameController.text.trim() : null,
-      vendorCompany: _vendorCompanyController.text.trim().isNotEmpty ? _vendorCompanyController.text.trim() : null,
-      vendorPhone: _vendorPhoneController.text.trim().isNotEmpty ? _vendorPhoneController.text.trim() : null,
-      vendorAddress: _vendorAddressController.text.trim().isNotEmpty ? _vendorAddressController.text.trim() : null,
-      referenceNumber: _vendorInvoiceRefController.text.trim().isNotEmpty ? _vendorInvoiceRefController.text.trim() : null,
+      vendorName: null,
+      vendorCompany: null,
+      vendorPhone: null,
+      vendorAddress: null,
+      referenceNumber: null,
       notes: _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : null,
       receiptUrl: _receiptPath,
       createdAt: widget.existing?.createdAt ?? DateTime.now(),
@@ -442,6 +453,9 @@ class _GarageExpenseFormDialogState extends State<GarageExpenseFormDialog> {
 
     try {
       await _expenseRepo.saveExpense(model);
+      if (Get.isRegistered<DashboardController>()) {
+        Get.find<DashboardController>().refreshData();
+      }
       Get.back(result: true);
       Get.snackbar('Saved', 'Garage expense saved successfully', backgroundColor: AppColors.success.withValues(alpha: 0.2));
     } catch (e) {
@@ -536,6 +550,7 @@ class _GarageExpenseFormDialogState extends State<GarageExpenseFormDialog> {
                 // Payment Method
                 DropdownButtonFormField<String>(
                   value: _paymentMethod,
+                  isExpanded: true,
                   decoration: const InputDecoration(
                     labelText: 'Payment Method',
                     prefixIcon: Icon(Icons.credit_card_rounded, size: 20),
@@ -546,70 +561,6 @@ class _GarageExpenseFormDialogState extends State<GarageExpenseFormDialog> {
                   },
                 ),
                 const SizedBox(height: 16),
-
-                // Vendor Details Section (Optional, manually entered per Section 14)
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.cardDark,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.borderDark),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Row(
-                        children: [
-                          Icon(Icons.store_rounded, size: 16, color: AppColors.primaryLight),
-                          SizedBox(width: 6),
-                          Text('Vendor Details (Optional)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primaryLight)),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: _vendorNameController,
-                              decoration: const InputDecoration(labelText: 'Vendor Name', hintText: 'e.g., Al-Madina Auto Tools'),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: TextFormField(
-                              controller: _vendorCompanyController,
-                              decoration: const InputDecoration(labelText: 'Vendor Company', hintText: 'Optional company name'),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: _vendorPhoneController,
-                              decoration: const InputDecoration(labelText: 'Vendor Contact Number', hintText: 'Phone / Mobile'),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: TextFormField(
-                              controller: _vendorInvoiceRefController,
-                              decoration: const InputDecoration(labelText: 'Vendor Invoice / Ref #', hintText: 'Voucher / Bill #'),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      TextFormField(
-                        controller: _vendorAddressController,
-                        decoration: const InputDecoration(labelText: 'Vendor Address', hintText: 'Shop / Warehouse location'),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
 
                 // Notes
                 TextFormField(
@@ -624,7 +575,10 @@ class _GarageExpenseFormDialogState extends State<GarageExpenseFormDialog> {
                 const SizedBox(height: 16),
 
                 // Receipt Upload
-                Row(
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     OutlinedButton.icon(
                       onPressed: _isUploading ? null : _pickReceipt,
@@ -634,15 +588,19 @@ class _GarageExpenseFormDialogState extends State<GarageExpenseFormDialog> {
                       label: Text(_receiptPath != null ? 'Replace Receipt' : 'Upload Receipt Photo'),
                     ),
                     if (_receiptPath != null) ...[
-                      const SizedBox(width: 12),
-                      const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 20),
-                      const SizedBox(width: 4),
-                      const Text('Receipt attached', style: TextStyle(fontSize: 12, color: AppColors.success)),
-                      const Spacer(),
-                      IconButton(
-                        icon: const Icon(Icons.close_rounded, size: 18, color: AppColors.error),
-                        onPressed: () => setState(() => _receiptPath = null),
-                        tooltip: 'Remove Receipt',
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 20),
+                          const SizedBox(width: 4),
+                          const Text('Receipt attached', style: TextStyle(fontSize: 12, color: AppColors.success)),
+                          const SizedBox(width: 6),
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded, size: 18, color: AppColors.error),
+                            onPressed: () => setState(() => _receiptPath = null),
+                            tooltip: 'Remove Receipt',
+                          ),
+                        ],
                       ),
                     ],
                   ],

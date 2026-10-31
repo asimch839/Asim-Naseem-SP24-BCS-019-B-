@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/responsive/responsive_layout.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/utils/formatters.dart';
 import '../../data/models/customer_model.dart';
@@ -72,6 +73,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final currency = AuthService.to.currentBusiness.value?.currency ?? AppConstants.defaultCurrency;
+    final isMobile = ResponsiveLayout.isMobile(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -98,7 +100,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
+              padding: EdgeInsets.all(isMobile ? 12 : 24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -224,17 +226,17 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                   const SizedBox(height: 24),
 
                   // 2. Customer Registered Cars
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Row(
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final titleWidget = const Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(Icons.directions_car_rounded, color: AppColors.primaryLight),
                           SizedBox(width: 8),
                           Text('Associated Vehicles', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                         ],
-                      ),
-                      ElevatedButton.icon(
+                      );
+                      final addBtn = ElevatedButton.icon(
                         onPressed: () async {
                           final res = await showDialog(
                             context: context,
@@ -244,8 +246,22 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                         },
                         icon: const Icon(Icons.add, size: 16),
                         label: const Text('Add Vehicle'),
-                      ),
-                    ],
+                      );
+
+                      if (constraints.maxWidth < 440) {
+                        return Wrap(
+                          alignment: WrapAlignment.spaceBetween,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: [titleWidget, addBtn],
+                        );
+                      }
+                      return Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [titleWidget, addBtn],
+                      );
+                    },
                   ),
                   const SizedBox(height: 12),
                   if (_vehicles.isEmpty)

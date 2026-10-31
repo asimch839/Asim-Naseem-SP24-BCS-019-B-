@@ -5,12 +5,15 @@ import '../../core/constants/app_colors.dart';
 import '../../core/services/auth_service.dart';
 import '../../data/repositories/inspection_repository.dart';
 import '../../data/repositories/customer_repository.dart';
+import '../../data/repositories/vehicle_repository.dart';
 import '../../core/services/pdf_service.dart';
 import '../../core/utils/formatters.dart';
 import '../../data/models/inspection_model.dart';
 import '../../data/models/vehicle_model.dart';
+import '../../data/models/customer_model.dart';
 import 'widgets/vehicle_diagram_widget.dart';
 import 'widgets/part_inspection_dialog.dart';
+import 'models/diagram_marker_model.dart';
 
 class InspectionCreateScreen extends StatefulWidget {
   final VehicleModel? vehicle;
@@ -28,14 +31,39 @@ class InspectionCreateScreen extends StatefulWidget {
     this.jobId,
   });
 
-  VehicleModel get activeVehicle => vehicle ?? preselectedVehicle!;
-
   @override
   State<InspectionCreateScreen> createState() => _InspectionCreateScreenState();
 }
 
 class _InspectionCreateScreenState extends State<InspectionCreateScreen> {
-  VehicleModel get activeVehicle => widget.activeVehicle;
+  VehicleModel? _selectedVehicle;
+  CustomerModel? _selectedCustomer;
+  List<CustomerModel> _customers = [];
+  List<VehicleModel> _customerVehicles = [];
+
+  final TextEditingController _customerSearchController = TextEditingController();
+  final FocusNode _customerFocusNode = FocusNode();
+  final TextEditingController _walkInVehicleController = TextEditingController();
+  final TextEditingController _walkInPlateController = TextEditingController();
+
+  final List<DiagramMarker> _diagramMarkers = [];
+  final List<DrawingStroke> _drawingStrokes = [];
+
+  VehicleModel get activeVehicle =>
+      _selectedVehicle ??
+      (widget.vehicle ??
+          widget.preselectedVehicle ??
+          VehicleModel(
+            id: 'temp_veh',
+            businessId: 'local',
+            customerId: _selectedCustomer?.id ?? 'temp_cust',
+            make: _walkInVehicleController.text.trim().isNotEmpty
+                ? _walkInVehicleController.text.trim()
+                : 'Vehicle',
+            registrationNumber: _walkInPlateController.text.trim().isNotEmpty
+                ? _walkInPlateController.text.trim().toUpperCase()
+                : 'WALK-IN',
+          ));
 
   // Diagram Parts List
   final List<InspectionPartItem> _diagramParts = [];
@@ -73,31 +101,44 @@ class _InspectionCreateScreenState extends State<InspectionCreateScreen> {
   final TextEditingController _customerRemarksController = TextEditingController();
   bool _isSaving = false;
 
-  // Accordion Expand/Collapse State
+  // Accordion Expand/Collapse State (Expanded by default for fast completion)
   final Map<String, bool> _sectionExpanded = {
     'diagram': true,
-    'drive': false,
-    'suspension': false,
-    'body': false,
-    'areas': false,
-    'checklist': false,
-    'remarks': false,
+    'drive': true,
+    'suspension': true,
+    'body': true,
+    'areas': true,
+    'checklist': true,
+    'remarks': true,
   };
 
   final List<String> _defaultChecklistTitles = [
-    'Spare Wheel & Jack',
-    'Toolkit & Rod',
-    'Floor Mats (Front & Rear)',
-    'Audio / Media Player & Remote',
-    'Perfume / Freshener',
-    'Original Documents / Tax Token',
-    'Cigarette Lighter',
-    'Personal Valuables & Belongings',
+    'Battery Code',
+    'EVB/CR/USB',
+    'CIG-LIGHTER',
+    'ASHTRAY',
+    'RADIO ANTENA',
+    'FLOOR MATS',
+    'WIPER BLADES',
+    'MONOGRAMS',
+    'WHEEL CAPS',
+    'SPARE WHEEL',
+    'SEAT COVERS',
+    'LCD WORKING',
+    'BACK CAMERA',
+    'FRONT CAMERA',
+    'JACK & WHEEL BRACE',
+    'TOOLS',
+    'NAVIGATION CARD',
+    'Others',
   ];
 
   @override
   void initState() {
     super.initState();
+    _selectedVehicle = widget.vehicle ?? widget.preselectedVehicle;
+    _loadCustomersAndVehicles();
+
     // Initialize default checklist items
     final business = AuthService.to.currentBusiness.value;
     final checklistSource = business?.checklistItems ?? _defaultChecklistTitles;
@@ -124,6 +165,10 @@ class _InspectionCreateScreenState extends State<InspectionCreateScreen> {
     for (var c in _sectionControllers.values) {
       c.dispose();
     }
+    _customerSearchController.dispose();
+    _customerFocusNode.dispose();
+    _walkInVehicleController.dispose();
+    _walkInPlateController.dispose();
     _driveConditionController.dispose();
     _steeringController.dispose();
     _brakeController.dispose();
@@ -279,6 +324,17 @@ class _InspectionCreateScreenState extends State<InspectionCreateScreen> {
     );
   }
 
+  void _setAllInspectionGoodMaster() {
+    _setAllMechanicalNormal();
+    _setAllSuspensionElectronicsWorking();
+    _setAllDetailAreasGood();
+    _setAllBelongingsPresent();
+    setState(() {
+      _bodyConditionController.text = 'Clean / No Dents';
+      _paintConditionController.text = 'Gloss Optimal';
+    });
+  }
+
   void _toggleAllSections(bool expand) {
     setState(() {
       for (var key in _sectionExpanded.keys) {
@@ -287,11 +343,111 @@ class _InspectionCreateScreenState extends State<InspectionCreateScreen> {
     });
   }
 
+  void _loadCustomersAndVehicles() async {
+    final custRepo = Get.find<CustomerRepository>();
+    final customers = await custRepo.getCustomers();
+    if (mounted) {
+      setState(() {
+        _customers = customers;
+        if (_selectedVehicle != null) {
+          _selectedCustomer = customers.firstWhereOrNull((c) => c.id == _selectedVehicle!.customerId);
+        } else if (widget.preselectedCustomerId != null) {
+          _selectedCustomer = customers.firstWhereOrNull((c) => c.id == widget.preselectedCustomerId);
+        }
+      });
+      if (_selectedCustomer != null) {
+        _onCustomerSelected(_selectedCustomer!);
+      }
+    }
+  }
+
+  void _onCustomerSelected(CustomerModel customer) async {
+    setState(() {
+      _selectedCustomer = customer;
+      _customerSearchController.text = customer.fullName;
+    });
+    final custRepo = Get.find<CustomerRepository>();
+    final vList = await custRepo.getCustomerVehicles(customer.id);
+    if (mounted) {
+      setState(() {
+        _customerVehicles = vList;
+        if (_selectedVehicle == null && vList.isNotEmpty) {
+          _selectedVehicle = vList.first;
+        }
+      });
+    }
+  }
+
   void _saveAndGeneratePdf() async {
     setState(() => _isSaving = true);
     final businessId = AuthService.to.businessId;
     final staff = AuthService.to.currentUser.value;
     final inspectionId = const Uuid().v4();
+
+    final custRepo = Get.find<CustomerRepository>();
+    final vehRepo = Get.find<VehicleRepository>();
+
+    VehicleModel targetVehicle;
+    String targetCustomerId;
+
+    if (_selectedVehicle != null) {
+      targetVehicle = _selectedVehicle!;
+      targetCustomerId = _selectedVehicle!.customerId;
+    } else {
+      final custName = _customerSearchController.text.trim();
+      if (custName.isEmpty && _selectedCustomer == null) {
+        Get.snackbar('Required', 'Please select or enter a Customer and Vehicle for this inspection',
+            backgroundColor: AppColors.error.withValues(alpha: 0.2));
+        setState(() => _isSaving = false);
+        return;
+      }
+
+      if (_selectedCustomer != null) {
+        targetCustomerId = _selectedCustomer!.id;
+      } else {
+        targetCustomerId = 'cust_${const Uuid().v4().substring(0, 8)}';
+        final newCust = CustomerModel(
+          id: targetCustomerId,
+          businessId: 'local',
+          fullName: custName,
+          phone: 'Walk-in',
+          status: 'Active',
+          createdAt: DateTime.now(),
+        );
+        await custRepo.saveCustomer(newCust);
+      }
+
+      final vText = _walkInVehicleController.text.trim();
+      final vMake = vText.isNotEmpty ? vText : 'Walk-in Vehicle';
+      final vPlate = _walkInPlateController.text.trim().isNotEmpty
+          ? _walkInPlateController.text.trim().toUpperCase()
+          : (vText.isNotEmpty ? vText.toUpperCase() : 'WALK-IN');
+
+      final newVeh = VehicleModel(
+        id: 'veh_${const Uuid().v4().substring(0, 8)}',
+        businessId: 'local',
+        customerId: targetCustomerId,
+        make: vMake,
+        registrationNumber: vPlate,
+        createdAt: DateTime.now(),
+      );
+      await vehRepo.saveVehicle(newVeh);
+      targetVehicle = newVeh;
+      _selectedVehicle = newVeh;
+    }
+
+    // Sync any marked defect pins into _diagramParts for PDF and reporting
+    for (final m in _diagramMarkers) {
+      if (!_diagramParts.any((p) => p.partName == m.panelName && p.view == m.viewName)) {
+        _diagramParts.add(InspectionPartItem(
+          partName: m.panelName,
+          view: m.viewName,
+          condition: m.defectType,
+          damageDescription: m.note.isNotEmpty ? m.note : m.defectType,
+          hasDamage: true,
+        ));
+      }
+    }
 
     // Compile section conditions
     final Map<String, String> sectionConditions = {};
@@ -371,6 +527,16 @@ class _InspectionCreateScreenState extends State<InspectionCreateScreen> {
           });
         }
       }
+      for (var entry in driveCondition.entries) {
+        if (entry.value.trim().isNotEmpty) {
+          itemsToSave.add({
+            'section_name': 'Drive & Systems',
+            'part_name': entry.key,
+            'condition': entry.value.trim(),
+            'view_type': 'Mechanical',
+          });
+        }
+      }
 
       final List<Map<String, dynamic>> photosToSave = [];
       for (var ph in allPhotos) {
@@ -382,8 +548,8 @@ class _InspectionCreateScreenState extends State<InspectionCreateScreen> {
 
       await inspRepo.saveInspection(
         id: inspectionId,
-        vehicleId: activeVehicle.id,
-        customerId: activeVehicle.customerId,
+        vehicleId: targetVehicle.id,
+        customerId: targetCustomerId,
         jobId: widget.jobId,
         inspectorName: staff?.fullName ?? 'Service Advisor',
         inspectionDate: DateTime.now(),
@@ -394,12 +560,12 @@ class _InspectionCreateScreenState extends State<InspectionCreateScreen> {
 
       final business = AuthService.to.currentBusiness.value;
       if (business != null) {
-        final cust = await custRepo.getCustomerById(activeVehicle.customerId);
+        final cust = await custRepo.getCustomerById(targetCustomerId);
         await PdfService.printInspectionReport(
           business: business,
           inspection: inspection,
-          vehicleReg: activeVehicle.registrationNumber,
-          vehicleName: '${activeVehicle.make} ${activeVehicle.model}',
+          vehicleReg: targetVehicle.registrationNumber,
+          vehicleName: '${targetVehicle.make} ${targetVehicle.model}',
           customerName: cust?.fullName ?? widget.preselectedCustomerName ?? 'Customer',
         );
       }
@@ -420,11 +586,14 @@ class _InspectionCreateScreenState extends State<InspectionCreateScreen> {
   @override
   Widget build(BuildContext context) {
     final bool allCollapsed = _sectionExpanded.values.every((v) => !v);
+    final isNarrow = MediaQuery.of(context).size.width < 500;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'Inspection: ${activeVehicle.make} ${activeVehicle.model} (${activeVehicle.registrationNumber})',
+          _selectedVehicle != null
+              ? 'Inspection: ${_selectedVehicle!.make} ${_selectedVehicle!.model} (${_selectedVehicle!.registrationNumber})'
+              : 'New Vehicle Inspection Audit',
           overflow: TextOverflow.ellipsis,
         ),
         leading: IconButton(
@@ -432,31 +601,46 @@ class _InspectionCreateScreenState extends State<InspectionCreateScreen> {
           onPressed: () => Get.back(),
         ),
         actions: [
-          // Expand/Collapse all toggle
-          TextButton.icon(
-            onPressed: () => _toggleAllSections(allCollapsed),
-            icon: Icon(allCollapsed ? Icons.unfold_more_rounded : Icons.unfold_less_rounded, size: 16),
-            label: Text(allCollapsed ? 'Expand All' : 'Collapse All', style: const TextStyle(fontSize: 12)),
-          ),
-          const SizedBox(width: 8),
-          ElevatedButton.icon(
-            onPressed: _isSaving ? null : _saveAndGeneratePdf,
-            icon: _isSaving
-                ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Icon(Icons.check_circle_rounded, size: 16),
-            label: const Text('Save & PDF'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.success,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          if (isNarrow) ...[
+            IconButton(
+              onPressed: () => _toggleAllSections(allCollapsed),
+              icon: Icon(allCollapsed ? Icons.unfold_more_rounded : Icons.unfold_less_rounded),
+              tooltip: allCollapsed ? 'Expand All' : 'Collapse All',
             ),
-          ),
-          const SizedBox(width: 14),
+            IconButton(
+              onPressed: _isSaving ? null : _saveAndGeneratePdf,
+              icon: _isSaving
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.check_circle_rounded, color: AppColors.success),
+              tooltip: 'Save & PDF',
+            ),
+          ] else ...[
+            // Expand/Collapse all toggle
+            TextButton.icon(
+              onPressed: () => _toggleAllSections(allCollapsed),
+              icon: Icon(allCollapsed ? Icons.unfold_more_rounded : Icons.unfold_less_rounded, size: 16),
+              label: Text(allCollapsed ? 'Expand All' : 'Collapse All', style: const TextStyle(fontSize: 12)),
+            ),
+            const SizedBox(width: 8),
+            ElevatedButton.icon(
+              onPressed: _isSaving ? null : _saveAndGeneratePdf,
+              icon: _isSaving
+                  ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.check_circle_rounded, size: 16),
+              label: const Text('Save & PDF'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.success,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              ),
+            ),
+          ],
+          const SizedBox(width: 8),
         ],
       ),
       bottomNavigationBar: _buildBottomActionBar(),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 90),
+        padding: EdgeInsets.fromLTRB(isNarrow ? 12 : 20, 16, isNarrow ? 12 : 20, 90),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -464,16 +648,48 @@ class _InspectionCreateScreenState extends State<InspectionCreateScreen> {
             _buildVehicleBanner(),
             const SizedBox(height: 14),
 
+            // Top Quick Action
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: _setAllInspectionGoodMaster,
+                  icon: const Icon(Icons.flash_on_rounded, size: 16),
+                  label: const Text('Set All Inspection Normal / Good'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+
             // 2. Interactive Vehicle Body Diagram
             _buildCollapsibleCard(
               id: 'diagram',
               icon: Icons.directions_car_rounded,
-              title: 'Vehicle Diagram & Marked Parts',
-              subtitle: 'Tap any body part to record dents, scratches, or wear',
-              statusBadge: '${_diagramParts.length} Parts Marked',
-              badgeColor: _diagramParts.isEmpty ? AppColors.textDarkMuted : AppColors.primaryLight,
+              title: 'Vehicle Body Damage Diagram (Interactive)',
+              subtitle: 'Mark dents, scratches, stone chips, cracks, or draw freehand',
+              statusBadge: '${_diagramMarkers.length} Defects Marked',
+              badgeColor: _diagramMarkers.isEmpty ? AppColors.textDarkMuted : AppColors.primaryLight,
               child: VehicleDiagramWidget(
                 parts: _diagramParts,
+                markers: _diagramMarkers,
+                strokes: _drawingStrokes,
+                onMarkersChanged: (mList) {
+                  setState(() {
+                    _diagramMarkers.clear();
+                    _diagramMarkers.addAll(mList);
+                  });
+                },
+                onStrokesChanged: (sList) {
+                  setState(() {
+                    _drawingStrokes.clear();
+                    _drawingStrokes.addAll(sList);
+                  });
+                },
                 onPartTap: _onPartTap,
                 onAddCustomPart: _addCustomPart,
               ),
@@ -569,54 +785,223 @@ class _InspectionCreateScreenState extends State<InspectionCreateScreen> {
   // --- VEHICLE TOP BANNER ---
   Widget _buildVehicleBanner() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.darkCard : Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              gradient: AppColors.primaryGradient,
-              borderRadius: BorderRadius.circular(10),
+
+    if (_selectedVehicle != null) {
+      final v = _selectedVehicle!;
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkCard : Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                gradient: AppColors.primaryGradient,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.directions_car_rounded, color: Colors.white, size: 22),
             ),
-            child: const Icon(Icons.directions_car_rounded, color: Colors.white, size: 22),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${v.make} ${v.model} ${v.year != null ? "(${v.year})" : ""}',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Plate: ${v.registrationNumber} • Mileage: ${v.mileage ?? 0} km • Date: ${Formatters.date(DateTime.now())}',
+                    style: const TextStyle(fontSize: 12, color: AppColors.textDarkSecondary),
+                  ),
+                ],
+              ),
+            ),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.swap_horiz_rounded, size: 16),
+              label: const Text('Change Vehicle', style: TextStyle(fontSize: 12)),
+              onPressed: () {
+                setState(() {
+                  _selectedVehicle = null;
+                });
+              },
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Vehicle & Customer Selector Card (When starting from Inspection Screen)
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
               children: [
-                Text(
-                  '${activeVehicle.make} ${activeVehicle.model} ${activeVehicle.year != null ? "(${activeVehicle.year})" : ""}',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Plate: ${activeVehicle.registrationNumber} • Mileage: ${activeVehicle.mileage ?? 0} km • Date: ${Formatters.date(DateTime.now())}',
-                  style: const TextStyle(fontSize: 12, color: AppColors.textDarkSecondary),
-                ),
+                Icon(Icons.directions_car_filled_rounded, color: AppColors.primary),
+                SizedBox(width: 8),
+                Text('Vehicle & Customer Selection', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
               ],
             ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: AppColors.accent.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(8),
+            const SizedBox(height: 12),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final isWide = constraints.maxWidth >= 600;
+                return Column(
+                  children: [
+                    if (isWide)
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(child: _buildCustomerSearchInput()),
+                          const SizedBox(width: 16),
+                          Expanded(child: _buildVehicleSelectionInput()),
+                        ],
+                      )
+                    else ...[
+                      _buildCustomerSearchInput(),
+                      const SizedBox(height: 10),
+                      _buildVehicleSelectionInput(),
+                    ],
+                  ],
+                );
+              },
             ),
-            child: Text(
-              'Advisor: ${AuthService.to.currentUser.value?.fullName ?? "Advisor"}',
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.accent),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildCustomerSearchInput() {
+    return RawAutocomplete<CustomerModel>(
+      textEditingController: _customerSearchController,
+      focusNode: _customerFocusNode,
+      optionsBuilder: (textVal) {
+        if (textVal.text.trim().isEmpty) return _customers;
+        final q = textVal.text.toLowerCase().trim();
+        return _customers.where((c) => c.fullName.toLowerCase().contains(q) || c.phone.contains(q));
+      },
+      displayStringForOption: (c) => c.fullName,
+      onSelected: (c) => _onCustomerSelected(c),
+      fieldViewBuilder: (ctx, ctrl, fNode, _) {
+        return TextFormField(
+          controller: ctrl,
+          focusNode: fNode,
+          decoration: InputDecoration(
+            labelText: 'Customer (Search or Type Walk-in) *',
+            hintText: 'Type customer name...',
+            prefixIcon: const Icon(Icons.person_rounded),
+            suffixIcon: PopupMenuButton<CustomerModel>(
+              icon: const Icon(Icons.arrow_drop_down),
+              tooltip: 'Browse Previous Customers',
+              onSelected: (c) => _onCustomerSelected(c),
+              itemBuilder: (context) {
+                return _customers.map((c) => PopupMenuItem(value: c, child: Text('${c.fullName} (${c.phone})'))).toList();
+              },
+            ),
+          ),
+          onChanged: (val) {
+            setState(() {
+              if (_selectedCustomer != null && val.trim() != _selectedCustomer!.fullName) {
+                _selectedCustomer = null;
+                _customerVehicles = [];
+                _selectedVehicle = null;
+              }
+            });
+          },
+        );
+      },
+      optionsViewBuilder: (context, onSelected, options) {
+        return Align(
+          alignment: Alignment.topLeft,
+          child: Material(
+            elevation: 8,
+            borderRadius: BorderRadius.circular(10),
+            color: Theme.of(context).cardColor,
+            child: Container(
+              width: 360,
+              constraints: const BoxConstraints(maxHeight: 240),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Theme.of(context).dividerColor),
+              ),
+              child: ListView.separated(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                shrinkWrap: true,
+                itemCount: options.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final c = options.elementAt(index);
+                  return ListTile(
+                    dense: true,
+                    leading: CircleAvatar(
+                      radius: 14,
+                      backgroundColor: AppColors.primary.withValues(alpha: 0.15),
+                      child: const Icon(Icons.person, size: 16, color: AppColors.primaryLight),
+                    ),
+                    title: Text(c.fullName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    subtitle: Text(c.phone, style: const TextStyle(fontSize: 11, color: AppColors.textDarkSecondary)),
+                    trailing: const Text('Previous', style: TextStyle(fontSize: 10, color: AppColors.accent, fontWeight: FontWeight.bold)),
+                    onTap: () => onSelected(c),
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildVehicleSelectionInput() {
+    if (_selectedCustomer != null && _customerVehicles.isNotEmpty) {
+      return DropdownButtonFormField<VehicleModel>(
+        value: _selectedVehicle,
+        decoration: const InputDecoration(labelText: 'Vehicle *', prefixIcon: Icon(Icons.directions_car_rounded)),
+        items: _customerVehicles
+            .map((v) => DropdownMenuItem(value: v, child: Text('${v.displayName} (${v.plateNumber})')))
+            .toList(),
+        onChanged: (val) {
+          setState(() {
+            _selectedVehicle = val;
+          });
+        },
+      );
+    }
+
+    return Row(
+      children: [
+        Expanded(
+          flex: 2,
+          child: TextFormField(
+            controller: _walkInVehicleController,
+            decoration: const InputDecoration(
+              labelText: 'Vehicle Make & Model *',
+              hintText: 'e.g. Civic / Corolla / Walk-in',
+              prefixIcon: Icon(Icons.directions_car_rounded),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: TextFormField(
+            controller: _walkInPlateController,
+            decoration: const InputDecoration(
+              labelText: 'Plate #',
+              hintText: 'e.g. LEA-123',
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -1270,7 +1655,7 @@ class _InspectionCreateScreenState extends State<InspectionCreateScreen> {
   Widget _buildBottomActionBar() {
     final presentCount = _checklistItems.where((c) => c.status == 'Present').length;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
         color: Theme.of(context).cardTheme.color,
         border: Border(top: BorderSide(color: Theme.of(context).dividerColor)),
@@ -1283,20 +1668,18 @@ class _InspectionCreateScreenState extends State<InspectionCreateScreen> {
         ],
       ),
       child: SafeArea(
-        child: Row(
-          children: [
-            Expanded(
-              child: Wrap(
-                spacing: 12,
-                runSpacing: 4,
-                children: [
-                  _buildStatPill('Diagram Parts', '${_diagramParts.length} marked', Icons.touch_app_rounded),
-                  _buildStatPill('Checklist', '$presentCount/${_checklistItems.length} Present', Icons.checklist_rounded),
-                ],
-              ),
-            ),
-            const SizedBox(width: 16),
-            ElevatedButton.icon(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isNarrow = constraints.maxWidth < 480;
+            final statPills = Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                _buildStatPill('Diagram', '${_diagramParts.length} marked', Icons.touch_app_rounded),
+                _buildStatPill('Checklist', '$presentCount/${_checklistItems.length} Present', Icons.checklist_rounded),
+              ],
+            );
+            final saveBtn = ElevatedButton.icon(
               onPressed: _isSaving ? null : _saveAndGeneratePdf,
               icon: _isSaving
                   ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
@@ -1305,11 +1688,31 @@ class _InspectionCreateScreenState extends State<InspectionCreateScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.success,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
-            ),
-          ],
+            );
+
+            if (isNarrow) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(child: statPills),
+                  const SizedBox(height: 8),
+                  saveBtn,
+                ],
+              );
+            }
+
+            return Row(
+              children: [
+                Expanded(child: statPills),
+                const SizedBox(width: 16),
+                saveBtn,
+              ],
+            );
+          },
         ),
       ),
     );

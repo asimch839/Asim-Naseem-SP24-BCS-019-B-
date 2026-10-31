@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/responsive/responsive_layout.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/services/pdf_service.dart';
@@ -61,6 +62,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
   @override
   Widget build(BuildContext context) {
     final currency = AuthService.to.currentBusiness.value?.currency ?? AppConstants.defaultCurrency;
+    final isMobile = ResponsiveLayout.isMobile(context);
 
     return AppScaffold(
       currentRoute: AppRoutes.invoices,
@@ -77,51 +79,106 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
         label: const Text('Create Invoice'),
       ),
       body: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(isMobile ? 12 : 24),
         child: Column(
           children: [
             // Filter Bar
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _searchController,
-                        decoration: const InputDecoration(
-                          hintText: 'Search by Invoice #, Customer Name, or Plate Number...',
-                          prefixIcon: Icon(Icons.search_rounded),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isNarrow = constraints.maxWidth < 600;
+                    if (isNarrow) {
+                      return Column(
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _searchController,
+                                  decoration: const InputDecoration(
+                                    hintText: 'Search Invoice #, Name, Plate...',
+                                    prefixIcon: Icon(Icons.search_rounded),
+                                  ),
+                                  onChanged: (val) {
+                                    _searchQuery = val.trim();
+                                    _fetchInvoices();
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              IconButton(
+                                icon: const Icon(Icons.refresh_rounded),
+                                tooltip: 'Refresh',
+                                onPressed: _fetchInvoices,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          DropdownButtonFormField<String>(
+                            value: _statusFilter,
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: 'Status Filter',
+                              isDense: true,
+                            ),
+                            items: const [
+                              DropdownMenuItem(value: 'All', child: Text('All Payment Statuses')),
+                              DropdownMenuItem(value: 'Paid', child: Text('Fully Paid')),
+                              DropdownMenuItem(value: 'Partially Paid', child: Text('Partially Paid')),
+                              DropdownMenuItem(value: 'Unpaid', child: Text('Unpaid Only')),
+                            ],
+                            onChanged: (val) {
+                              if (val != null) {
+                                setState(() => _statusFilter = val);
+                                _fetchInvoices();
+                              }
+                            },
+                          ),
+                        ],
+                      );
+                    }
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _searchController,
+                            decoration: const InputDecoration(
+                              hintText: 'Search by Invoice #, Customer Name, or Plate Number...',
+                              prefixIcon: Icon(Icons.search_rounded),
+                            ),
+                            onChanged: (val) {
+                              _searchQuery = val.trim();
+                              _fetchInvoices();
+                            },
+                          ),
                         ),
-                        onChanged: (val) {
-                          _searchQuery = val.trim();
-                          _fetchInvoices();
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    DropdownButton<String>(
-                      value: _statusFilter,
-                      items: const [
-                        DropdownMenuItem(value: 'All', child: Text('All Payment Statuses')),
-                        DropdownMenuItem(value: 'Paid', child: Text('Fully Paid')),
-                        DropdownMenuItem(value: 'Partially Paid', child: Text('Partially Paid')),
-                        DropdownMenuItem(value: 'Unpaid', child: Text('Unpaid Only')),
+                        const SizedBox(width: 16),
+                        DropdownButton<String>(
+                          value: _statusFilter,
+                          items: const [
+                            DropdownMenuItem(value: 'All', child: Text('All Payment Statuses')),
+                            DropdownMenuItem(value: 'Paid', child: Text('Fully Paid')),
+                            DropdownMenuItem(value: 'Partially Paid', child: Text('Partially Paid')),
+                            DropdownMenuItem(value: 'Unpaid', child: Text('Unpaid Only')),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) {
+                              setState(() => _statusFilter = val);
+                              _fetchInvoices();
+                            }
+                          },
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          icon: const Icon(Icons.refresh_rounded),
+                          tooltip: 'Refresh',
+                          onPressed: _fetchInvoices,
+                        ),
                       ],
-                      onChanged: (val) {
-                        if (val != null) {
-                          setState(() => _statusFilter = val);
-                          _fetchInvoices();
-                        }
-                      },
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      icon: const Icon(Icons.refresh_rounded),
-                      tooltip: 'Refresh',
-                      onPressed: _fetchInvoices,
-                    ),
-                  ],
+                    );
+                  },
                 ),
               ),
             ),
@@ -161,7 +218,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                                   : (isPartial ? AppColors.warning : AppColors.error);
 
                               return ListTile(
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                                contentPadding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 20, vertical: 8),
                                 leading: Container(
                                   padding: const EdgeInsets.all(10),
                                   decoration: BoxDecoration(
@@ -172,18 +229,10 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                                 ),
                                 title: Row(
                                   children: [
-                                    Text(invoice.invoiceNumber, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                                    const SizedBox(width: 8),
-                                    Flexible(
-                                      child: Text(
-                                        '• ${invoice.customerName}',
-                                        style: const TextStyle(fontSize: 14),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
+                                    Text(invoice.invoiceNumber, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                    const SizedBox(width: 6),
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                       decoration: BoxDecoration(
                                         color: statusColor.withValues(alpha: 0.15),
                                         borderRadius: BorderRadius.circular(4),
@@ -191,38 +240,37 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                                       child: Text(
                                         invoice.status,
                                         style: TextStyle(
-                                          fontSize: 11,
+                                          fontSize: 10,
                                           fontWeight: FontWeight.bold,
                                           color: statusColor,
                                         ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        '• ${invoice.customerName}',
+                                        style: const TextStyle(fontSize: 13),
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
                                   ],
                                 ),
                                 subtitle: Padding(
                                   padding: const EdgeInsets.only(top: 4),
-                                  child: Text(
-                                    '${invoice.vehicleDisplayName ?? "General Detailing"} ${invoice.vehicleRegNumber != null && invoice.vehicleRegNumber!.isNotEmpty ? "(${invoice.vehicleRegNumber})" : ""} • Date: ${Formatters.date(invoice.createdAt)}',
-                                    style: const TextStyle(fontSize: 12, color: AppColors.textDarkSecondary),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      crossAxisAlignment: CrossAxisAlignment.end,
-                                      children: [
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        '${invoice.vehicleDisplayName ?? "General Detailing"} ${invoice.vehicleRegNumber != null && invoice.vehicleRegNumber!.isNotEmpty ? "(${invoice.vehicleRegNumber})" : ""} • ${Formatters.date(invoice.createdAt)}',
+                                        style: const TextStyle(fontSize: 12, color: AppColors.textDarkSecondary),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      if (isMobile) ...[
+                                        const SizedBox(height: 2),
                                         Text(
-                                          Formatters.currency(invoice.grandTotal, symbol: currency),
-                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                                        ),
-                                        Text(
-                                          invoice.remainingAmount > 0
-                                              ? 'Remaining: ${Formatters.currency(invoice.remainingAmount, symbol: currency)}'
-                                              : 'Fully Settled',
+                                          'Total: ${Formatters.currency(invoice.grandTotal, symbol: currency)} • ${invoice.remainingAmount > 0 ? "Due: ${Formatters.currency(invoice.remainingAmount, symbol: currency)}" : "Fully Settled"}',
                                           style: TextStyle(
                                             fontSize: 11,
                                             fontWeight: FontWeight.w600,
@@ -230,33 +278,99 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                                           ),
                                         ),
                                       ],
-                                    ),
-                                    const SizedBox(width: 12),
-                                    if (invoice.remainingAmount > 0)
-                                      ElevatedButton.icon(
-                                        onPressed: () async {
-                                          final res = await showDialog(
-                                            context: context,
-                                            builder: (_) => RecordPaymentDialog(invoice: invoice),
-                                          );
-                                          if (res == true) _fetchInvoices();
-                                        },
-                                        icon: const Icon(Icons.price_check_rounded, size: 16),
-                                        label: const Text('Pay'),
-                                      ),
-                                    const SizedBox(width: 8),
-                                    IconButton(
-                                      icon: const Icon(Icons.print_rounded),
-                                      tooltip: 'Print / Save PDF',
-                                      onPressed: () async {
-                                        final business = AuthService.to.currentBusiness.value;
-                                        if (business != null) {
-                                          await PdfService.printInvoice(business: business, invoice: invoice);
-                                        }
-                                      },
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
+                                trailing: isMobile
+                                    ? PopupMenuButton<String>(
+                                        icon: const Icon(Icons.more_vert_rounded),
+                                        onSelected: (action) async {
+                                          if (action == 'pay') {
+                                            final res = await showDialog(
+                                              context: context,
+                                              builder: (_) => RecordPaymentDialog(invoice: invoice),
+                                            );
+                                            if (res == true) _fetchInvoices();
+                                          } else if (action == 'print') {
+                                            final business = AuthService.to.currentBusiness.value;
+                                            if (business != null) {
+                                              await PdfService.printInvoice(business: business, invoice: invoice);
+                                            }
+                                          }
+                                        },
+                                        itemBuilder: (context) => [
+                                          if (invoice.remainingAmount > 0)
+                                            const PopupMenuItem(
+                                              value: 'pay',
+                                              child: Row(
+                                                children: [
+                                                  Icon(Icons.price_check_rounded, color: AppColors.success, size: 18),
+                                                  SizedBox(width: 8),
+                                                  Text('Collect Payment', style: TextStyle(color: AppColors.success, fontWeight: FontWeight.bold)),
+                                                ],
+                                              ),
+                                            ),
+                                          const PopupMenuItem(
+                                            value: 'print',
+                                            child: Row(
+                                              children: [
+                                                Icon(Icons.print_rounded, size: 18),
+                                                SizedBox(width: 8),
+                                                Text('Print / Save PDF'),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      )
+                                    : Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Column(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            crossAxisAlignment: CrossAxisAlignment.end,
+                                            children: [
+                                              Text(
+                                                Formatters.currency(invoice.grandTotal, symbol: currency),
+                                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                              ),
+                                              Text(
+                                                invoice.remainingAmount > 0
+                                                    ? 'Remaining: ${Formatters.currency(invoice.remainingAmount, symbol: currency)}'
+                                                    : 'Fully Settled',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: invoice.remainingAmount > 0 ? AppColors.error : AppColors.success,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(width: 12),
+                                          if (invoice.remainingAmount > 0)
+                                            ElevatedButton.icon(
+                                              onPressed: () async {
+                                                final res = await showDialog(
+                                                  context: context,
+                                                  builder: (_) => RecordPaymentDialog(invoice: invoice),
+                                                );
+                                                if (res == true) _fetchInvoices();
+                                              },
+                                              icon: const Icon(Icons.price_check_rounded, size: 16),
+                                              label: const Text('Pay'),
+                                            ),
+                                          const SizedBox(width: 8),
+                                          IconButton(
+                                            icon: const Icon(Icons.print_rounded),
+                                            tooltip: 'Print / Save PDF',
+                                            onPressed: () async {
+                                              final business = AuthService.to.currentBusiness.value;
+                                              if (business != null) {
+                                                await PdfService.printInvoice(business: business, invoice: invoice);
+                                              }
+                                            },
+                                          ),
+                                        ],
+                                      ),
                               );
                             },
                           ),

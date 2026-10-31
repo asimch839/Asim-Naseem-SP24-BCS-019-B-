@@ -154,24 +154,24 @@ class _StaffListSubViewState extends State<StaffListSubView> {
   Widget build(BuildContext context) {
     final currency = AuthService.to.currentBusiness.value?.currency ?? AppConstants.defaultCurrency;
 
+    final isCompact = MediaQuery.of(context).size.width < 600;
+
     return Padding(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(isCompact ? 12 : 20),
       child: Column(
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _searchController,
-                  decoration: const InputDecoration(
-                    hintText: 'Search staff by name, designation, phone, or CNIC...',
-                    prefixIcon: Icon(Icons.search_rounded),
-                  ),
-                  onChanged: (v) => setState(() => _searchQuery = v.trim().toLowerCase()),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 560;
+              final searchField = TextField(
+                controller: _searchController,
+                decoration: const InputDecoration(
+                  hintText: 'Search staff by name, role, phone...',
+                  prefixIcon: Icon(Icons.search_rounded),
                 ),
-              ),
-              const SizedBox(width: 16),
-              ElevatedButton.icon(
+                onChanged: (v) => setState(() => _searchQuery = v.trim().toLowerCase()),
+              );
+              final addButton = ElevatedButton.icon(
                 onPressed: () async {
                   final res = await showDialog<bool>(
                     context: context,
@@ -181,10 +181,28 @@ class _StaffListSubViewState extends State<StaffListSubView> {
                 },
                 icon: const Icon(Icons.person_add_alt_1_rounded),
                 label: const Text('Add Staff Member'),
-              ),
-            ],
+              );
+
+              if (isNarrow) {
+                return Column(
+                  children: [
+                    searchField,
+                    const SizedBox(height: 10),
+                    SizedBox(width: double.infinity, child: addButton),
+                  ],
+                );
+              }
+
+              return Row(
+                children: [
+                  Expanded(child: searchField),
+                  const SizedBox(width: 14),
+                  addButton,
+                ],
+              );
+            },
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           Expanded(
             child: FutureBuilder<List<StaffModel>>(
               future: _staffRepo.getStaffList(searchQuery: _searchQuery),
@@ -329,76 +347,111 @@ class _StaffAttendanceSubViewState extends State<StaffAttendanceSubView> {
   Widget build(BuildContext context) {
     final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
 
+    final isCompactScreen = MediaQuery.of(context).size.width < 600;
+
     return Padding(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(isCompactScreen ? 12 : 20),
       child: Column(
         children: [
           // Date Selector Header
           Card(
             child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.chevron_left_rounded),
-                    onPressed: () => setState(() => _selectedDate = _selectedDate.subtract(const Duration(days: 1))),
-                  ),
-                  InkWell(
-                    onTap: () async {
-                      final d = await showDatePicker(
-                        context: context,
-                        initialDate: _selectedDate,
-                        firstDate: DateTime(2020),
-                        lastDate: DateTime.now().add(const Duration(days: 1)),
-                      );
-                      if (d != null) setState(() => _selectedDate = d);
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
+              padding: const EdgeInsets.all(12),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final isCompact = constraints.maxWidth < 620;
+
+                  final dateControls = Row(
+                    mainAxisSize: isCompact ? MainAxisSize.max : MainAxisSize.min,
+                    mainAxisAlignment: isCompact ? MainAxisAlignment.spaceBetween : MainAxisAlignment.start,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.chevron_left_rounded),
+                        onPressed: () => setState(() => _selectedDate = _selectedDate.subtract(const Duration(days: 1))),
                       ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.calendar_today_rounded, size: 16, color: AppColors.primaryLight),
-                          const SizedBox(width: 8),
-                          Text(
-                            DateFormat('EEEE, dd MMMM yyyy').format(_selectedDate),
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      Flexible(
+                        child: InkWell(
+                          onTap: () async {
+                            final d = await showDatePicker(
+                              context: context,
+                              initialDate: _selectedDate,
+                              firstDate: DateTime(2020),
+                              lastDate: DateTime.now().add(const Duration(days: 1)),
+                            );
+                            if (d != null) setState(() => _selectedDate = d);
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.calendar_today_rounded, size: 16, color: AppColors.primaryLight),
+                                const SizedBox(width: 8),
+                                Flexible(
+                                  child: Text(
+                                    DateFormat(isCompact ? 'dd MMM yyyy' : 'EEEE, dd MMMM yyyy').format(_selectedDate),
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.chevron_right_rounded),
-                    onPressed: () => setState(() => _selectedDate = _selectedDate.add(const Duration(days: 1))),
-                  ),
-                  const Spacer(),
-                  FutureBuilder<List<Map<String, dynamic>>>(
+                      IconButton(
+                        icon: const Icon(Icons.chevron_right_rounded),
+                        onPressed: () => setState(() => _selectedDate = _selectedDate.add(const Duration(days: 1))),
+                      ),
+                    ],
+                  );
+
+                  final statsBadges = FutureBuilder<List<Map<String, dynamic>>>(
                     future: _staffRepo.getDailyAttendance(dateStr),
                     builder: (context, snapshot) {
                       final list = snapshot.data ?? [];
                       final present = list.where((a) => a['attendance_status'] == AppConstants.attendancePresent).length;
                       final absent = list.where((a) => a['attendance_status'] == AppConstants.attendanceAbsent).length;
                       final leave = list.where((a) => a['attendance_status'] == AppConstants.attendanceLeave).length;
-                      return Row(
+                      return Wrap(
+                        spacing: 8,
+                        runSpacing: 6,
                         children: [
                           _badge('Present: $present', AppColors.success),
-                          const SizedBox(width: 8),
                           _badge('Absent: $absent', AppColors.error),
-                          const SizedBox(width: 8),
                           _badge('Leave: $leave', AppColors.warning),
                         ],
                       );
                     },
-                  ),
-                ],
+                  );
+
+                  if (isCompact) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        dateControls,
+                        const SizedBox(height: 10),
+                        Center(child: statsBadges),
+                      ],
+                    );
+                  }
+
+                  return Row(
+                    children: [
+                      dateControls,
+                      const Spacer(),
+                      statsBadges,
+                    ],
+                  );
+                },
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
           // Attendance Register Table
           Expanded(
@@ -597,38 +650,69 @@ class _StaffSalariesSubViewState extends State<StaffSalariesSubView> {
   Widget build(BuildContext context) {
     final currency = AuthService.to.currentBusiness.value?.currency ?? AppConstants.defaultCurrency;
 
+    final isCompactScreen = MediaQuery.of(context).size.width < 600;
+
     return Padding(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(isCompactScreen ? 12 : 20),
       child: Column(
         children: [
           Card(
             child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.chevron_left_rounded),
-                    onPressed: () => setState(() => _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month - 1)),
-                  ),
-                  Text(
-                    DateFormat('MMMM yyyy').format(_selectedMonth),
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.chevron_right_rounded),
-                    onPressed: () => setState(() => _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1)),
-                  ),
-                  const Spacer(),
-                  ElevatedButton.icon(
+              padding: const EdgeInsets.all(12),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final isCompact = constraints.maxWidth < 600;
+
+                  final monthControls = Row(
+                    mainAxisSize: isCompact ? MainAxisSize.max : MainAxisSize.min,
+                    mainAxisAlignment: isCompact ? MainAxisAlignment.spaceBetween : MainAxisAlignment.start,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.chevron_left_rounded),
+                        onPressed: () => setState(() => _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month - 1)),
+                      ),
+                      Text(
+                        DateFormat('MMMM yyyy').format(_selectedMonth),
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.chevron_right_rounded),
+                        onPressed: () => setState(() => _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1)),
+                      ),
+                    ],
+                  );
+
+                  final calculateButton = ElevatedButton.icon(
                     onPressed: _generateMonthlyPayroll,
-                    icon: const Icon(Icons.calculate_rounded),
-                    label: const Text('Calculate / Sync Month Payroll'),
-                  ),
-                ],
+                    icon: const Icon(Icons.calculate_rounded, size: 18),
+                    label: Text(
+                      isCompact ? 'Calculate Payroll' : 'Calculate / Sync Month Payroll',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  );
+
+                  if (isCompact) {
+                    return Column(
+                      children: [
+                        monthControls,
+                        const SizedBox(height: 8),
+                        SizedBox(width: double.infinity, child: calculateButton),
+                      ],
+                    );
+                  }
+
+                  return Row(
+                    children: [
+                      monthControls,
+                      const Spacer(),
+                      calculateButton,
+                    ],
+                  );
+                },
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
           Expanded(
             child: FutureBuilder<List<Map<String, dynamic>>>(
@@ -759,31 +843,49 @@ class _StaffExpensesSubViewState extends State<StaffExpensesSubView> {
   Widget build(BuildContext context) {
     final currency = AuthService.to.currentBusiness.value?.currency ?? AppConstants.defaultCurrency;
 
+    final isCompact = MediaQuery.of(context).size.width < 600;
+
     return Padding(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(isCompact ? 12 : 20),
       child: Column(
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _searchController,
-                  decoration: const InputDecoration(
-                    hintText: 'Search by staff name, category, or reference...',
-                    prefixIcon: Icon(Icons.search_rounded),
-                  ),
-                  onChanged: (v) => setState(() => _searchQuery = v.trim().toLowerCase()),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 560;
+              final searchField = TextField(
+                controller: _searchController,
+                decoration: const InputDecoration(
+                  hintText: 'Search by staff name, category...',
+                  prefixIcon: Icon(Icons.search_rounded),
                 ),
-              ),
-              const SizedBox(width: 16),
-              ElevatedButton.icon(
+                onChanged: (v) => setState(() => _searchQuery = v.trim().toLowerCase()),
+              );
+              final addButton = ElevatedButton.icon(
                 onPressed: () => _openStaffExpenseDialog(),
                 icon: const Icon(Icons.add_rounded),
                 label: const Text('Add Staff Expense'),
-              ),
-            ],
+              );
+
+              if (isNarrow) {
+                return Column(
+                  children: [
+                    searchField,
+                    const SizedBox(height: 10),
+                    SizedBox(width: double.infinity, child: addButton),
+                  ],
+                );
+              }
+
+              return Row(
+                children: [
+                  Expanded(child: searchField),
+                  const SizedBox(width: 14),
+                  addButton,
+                ],
+              );
+            },
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           Expanded(
             child: FutureBuilder<List<Map<String, dynamic>>>(
               future: _staffRepo.getStaffExpenses(),

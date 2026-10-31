@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/responsive/responsive_layout.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/services/pdf_service.dart';
 import '../../core/utils/formatters.dart';
@@ -139,6 +140,249 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     );
   }
 
+  Future<void> _showEditServicesPricesDialog() async {
+    final currency = AuthService.to.currentBusiness.value?.currency ?? AppConstants.defaultCurrency;
+    final List<Map<String, dynamic>> tempServices = _jobServices.map((s) => {
+      'description': s['description'] ?? 'Detailing Service',
+      'amount': (s['amount'] as num?)?.toDouble() ?? 0.0,
+    }).toList();
+    final discountCtrl = TextEditingController(text: _job.discount.toStringAsFixed(0));
+
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDlgState) {
+            final subtotal = tempServices.fold(0.0, (sum, s) => sum + ((s['amount'] as num?)?.toDouble() ?? 0.0));
+            final disc = double.tryParse(discountCtrl.text.trim()) ?? 0.0;
+            final grand = (subtotal - disc).clamp(0.0, double.infinity);
+
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Edit Services & Job Pricing', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  IconButton(icon: const Icon(Icons.close_rounded), onPressed: () => Navigator.pop(ctx)),
+                ],
+              ),
+              content: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: 520,
+                  maxHeight: MediaQuery.of(ctx).size.height * 0.85,
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Adjust the price of any service or package on this job card:',
+                        style: TextStyle(fontSize: 13, color: AppColors.textDarkSecondary),
+                      ),
+                      const SizedBox(height: 14),
+                      ...tempServices.asMap().entries.map((entry) {
+                        final idx = entry.key;
+                        final s = entry.value;
+                        final priceCtrl = TextEditingController(text: ((s['amount'] as num?)?.toDouble() ?? 0.0).toStringAsFixed(0));
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: LayoutBuilder(
+                            builder: (ctx, constraints) {
+                              final isNarrow = constraints.maxWidth < 360;
+                              if (isNarrow) {
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            s['description'] as String? ?? 'Service',
+                                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                          ),
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(Icons.delete_outline_rounded, color: AppColors.error, size: 20),
+                                          tooltip: 'Remove service',
+                                          onPressed: () {
+                                            setDlgState(() {
+                                              tempServices.removeAt(idx);
+                                            });
+                                          },
+                                        ),
+                                      ],
+                                    ),
+                                    TextFormField(
+                                      controller: priceCtrl,
+                                      keyboardType: TextInputType.number,
+                                      decoration: InputDecoration(
+                                        labelText: 'Price ($currency)',
+                                        isDense: true,
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                      ),
+                                      onChanged: (v) {
+                                        final p = double.tryParse(v.trim());
+                                        if (p != null) {
+                                          s['amount'] = p;
+                                          setDlgState(() {});
+                                        }
+                                      },
+                                    ),
+                                  ],
+                                );
+                              }
+                              return Row(
+                                children: [
+                                  Expanded(
+                                    flex: 3,
+                                    child: Text(
+                                      s['description'] as String? ?? 'Service',
+                                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  SizedBox(
+                                    width: 130,
+                                    child: TextFormField(
+                                      controller: priceCtrl,
+                                      keyboardType: TextInputType.number,
+                                      decoration: InputDecoration(
+                                        labelText: 'Price ($currency)',
+                                        isDense: true,
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                      ),
+                                      onChanged: (v) {
+                                        final p = double.tryParse(v.trim());
+                                        if (p != null) {
+                                          s['amount'] = p;
+                                          setDlgState(() {});
+                                        }
+                                      },
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.delete_outline_rounded, color: AppColors.error, size: 20),
+                                    tooltip: 'Remove service',
+                                    onPressed: () {
+                                      setDlgState(() {
+                                        tempServices.removeAt(idx);
+                                      });
+                                    },
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+                        );
+                      }),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          icon: const Icon(Icons.add_rounded, size: 16),
+                          label: const Text('Add Another Operation / Service'),
+                          onPressed: () async {
+                            final nameCtrl = TextEditingController();
+                            final pCtrl = TextEditingController();
+                            await showDialog(
+                              context: ctx,
+                              builder: (subCtx) => AlertDialog(
+                                title: const Text('Add Service Line'),
+                                content: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Service Name')),
+                                    const SizedBox(height: 8),
+                                    TextField(controller: pCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Price')),
+                                  ],
+                                ),
+                                actions: [
+                                  TextButton(onPressed: () => Navigator.pop(subCtx), child: const Text('Cancel')),
+                                  ElevatedButton(
+                                    onPressed: () {
+                                      if (nameCtrl.text.trim().isNotEmpty) {
+                                        setDlgState(() {
+                                          tempServices.add({
+                                            'description': nameCtrl.text.trim(),
+                                            'amount': double.tryParse(pCtrl.text.trim()) ?? 0.0,
+                                          });
+                                        });
+                                        Navigator.pop(subCtx);
+                                      }
+                                    },
+                                    child: const Text('Add'),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const Divider(height: 24),
+                      Wrap(
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 12,
+                        runSpacing: 10,
+                        children: [
+                          SizedBox(
+                            width: 140,
+                            child: TextFormField(
+                              controller: discountCtrl,
+                              keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(
+                                labelText: 'Discount',
+                                isDense: true,
+                              ),
+                              onChanged: (_) => setDlgState(() {}),
+                            ),
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text('Subtotal: ${Formatters.currency(subtotal, symbol: currency)}', style: const TextStyle(fontSize: 12, color: AppColors.textDarkSecondary)),
+                              Text(
+                                'Grand Total: ${Formatters.currency(grand, symbol: currency)}',
+                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.success),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+                ElevatedButton(
+                  onPressed: () async {
+                    final jobRepo = Get.find<JobRepository>();
+                    await jobRepo.updateJobServices(
+                      jobId: _job.id,
+                      services: tempServices,
+                      serviceLabour: subtotal,
+                      discount: disc,
+                    );
+                    if (ctx.mounted) Navigator.pop(ctx);
+                    await _loadJobDetails();
+                    Get.snackbar(
+                      'Pricing Updated',
+                      'Job services & prices updated successfully',
+                      backgroundColor: AppColors.success.withValues(alpha: 0.2),
+                    );
+                  },
+                  child: const Text('Save Changes'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final currency = AuthService.to.currentBusiness.value?.currency ?? AppConstants.defaultCurrency;
@@ -165,7 +409,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(ResponsiveLayout.isMobile(context) ? 12 : 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -303,13 +547,30 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
               alignment: WrapAlignment.spaceBetween,
               crossAxisAlignment: WrapCrossAlignment.center,
               spacing: 12,
-              runSpacing: 8,
+              runSpacing: 10,
               children: [
                 const Text('Services & Labour', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                ElevatedButton.icon(
-                  onPressed: _recordStockDeductionDialog,
-                  icon: const Icon(Icons.inventory_2_rounded, size: 16),
-                  label: const Text('Record Chemical / Stock Usage'),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: _showEditServicesPricesDialog,
+                      icon: const Icon(Icons.edit_note_rounded, size: 16),
+                      label: const Text('Edit Prices & Services'),
+                      style: OutlinedButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: _recordStockDeductionDialog,
+                      icon: const Icon(Icons.inventory_2_rounded, size: 16),
+                      label: const Text('Record Chemical / Stock Usage'),
+                      style: ElevatedButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -329,7 +590,18 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                     final amt = (item['amount'] as num?)?.toDouble() ?? 0.0;
                     return ListTile(
                       title: Text(desc, style: const TextStyle(fontWeight: FontWeight.bold)),
-                      trailing: Text(Formatters.currency(amt, symbol: currency), style: const TextStyle(fontWeight: FontWeight.bold)),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(Formatters.currency(amt, symbol: currency), style: const TextStyle(fontWeight: FontWeight.bold)),
+                          const SizedBox(width: 8),
+                          IconButton(
+                            icon: const Icon(Icons.edit_rounded, size: 16, color: AppColors.primaryLight),
+                            tooltip: 'Edit price',
+                            onPressed: _showEditServicesPricesDialog,
+                          ),
+                        ],
+                      ),
                     );
                   },
                 ),
@@ -340,28 +612,58 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isMobileCard = constraints.maxWidth < 540;
+                    if (isMobileCard) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const Text('Generate Tax Invoice', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                          const SizedBox(height: 4),
+                          const Text('Issue a formatted invoice and collect remaining customer payment.', style: TextStyle(fontSize: 12, color: AppColors.textDarkSecondary)),
+                          const SizedBox(height: 12),
+                          ElevatedButton.icon(
+                            icon: const Icon(Icons.receipt_long_rounded),
+                            label: const Text('Create Invoice from Job'),
+                            onPressed: () async {
+                              final res = await showDialog(
+                                context: context,
+                                builder: (_) => InvoiceCreateDialog(preselectedJob: _job),
+                              );
+                              if (res == true) _loadJobDetails();
+                            },
+                          ),
+                        ],
+                      );
+                    }
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Generate Tax Invoice', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                        Text('Issue a formatted invoice and collect remaining customer payment.', style: TextStyle(fontSize: 12, color: AppColors.textDarkSecondary)),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Generate Tax Invoice', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                              Text('Issue a formatted invoice and collect remaining customer payment.', style: TextStyle(fontSize: 12, color: AppColors.textDarkSecondary)),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.receipt_long_rounded),
+                          label: const Text('Create Invoice from Job'),
+                          onPressed: () async {
+                            final res = await showDialog(
+                              context: context,
+                              builder: (_) => InvoiceCreateDialog(preselectedJob: _job),
+                            );
+                            if (res == true) _loadJobDetails();
+                          },
+                        ),
                       ],
-                    ),
-                    ElevatedButton.icon(
-                      icon: const Icon(Icons.receipt_long_rounded),
-                      label: const Text('Create Invoice from Job'),
-                      onPressed: () async {
-                        final res = await showDialog(
-                          context: context,
-                          builder: (_) => InvoiceCreateDialog(preselectedJob: _job),
-                        );
-                        if (res == true) _loadJobDetails();
-                      },
-                    ),
-                  ],
+                    );
+                  },
                 ),
               ),
             ),

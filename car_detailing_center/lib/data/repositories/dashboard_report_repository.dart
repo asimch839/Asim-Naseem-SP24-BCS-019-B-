@@ -2,6 +2,7 @@ import 'package:intl/intl.dart';
 import 'package:sqflite/sqflite.dart';
 import '../database/app_database.dart';
 import 'settings_repository.dart';
+import 'staff_repository.dart';
 
 class DashboardMetrics {
   final double totalIncome;
@@ -52,8 +53,65 @@ class DashboardMetrics {
 class DashboardReportRepository {
   Future<Database> get _db async => await AppDatabase.instance.database;
 
+  /// Helper to accurately compute all workshop and staff expenses in a date range without duplicate counting
+  Future<double> _queryTotalExpensesInRange(Database db, String startIso, String endIso) async {
+    final gExpRes = await db.rawQuery('''
+      SELECT COALESCE(SUM(amount), 0.0) as val
+      FROM garage_expenses
+      WHERE date >= ? AND date <= ?
+    ''', [startIso, endIso]);
+    final gExp = (gExpRes.first['val'] as num?)?.toDouble() ?? 0.0;
+
+    final unsyncedSalRes = await db.rawQuery('''
+      SELECT COALESCE(SUM(amount), 0.0) as val
+      FROM salary_payments
+      WHERE payment_date >= ? AND payment_date <= ? AND ('gexp_' || id) NOT IN (SELECT id FROM garage_expenses)
+    ''', [startIso, endIso]);
+    final unsyncedSal = (unsyncedSalRes.first['val'] as num?)?.toDouble() ?? 0.0;
+
+    final unsyncedStaffRes = await db.rawQuery('''
+      SELECT COALESCE(SUM(amount), 0.0) as val
+      FROM staff_expenses
+      WHERE date >= ? AND date <= ? AND ('gexp_' || id) NOT IN (SELECT id FROM garage_expenses)
+    ''', [startIso, endIso]);
+    final unsyncedStaff = (unsyncedStaffRes.first['val'] as num?)?.toDouble() ?? 0.0;
+
+    return gExp + unsyncedSal + unsyncedStaff;
+  }
+
+  /// Helper to accurately compute all workshop and staff expenses for a prefix pattern (e.g. 2026-10-30 or 2026-10)
+  Future<double> _queryTotalExpensesLike(Database db, String pattern) async {
+    final gExpRes = await db.rawQuery('''
+      SELECT COALESCE(SUM(amount), 0.0) as val
+      FROM garage_expenses
+      WHERE date LIKE '$pattern%'
+    ''');
+    final gExp = (gExpRes.first['val'] as num?)?.toDouble() ?? 0.0;
+
+    final unsyncedSalRes = await db.rawQuery('''
+      SELECT COALESCE(SUM(amount), 0.0) as val
+      FROM salary_payments
+      WHERE payment_date LIKE '$pattern%' AND ('gexp_' || id) NOT IN (SELECT id FROM garage_expenses)
+    ''');
+    final unsyncedSal = (unsyncedSalRes.first['val'] as num?)?.toDouble() ?? 0.0;
+
+    final unsyncedStaffRes = await db.rawQuery('''
+      SELECT COALESCE(SUM(amount), 0.0) as val
+      FROM staff_expenses
+      WHERE date LIKE '$pattern%' AND ('gexp_' || id) NOT IN (SELECT id FROM garage_expenses)
+    ''');
+    final unsyncedStaff = (unsyncedStaffRes.first['val'] as num?)?.toDouble() ?? 0.0;
+
+    return gExp + unsyncedSal + unsyncedStaff;
+  }
+
   /// Fetch all 18 real KPI cards from SQLite for a given date range
   Future<DashboardMetrics> getDashboardKPIs(DateTime start, DateTime end) async {
+    // Ensure all staff disbursements/expenses are synchronized into unified garage_expenses
+    try {
+      await StaffRepository().syncStaffPaymentsToExpenses();
+    } catch (_) {}
+
     final db = await _db;
     final startStr = start.toIso8601String();
     final endStr = end.toIso8601String();
@@ -67,32 +125,8 @@ class DashboardReportRepository {
     ''', [startStr, endStr]);
     final totalIncome = (incomeRes.first['income'] as num?)?.toDouble() ?? 0.0;
 
-    // 2. Expenses:
-    // a) Garage expenses in period
-    final garageExpRes = await db.rawQuery('''
-      SELECT COALESCE(SUM(amount), 0.0) as g_exp
-      FROM garage_expenses
-      WHERE date BETWEEN ? AND ?
-    ''', [startStr, endStr]);
-    final garageExp = (garageExpRes.first['g_exp'] as num?)?.toDouble() ?? 0.0;
-
-    // b) Staff expenses in period
-    final staffExpRes = await db.rawQuery('''
-      SELECT COALESCE(SUM(amount), 0.0) as s_exp
-      FROM staff_expenses
-      WHERE date BETWEEN ? AND ?
-    ''', [startStr, endStr]);
-    final staffExp = (staffExpRes.first['s_exp'] as num?)?.toDouble() ?? 0.0;
-
-    // c) Valid salary disbursements (non-advance salary payments to prevent double counting)
-    final salaryPaidRes = await db.rawQuery('''
-      SELECT COALESCE(SUM(amount), 0.0) as sal_paid
-      FROM salary_payments
-      WHERE payment_date BETWEEN ? AND ? AND is_advance = 0
-    ''', [startStr, endStr]);
-    final salaryPaid = (salaryPaidRes.first['sal_paid'] as num?)?.toDouble() ?? 0.0;
-
-    final totalExpenses = garageExp + staffExp + salaryPaid;
+    // 2. Expenses: All garage operating expenses + staff salary payouts & advances + staff expenses
+    final totalExpenses = await _queryTotalExpensesInRange(db, startStr, endStr);
     final netIncome = totalIncome - totalExpenses;
 
     // 3. Outstanding Payments across all active invoices
@@ -186,6 +220,9 @@ class DashboardReportRepository {
 
   /// Graph 1: Daily Income vs Expenses (Last 7 Days)
   Future<List<Map<String, dynamic>>> getDailyIncomeVsExpense() async {
+    try {
+      await StaffRepository().syncStaffPaymentsToExpenses();
+    } catch (_) {}
     final db = await _db;
     final List<Map<String, dynamic>> dailyData = [];
     final now = DateTime.now();
@@ -203,10 +240,8 @@ class DashboardReportRepository {
       ''');
       final income = (incRes.first['val'] as num?)?.toDouble() ?? 0.0;
 
-      // Expenses for day
-      final gExpRes = await db.rawQuery("SELECT COALESCE(SUM(amount), 0.0) as val FROM garage_expenses WHERE date LIKE '$dayStr%'");
-      final sExpRes = await db.rawQuery("SELECT COALESCE(SUM(amount), 0.0) as val FROM staff_expenses WHERE date LIKE '$dayStr%'");
-      final exp = ((gExpRes.first['val'] as num?)?.toDouble() ?? 0.0) + ((sExpRes.first['val'] as num?)?.toDouble() ?? 0.0);
+      // Expenses for day (inclusive of garage expenses, staff salaries, advances, and staff expenses)
+      final exp = await _queryTotalExpensesLike(db, dayStr);
 
       dailyData.add({
         'label': dayLabel,
@@ -220,6 +255,9 @@ class DashboardReportRepository {
 
   /// Graph 2: Monthly Income vs Expenses (Last 6 Months)
   Future<List<Map<String, dynamic>>> getMonthlyIncomeVsExpense() async {
+    try {
+      await StaffRepository().syncStaffPaymentsToExpenses();
+    } catch (_) {}
     final db = await _db;
     final List<Map<String, dynamic>> monthlyData = [];
     final now = DateTime.now();
@@ -236,9 +274,7 @@ class DashboardReportRepository {
       ''');
       final income = (incRes.first['val'] as num?)?.toDouble() ?? 0.0;
 
-      final gExpRes = await db.rawQuery("SELECT COALESCE(SUM(amount), 0.0) as val FROM garage_expenses WHERE date LIKE '$mStr%'");
-      final sExpRes = await db.rawQuery("SELECT COALESCE(SUM(amount), 0.0) as val FROM staff_expenses WHERE date LIKE '$mStr%'");
-      final exp = ((gExpRes.first['val'] as num?)?.toDouble() ?? 0.0) + ((sExpRes.first['val'] as num?)?.toDouble() ?? 0.0);
+      final exp = await _queryTotalExpensesLike(db, mStr);
 
       monthlyData.add({
         'label': mLabel,
@@ -252,6 +288,9 @@ class DashboardReportRepository {
 
   /// Graph: Dynamically Filtered Income vs Expenses by Date Range & Mode (Daily, Weekly, Monthly, Custom)
   Future<List<Map<String, dynamic>>> getFilteredIncomeVsExpense(DateTime start, DateTime end, String filterMode) async {
+    try {
+      await StaffRepository().syncStaffPaymentsToExpenses();
+    } catch (_) {}
     final db = await _db;
     final List<Map<String, dynamic>> result = [];
 
@@ -272,17 +311,7 @@ class DashboardReportRepository {
         ''', [slot['start'], slot['end']]);
         final inc = (incRes.first['val'] as num?)?.toDouble() ?? 0.0;
 
-        final gExpRes = await db.rawQuery('''
-          SELECT COALESCE(SUM(amount), 0.0) as val
-          FROM garage_expenses
-          WHERE date >= ? AND date <= ?
-        ''', [slot['start'], slot['end']]);
-        final sExpRes = await db.rawQuery('''
-          SELECT COALESCE(SUM(amount), 0.0) as val
-          FROM staff_expenses
-          WHERE date >= ? AND date <= ?
-        ''', [slot['start'], slot['end']]);
-        final exp = ((gExpRes.first['val'] as num?)?.toDouble() ?? 0.0) + ((sExpRes.first['val'] as num?)?.toDouble() ?? 0.0);
+        final exp = await _queryTotalExpensesInRange(db, slot['start']!, slot['end']!);
 
         result.add({
           'label': slot['label'],
@@ -295,10 +324,8 @@ class DashboardReportRepository {
       final totalExp = result.fold<double>(0.0, (sum, i) => sum + (i['expense'] as double));
       if (totalInc == 0 && totalExp == 0) {
         final incRes = await db.rawQuery("SELECT COALESCE(SUM(amount), 0.0) as val FROM payments WHERE payment_date LIKE '$dayStr%' AND is_refund = 0");
-        final gExpRes = await db.rawQuery("SELECT COALESCE(SUM(amount), 0.0) as val FROM garage_expenses WHERE date LIKE '$dayStr%'");
-        final sExpRes = await db.rawQuery("SELECT COALESCE(SUM(amount), 0.0) as val FROM staff_expenses WHERE date LIKE '$dayStr%'");
         final dayInc = (incRes.first['val'] as num?)?.toDouble() ?? 0.0;
-        final dayExp = ((gExpRes.first['val'] as num?)?.toDouble() ?? 0.0) + ((sExpRes.first['val'] as num?)?.toDouble() ?? 0.0);
+        final dayExp = await _queryTotalExpensesLike(db, dayStr);
         if (dayInc > 0 || dayExp > 0) {
           result.clear();
           result.add({'label': 'Today', 'income': dayInc, 'expense': dayExp});
@@ -315,9 +342,7 @@ class DashboardReportRepository {
         final incRes = await db.rawQuery("SELECT COALESCE(SUM(amount), 0.0) as val FROM payments WHERE payment_date LIKE '$dayStr%' AND is_refund = 0");
         final inc = (incRes.first['val'] as num?)?.toDouble() ?? 0.0;
 
-        final gExpRes = await db.rawQuery("SELECT COALESCE(SUM(amount), 0.0) as val FROM garage_expenses WHERE date LIKE '$dayStr%'");
-        final sExpRes = await db.rawQuery("SELECT COALESCE(SUM(amount), 0.0) as val FROM staff_expenses WHERE date LIKE '$dayStr%'");
-        final exp = ((gExpRes.first['val'] as num?)?.toDouble() ?? 0.0) + ((sExpRes.first['val'] as num?)?.toDouble() ?? 0.0);
+        final exp = await _queryTotalExpensesLike(db, dayStr);
 
         result.add({
           'label': dayLabel,
@@ -346,17 +371,7 @@ class DashboardReportRepository {
         ''', [startIso, endIso]);
         final inc = (incRes.first['val'] as num?)?.toDouble() ?? 0.0;
 
-        final gExpRes = await db.rawQuery('''
-          SELECT COALESCE(SUM(amount), 0.0) as val
-          FROM garage_expenses
-          WHERE date >= ? AND date <= ?
-        ''', [startIso, endIso]);
-        final sExpRes = await db.rawQuery('''
-          SELECT COALESCE(SUM(amount), 0.0) as val
-          FROM staff_expenses
-          WHERE date >= ? AND date <= ?
-        ''', [startIso, endIso]);
-        final exp = ((gExpRes.first['val'] as num?)?.toDouble() ?? 0.0) + ((sExpRes.first['val'] as num?)?.toDouble() ?? 0.0);
+        final exp = await _queryTotalExpensesInRange(db, startIso, endIso);
 
         result.add({
           'label': label,
@@ -375,9 +390,7 @@ class DashboardReportRepository {
         final incRes = await db.rawQuery("SELECT COALESCE(SUM(amount), 0.0) as val FROM payments WHERE payment_date LIKE '$mStr%' AND is_refund = 0");
         final inc = (incRes.first['val'] as num?)?.toDouble() ?? 0.0;
 
-        final gExpRes = await db.rawQuery("SELECT COALESCE(SUM(amount), 0.0) as val FROM garage_expenses WHERE date LIKE '$mStr%'");
-        final sExpRes = await db.rawQuery("SELECT COALESCE(SUM(amount), 0.0) as val FROM staff_expenses WHERE date LIKE '$mStr%'");
-        final exp = ((gExpRes.first['val'] as num?)?.toDouble() ?? 0.0) + ((sExpRes.first['val'] as num?)?.toDouble() ?? 0.0);
+        final exp = await _queryTotalExpensesLike(db, mStr);
 
         result.add({
           'label': mLabel,
@@ -561,7 +574,7 @@ class DashboardReportRepository {
           ORDER BY total_spent DESC
         ''', [startStr, endStr]);
       case 'inventory':
-        return await db.rawQuery('SELECT item_name, current_quantity, unit, brand, purchase_price, (current_quantity * purchase_price) as stock_value, purchase_date FROM inventory_items WHERE is_deleted = 0 ORDER BY item_name ASC');
+        return await db.rawQuery('SELECT item_name, current_quantity, unit, brand, purchase_price, selling_price, (current_quantity * purchase_price) as stock_value, (current_quantity * CASE WHEN selling_price > 0 THEN selling_price ELSE purchase_price END) as retail_value, purchase_date FROM inventory_items WHERE is_deleted = 0 ORDER BY item_name ASC');
       case 'inventory_transactions':
         return await db.rawQuery('''
           SELECT it.date_time, ii.item_name, it.transaction_type, it.previous_quantity, it.quantity_change, it.new_quantity, it.user_name, it.reason_notes, it.vendor_reference
@@ -600,9 +613,10 @@ class DashboardReportRepository {
       case 'income_expense':
       default:
         final inc = await db.rawQuery("SELECT date(payment_date) as record_date, 'Payment Received' as category, amount, payment_method as method, 'Income' as type FROM payments WHERE payment_date BETWEEN ? AND ? AND is_refund = 0", [startStr, endStr]);
-        final expG = await db.rawQuery("SELECT date(date) as record_date, category, amount, payment_method as method, 'Garage Expense' as type FROM garage_expenses WHERE date BETWEEN ? AND ?", [startStr, endStr]);
-        final expS = await db.rawQuery("SELECT date(date) as record_date, category, amount, payment_method as method, 'Staff Expense' as type FROM staff_expenses WHERE date BETWEEN ? AND ?", [startStr, endStr]);
-        return [...inc, ...expG, ...expS];
+        final expG = await db.rawQuery("SELECT date(date) as record_date, category, amount, payment_method as method, 'Expense' as type FROM garage_expenses WHERE date BETWEEN ? AND ?", [startStr, endStr]);
+        final unsyncedSal = await db.rawQuery("SELECT date(payment_date) as record_date, 'Staff Salary' as category, amount, payment_method as method, 'Expense' as type FROM salary_payments WHERE payment_date BETWEEN ? AND ? AND ('gexp_' || id) NOT IN (SELECT id FROM garage_expenses)", [startStr, endStr]);
+        final unsyncedStaff = await db.rawQuery("SELECT date(date) as record_date, category, amount, payment_method as method, 'Expense' as type FROM staff_expenses WHERE date BETWEEN ? AND ? AND ('gexp_' || id) NOT IN (SELECT id FROM garage_expenses)", [startStr, endStr]);
+        return [...inc, ...expG, ...unsyncedSal, ...unsyncedStaff];
     }
   }
 }

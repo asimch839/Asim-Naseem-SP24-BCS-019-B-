@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/responsive/responsive_layout.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/utils/formatters.dart';
@@ -14,6 +15,7 @@ import '../../data/repositories/settings_repository.dart';
 import 'inventory_form_dialog.dart';
 import 'stock_adjustment_dialog.dart';
 import 'stock_history_dialog.dart';
+import '../invoices/invoice_create_dialog.dart';
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({super.key});
@@ -45,6 +47,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
   @override
   Widget build(BuildContext context) {
     final currency = AuthService.to.currentBusiness.value?.currency ?? AppConstants.defaultCurrency;
+    final isMobile = ResponsiveLayout.isMobile(context);
 
     return AppScaffold(
       currentRoute: AppRoutes.inventory,
@@ -62,7 +65,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
         label: const Text('Add Stock Item'),
       ),
       body: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(isMobile ? 12 : 24),
         child: Column(
           children: [
             // 1. Inventory KPI Header (Section 15: Total, Low, Out-of-Stock, Purchase Value)
@@ -73,7 +76,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 final totalItems = data['total_items'] ?? 0;
                 final lowStock = data['low_stock'] ?? 0;
                 final outOfStock = data['out_of_stock'] ?? 0;
-                final purchaseVal = (data['stock_purchase_value'] as num?)?.toDouble() ?? 0.0;
+                final purchaseVal = (data['stock_purchase_value'] as num?)?.toDouble() ?? (data['total_purchase_value'] as num?)?.toDouble() ?? 0.0;
+                final retailVal = (data['total_retail_value'] as num?)?.toDouble() ?? purchaseVal;
 
                 return LayoutBuilder(
                   builder: (context, constraints) {
@@ -116,6 +120,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                               value: Formatters.currency(purchaseVal, symbol: currency),
                               icon: Icons.account_balance_wallet_rounded,
                               color: AppColors.success,
+                              subtitle: 'Retail Value: ${Formatters.currency(retailVal, symbol: currency)}',
                             ),
                           ),
                         ],
@@ -167,32 +172,68 @@ class _InventoryScreenState extends State<InventoryScreen> {
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _searchController,
-                        decoration: const InputDecoration(
-                          hintText: 'Search by item name, brand, description, or notes...',
-                          prefixIcon: Icon(Icons.search_rounded),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isNarrow = constraints.maxWidth < 600;
+                    if (isNarrow) {
+                      return Column(
+                        children: [
+                          TextField(
+                            controller: _searchController,
+                            decoration: const InputDecoration(
+                              hintText: 'Search items, brand, notes...',
+                              prefixIcon: Icon(Icons.search_rounded),
+                            ),
+                            onChanged: (val) => setState(() => _searchQuery = val.trim().toLowerCase()),
+                          ),
+                          const SizedBox(height: 10),
+                          DropdownButtonFormField<String>(
+                            value: _stockFilter,
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: 'Stock Filter',
+                              isDense: true,
+                            ),
+                            items: const [
+                              DropdownMenuItem(value: 'All', child: Text('All Stock Items')),
+                              DropdownMenuItem(value: 'low', child: Text('Low Stock Only')),
+                              DropdownMenuItem(value: 'out', child: Text('Out of Stock Only')),
+                            ],
+                            onChanged: (val) {
+                              if (val != null) setState(() => _stockFilter = val);
+                            },
+                          ),
+                        ],
+                      );
+                    }
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _searchController,
+                            decoration: const InputDecoration(
+                              hintText: 'Search by item name, brand, description, or notes...',
+                              prefixIcon: Icon(Icons.search_rounded),
+                            ),
+                            onChanged: (val) => setState(() => _searchQuery = val.trim().toLowerCase()),
+                          ),
                         ),
-                        onChanged: (val) => setState(() => _searchQuery = val.trim().toLowerCase()),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    DropdownButton<String>(
-                      value: _stockFilter,
-                      underline: const SizedBox(),
-                      items: const [
-                        DropdownMenuItem(value: 'All', child: Text('All Stock Items')),
-                        DropdownMenuItem(value: 'low', child: Text('Low Stock Only')),
-                        DropdownMenuItem(value: 'out', child: Text('Out of Stock Only')),
+                        const SizedBox(width: 16),
+                        DropdownButton<String>(
+                          value: _stockFilter,
+                          underline: const SizedBox(),
+                          items: const [
+                            DropdownMenuItem(value: 'All', child: Text('All Stock Items')),
+                            DropdownMenuItem(value: 'low', child: Text('Low Stock Only')),
+                            DropdownMenuItem(value: 'out', child: Text('Out of Stock Only')),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) setState(() => _stockFilter = val);
+                          },
+                        ),
                       ],
-                      onChanged: (val) {
-                        if (val != null) setState(() => _stockFilter = val);
-                      },
-                    ),
-                  ],
+                    );
+                  },
                 ),
               ),
             ),
@@ -297,7 +338,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Current Quantity: ${item.currentQuantity.toStringAsFixed(1)} ${item.unit} • Purchase Price: ${Formatters.currency(item.purchasePrice, symbol: currency)} • Purchased: ${Formatters.date(item.purchaseDate)}',
+                                'Qty: ${item.currentQuantity.toStringAsFixed(1)} ${item.unit} • Buy: ${Formatters.currency(item.purchasePrice, symbol: currency)} • Sell: ${Formatters.currency(item.sellingPrice, symbol: currency)}${item.potentialMargin > 0 ? " (+${Formatters.currency(item.potentialMargin, symbol: currency)} margin)" : ""}',
                                 style: const TextStyle(fontSize: 12, color: AppColors.textDarkSecondary),
                               ),
                               if (item.description != null && item.description!.isNotEmpty)
@@ -335,7 +376,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                     PopupMenuButton<String>(
                                       icon: const Icon(Icons.more_vert_rounded),
                                       onSelected: (val) async {
-                                        if (val == 'history') {
+                                        if (val == 'sell') {
+                                          final res = await showDialog<bool>(
+                                            context: context,
+                                            builder: (_) => InvoiceCreateDialog(preselectedStockItem: item),
+                                          );
+                                          if (res == true && mounted) setState(() {});
+                                        } else if (val == 'history') {
                                           showDialog(
                                             context: context,
                                             builder: (_) => StockHistoryDialog(item: item),
@@ -369,6 +416,16 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                         }
                                       },
                                       itemBuilder: (ctx) => [
+                                        const PopupMenuItem(
+                                          value: 'sell',
+                                          child: Row(
+                                            children: [
+                                              Icon(Icons.receipt_long_rounded, size: 16, color: AppColors.success),
+                                              SizedBox(width: 8),
+                                              Text('Sell / Generate Bill', style: TextStyle(color: AppColors.success, fontWeight: FontWeight.bold)),
+                                            ],
+                                          ),
+                                        ),
                                         const PopupMenuItem(value: 'history', child: Text('Quantity History')),
                                         const PopupMenuItem(value: 'edit', child: Text('Edit Item')),
                                         const PopupMenuItem(value: 'delete', child: Text('Delete Item', style: TextStyle(color: AppColors.error))),
@@ -379,6 +436,23 @@ class _InventoryScreenState extends State<InventoryScreen> {
                               : Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
+                                    OutlinedButton.icon(
+                                      icon: const Icon(Icons.receipt_long_rounded, size: 15, color: AppColors.success),
+                                      label: const Text('Sell / Bill', style: TextStyle(color: AppColors.success, fontSize: 11.5, fontWeight: FontWeight.bold)),
+                                      style: OutlinedButton.styleFrom(
+                                        side: const BorderSide(color: AppColors.success),
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        visualDensity: VisualDensity.compact,
+                                      ),
+                                      onPressed: () async {
+                                        final res = await showDialog<bool>(
+                                          context: context,
+                                          builder: (_) => InvoiceCreateDialog(preselectedStockItem: item),
+                                        );
+                                        if (res == true && mounted) setState(() {});
+                                      },
+                                    ),
+                                    const SizedBox(width: 6),
                                     IconButton(
                                       icon: const Icon(Icons.add_circle_outline_rounded, color: AppColors.success, size: 22),
                                       tooltip: '+ Increase Quantity',

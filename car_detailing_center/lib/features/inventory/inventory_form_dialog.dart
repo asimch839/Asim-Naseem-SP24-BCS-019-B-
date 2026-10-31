@@ -22,6 +22,7 @@ class _InventoryFormDialogState extends State<InventoryFormDialog> {
   late final TextEditingController _brandController;
   late final TextEditingController _unitController;
   late final TextEditingController _purchasePriceController;
+  late final TextEditingController _sellingPriceController;
   late final TextEditingController _descController;
   late final TextEditingController _notesController;
 
@@ -37,6 +38,7 @@ class _InventoryFormDialogState extends State<InventoryFormDialog> {
     _brandController = TextEditingController(text: it?.brand ?? '');
     _unitController = TextEditingController(text: it?.unit ?? 'Units');
     _purchasePriceController = TextEditingController(text: it != null ? it.purchasePrice.toStringAsFixed(0) : '0');
+    _sellingPriceController = TextEditingController(text: it != null ? it.sellingPrice.toStringAsFixed(0) : '0');
     _descController = TextEditingController(text: it?.description ?? '');
     _notesController = TextEditingController(text: it?.notes ?? '');
     final pDate = it?.purchaseDate;
@@ -50,7 +52,8 @@ class _InventoryFormDialogState extends State<InventoryFormDialog> {
     setState(() => _isSaving = true);
 
     final quantity = double.tryParse(_quantityController.text.trim()) ?? 0.0;
-    final price = double.tryParse(_purchasePriceController.text.trim()) ?? 0.0;
+    final purchasePrice = double.tryParse(_purchasePriceController.text.trim()) ?? 0.0;
+    final sellingPrice = double.tryParse(_sellingPriceController.text.trim()) ?? purchasePrice;
 
     try {
       await _inventoryRepo.saveItem(
@@ -59,7 +62,8 @@ class _InventoryFormDialogState extends State<InventoryFormDialog> {
         currentQuantity: quantity,
         brand: _brandController.text.trim().isNotEmpty ? _brandController.text.trim() : null,
         unit: _unitController.text.trim().isNotEmpty ? _unitController.text.trim() : 'Units',
-        purchasePrice: price,
+        purchasePrice: purchasePrice,
+        sellingPrice: sellingPrice > 0 ? sellingPrice : purchasePrice,
         purchaseDate: _purchaseDate,
         description: _descController.text.trim().isNotEmpty ? _descController.text.trim() : null,
         notes: _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : null,
@@ -111,90 +115,272 @@ class _InventoryFormDialogState extends State<InventoryFormDialog> {
                 const SizedBox(height: 14),
 
                 // 2. Brand & Unit
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _brandController,
-                        decoration: const InputDecoration(
-                          labelText: 'Brand',
-                          hintText: 'e.g., Meguiar\'s, Koch Chemie',
-                          prefixIcon: Icon(Icons.branding_watermark_rounded, size: 20),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isNarrow = constraints.maxWidth < 440;
+                    if (isNarrow) {
+                      return Column(
+                        children: [
+                          TextFormField(
+                            controller: _brandController,
+                            decoration: const InputDecoration(
+                              labelText: 'Brand',
+                              hintText: 'e.g., Meguiar\'s, Koch Chemie',
+                              prefixIcon: Icon(Icons.branding_watermark_rounded, size: 20),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _unitController,
+                            decoration: const InputDecoration(
+                              labelText: 'Unit *',
+                              hintText: 'e.g., Liters, Bottles, Pieces, Packs',
+                              prefixIcon: Icon(Icons.straighten_rounded, size: 20),
+                            ),
+                            validator: (v) => v == null || v.trim().isEmpty ? 'Enter unit' : null,
+                          ),
+                        ],
+                      );
+                    }
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: _brandController,
+                            decoration: const InputDecoration(
+                              labelText: 'Brand',
+                              hintText: 'e.g., Meguiar\'s, Koch Chemie',
+                              prefixIcon: Icon(Icons.branding_watermark_rounded, size: 20),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _unitController,
-                        decoration: const InputDecoration(
-                          labelText: 'Unit *',
-                          hintText: 'e.g., Liters, Bottles, Pieces, Packs',
-                          prefixIcon: Icon(Icons.straighten_rounded, size: 20),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: TextFormField(
+                            controller: _unitController,
+                            decoration: const InputDecoration(
+                              labelText: 'Unit *',
+                              hintText: 'e.g., Liters, Bottles, Pieces, Packs',
+                              prefixIcon: Icon(Icons.straighten_rounded, size: 20),
+                            ),
+                            validator: (v) => v == null || v.trim().isEmpty ? 'Enter unit' : null,
+                          ),
                         ),
-                        validator: (v) => v == null || v.trim().isEmpty ? 'Enter unit' : null,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-
-                // 3. Current Quantity & Purchase Price
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _quantityController,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        decoration: const InputDecoration(
-                          labelText: 'Current Quantity *',
-                          prefixIcon: Icon(Icons.format_list_numbered_rounded, size: 20),
-                        ),
-                        validator: (v) {
-                          if (v == null || v.trim().isEmpty) return 'Enter quantity';
-                          if (double.tryParse(v.trim()) == null) return 'Invalid number';
-                          return null;
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _purchasePriceController,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        decoration: const InputDecoration(
-                          labelText: 'Purchase Price (Cost) *',
-                          prefixIcon: Icon(Icons.attach_money_rounded, size: 20),
-                        ),
-                        validator: (v) {
-                          if (v == null || v.trim().isEmpty) return 'Enter price';
-                          if (double.tryParse(v.trim()) == null) return 'Invalid number';
-                          return null;
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-
-                // 4. Purchase Date
-                InkWell(
-                  onTap: () async {
-                    final d = await showDatePicker(
-                      context: context,
-                      initialDate: _purchaseDate,
-                      firstDate: DateTime(2020),
-                      lastDate: DateTime.now().add(const Duration(days: 1)),
+                      ],
                     );
-                    if (d != null) setState(() => _purchaseDate = d);
                   },
-                  child: InputDecorator(
-                    decoration: const InputDecoration(
-                      labelText: 'Purchase Date',
-                      prefixIcon: Icon(Icons.calendar_today_rounded, size: 20),
-                    ),
-                    child: Text(Formatters.date(_purchaseDate)),
-                  ),
+                ),
+                const SizedBox(height: 14),
+
+                // 3. Current Quantity & Purchase Date
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isNarrow = constraints.maxWidth < 440;
+                    if (isNarrow) {
+                      return Column(
+                        children: [
+                          TextFormField(
+                            controller: _quantityController,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: const InputDecoration(
+                              labelText: 'Current Quantity *',
+                              prefixIcon: Icon(Icons.format_list_numbered_rounded, size: 20),
+                            ),
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) return 'Enter quantity';
+                              if (double.tryParse(v.trim()) == null) return 'Invalid number';
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                          InkWell(
+                            onTap: () async {
+                              final d = await showDatePicker(
+                                context: context,
+                                initialDate: _purchaseDate,
+                                firstDate: DateTime(2020),
+                                lastDate: DateTime.now().add(const Duration(days: 1)),
+                              );
+                              if (d != null) setState(() => _purchaseDate = d);
+                            },
+                            child: InputDecorator(
+                              decoration: const InputDecoration(
+                                labelText: 'Purchase Date',
+                                prefixIcon: Icon(Icons.calendar_today_rounded, size: 20),
+                              ),
+                              child: Text(Formatters.date(_purchaseDate)),
+                            ),
+                          ),
+                        ],
+                      );
+                    }
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: _quantityController,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: const InputDecoration(
+                              labelText: 'Current Quantity *',
+                              prefixIcon: Icon(Icons.format_list_numbered_rounded, size: 20),
+                            ),
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) return 'Enter quantity';
+                              if (double.tryParse(v.trim()) == null) return 'Invalid number';
+                              return null;
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: InkWell(
+                            onTap: () async {
+                              final d = await showDatePicker(
+                                context: context,
+                                initialDate: _purchaseDate,
+                                firstDate: DateTime(2020),
+                                lastDate: DateTime.now().add(const Duration(days: 1)),
+                              );
+                              if (d != null) setState(() => _purchaseDate = d);
+                            },
+                            child: InputDecorator(
+                              decoration: const InputDecoration(
+                                labelText: 'Purchase Date',
+                                prefixIcon: Icon(Icons.calendar_today_rounded, size: 20),
+                              ),
+                              child: Text(Formatters.date(_purchaseDate)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+                const SizedBox(height: 14),
+
+                // 4. Purchase Price (Cost) & Selling Price (Farokht)
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isNarrow = constraints.maxWidth < 440;
+                    if (isNarrow) {
+                      return Column(
+                        children: [
+                          TextFormField(
+                            controller: _purchasePriceController,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: const InputDecoration(
+                              labelText: 'Purchase Price (Cost) *',
+                              helperText: 'Khareed qeemat',
+                              prefixIcon: Icon(Icons.shopping_bag_outlined, size: 20),
+                            ),
+                            onChanged: (_) => setState(() {}),
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) return 'Enter price';
+                              if (double.tryParse(v.trim()) == null) return 'Invalid number';
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _sellingPriceController,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: const InputDecoration(
+                              labelText: 'Selling Price (Farokht) *',
+                              helperText: 'Jis py customer ko bechna hai',
+                              prefixIcon: Icon(Icons.point_of_sale_rounded, size: 20),
+                            ),
+                            onChanged: (_) => setState(() {}),
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) return 'Enter selling price';
+                              if (double.tryParse(v.trim()) == null) return 'Invalid number';
+                              return null;
+                            },
+                          ),
+                        ],
+                      );
+                    }
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: _purchasePriceController,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: const InputDecoration(
+                              labelText: 'Purchase Price (Cost) *',
+                              helperText: 'Khareed qeemat',
+                              prefixIcon: Icon(Icons.shopping_bag_outlined, size: 20),
+                            ),
+                            onChanged: (_) => setState(() {}),
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) return 'Enter price';
+                              if (double.tryParse(v.trim()) == null) return 'Invalid number';
+                              return null;
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: TextFormField(
+                            controller: _sellingPriceController,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: const InputDecoration(
+                              labelText: 'Selling Price (Farokht) *',
+                              helperText: 'Jis py customer ko bechna hai',
+                              prefixIcon: Icon(Icons.point_of_sale_rounded, size: 20),
+                            ),
+                            onChanged: (_) => setState(() {}),
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) return 'Enter selling price';
+                              if (double.tryParse(v.trim()) == null) return 'Invalid number';
+                              return null;
+                            },
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+                Builder(
+                  builder: (_) {
+                    final buy = double.tryParse(_purchasePriceController.text.trim()) ?? 0.0;
+                    final sell = double.tryParse(_sellingPriceController.text.trim()) ?? 0.0;
+                    final diff = sell - buy;
+                    final pct = buy > 0 ? (diff / buy) * 100 : 0.0;
+                    final isProfit = diff >= 0;
+                    return Container(
+                      margin: const EdgeInsets.only(top: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: (isProfit ? AppColors.success : AppColors.error).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: (isProfit ? AppColors.success : AppColors.error).withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            isProfit ? Icons.trending_up_rounded : Icons.trending_down_rounded,
+                            size: 16,
+                            color: isProfit ? AppColors.success : AppColors.error,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              isProfit
+                                  ? 'Expected Profit Margin: +Rs. ${diff.toStringAsFixed(0)} (${pct.toStringAsFixed(1)}% per unit)'
+                                  : 'Notice: Selling below cost (-Rs. ${(-diff).toStringAsFixed(0)} per unit)',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w600,
+                                color: isProfit ? AppColors.success : AppColors.error,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 14),
 

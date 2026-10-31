@@ -30,7 +30,7 @@ class InvoicePaymentRepository {
              (SELECT COUNT(*) FROM invoice_items WHERE invoice_id = inv.id) as items_count
       FROM invoices inv
       INNER JOIN customers c ON inv.customer_id = c.id
-      INNER JOIN vehicles v ON inv.vehicle_id = v.id
+      LEFT JOIN vehicles v ON inv.vehicle_id = v.id
       WHERE 1=1
     ''';
     final List<dynamic> args = [];
@@ -64,7 +64,7 @@ class InvoicePaymentRepository {
              v.vehicle_name, v.registration_number, v.color, v.model_year
       FROM invoices inv
       INNER JOIN customers c ON inv.customer_id = c.id
-      INNER JOIN vehicles v ON inv.vehicle_id = v.id
+      LEFT JOIN vehicles v ON inv.vehicle_id = v.id
       WHERE inv.id = ?
     ''', [invoiceId]);
 
@@ -83,7 +83,7 @@ class InvoicePaymentRepository {
     String? id,
     String? invoiceNumber,
     required String customerId,
-    required String vehicleId,
+    String? vehicleId,
     String? jobId,
     required DateTime date,
     String? description,
@@ -93,6 +93,8 @@ class InvoicePaymentRepository {
     String? notes,
   }) async {
     final db = await _db;
+    await AppDatabase.instance.ensureInvoicesTableSchema(db);
+
     final invoiceId = id ?? 'inv_${const Uuid().v4().substring(0, 8)}';
     final invNum = invoiceNumber ?? await generateNextInvoiceNumber();
 
@@ -110,6 +112,8 @@ class InvoicePaymentRepository {
     final grandTotal = taxableAmount + taxAmount;
 
     final now = DateTime.now().toIso8601String();
+    final cleanVehicleId = (vehicleId != null && vehicleId.trim().isNotEmpty) ? vehicleId.trim() : null;
+    final cleanJobId = (jobId != null && jobId.trim().isNotEmpty) ? jobId.trim() : null;
 
     await db.transaction((txn) async {
       // Check existing paid amount if editing
@@ -129,8 +133,8 @@ class InvoicePaymentRepository {
           'invoice_number': invNum,
           'date': date.toIso8601String(),
           'customer_id': customerId,
-          'vehicle_id': vehicleId,
-          'job_id': jobId ?? '',
+          'vehicle_id': cleanVehicleId,
+          'job_id': cleanJobId,
           'description': description ?? '',
           'subtotal': subtotal,
           'discount': discount,
@@ -203,7 +207,11 @@ class InvoicePaymentRepository {
         'id': paymentId,
         'invoice_id': invoiceId,
         'customer_id': customerId,
-        'vehicle_id': vehicleId ?? inv['vehicle_id'],
+        'vehicle_id': (vehicleId != null && vehicleId.trim().isNotEmpty)
+            ? vehicleId.trim()
+            : (inv['vehicle_id'] != null && (inv['vehicle_id'] as String).trim().isNotEmpty
+                ? (inv['vehicle_id'] as String).trim()
+                : null),
         'amount': amount,
         'payment_date': paymentDate.toIso8601String(),
         'payment_method': paymentMethod,

@@ -119,89 +119,95 @@ class _StaffFormDialogState extends State<StaffFormDialog> {
                 const Divider(),
                 const SizedBox(height: 12),
 
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _nameController,
-                        decoration: const InputDecoration(labelText: 'Full Name *', prefixIcon: Icon(Icons.badge_outlined)),
-                        validator: Validators.required,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _fatherNameController,
-                        decoration: const InputDecoration(labelText: "Father's Name"),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isWide = constraints.maxWidth >= 480;
 
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _cnicController,
-                        decoration: const InputDecoration(labelText: 'CNIC / National ID', hintText: 'e.g. 35201-xxxxxxx-x', prefixIcon: Icon(Icons.credit_card_rounded)),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _phoneController,
-                        decoration: const InputDecoration(labelText: 'Contact Phone *', prefixIcon: Icon(Icons.phone_outlined)),
-                        validator: Validators.phone,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
+                    final nameField = TextFormField(
+                      controller: _nameController,
+                      decoration: const InputDecoration(labelText: 'Full Name *', prefixIcon: Icon(Icons.badge_outlined)),
+                      validator: Validators.required,
+                    );
 
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _designationController,
-                        decoration: const InputDecoration(labelText: 'Designation / Role *', hintText: 'Detailer, Polisher, PPF Expert'),
-                        validator: Validators.required,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: _salaryType,
-                        decoration: const InputDecoration(labelText: 'Salary Structure'),
-                        items: AppConstants.salaryTypes.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
-                        onChanged: (val) {
-                          if (val != null) setState(() => _salaryType = val);
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
+                    final fatherNameField = TextFormField(
+                      controller: _fatherNameController,
+                      decoration: const InputDecoration(labelText: "Father's Name"),
+                    );
 
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _baseSalaryController,
-                        decoration: const InputDecoration(labelText: 'Base Salary *', prefixIcon: Icon(Icons.payments_outlined)),
-                        keyboardType: TextInputType.number,
-                        validator: Validators.nonNegativeNumber,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _commissionRateController,
-                        decoration: const InputDecoration(labelText: 'Commission Rate (%)', hintText: 'e.g. 5'),
-                        keyboardType: TextInputType.number,
-                      ),
-                    ),
-                  ],
+                    final cnicField = TextFormField(
+                      controller: _cnicController,
+                      decoration: const InputDecoration(labelText: 'CNIC / National ID', hintText: 'e.g. 35201-xxxxxxx-x', prefixIcon: Icon(Icons.credit_card_rounded)),
+                    );
+
+                    final phoneField = TextFormField(
+                      controller: _phoneController,
+                      decoration: const InputDecoration(labelText: 'Contact Phone *', prefixIcon: Icon(Icons.phone_outlined)),
+                      validator: Validators.phone,
+                    );
+
+                    final designationField = TextFormField(
+                      controller: _designationController,
+                      decoration: const InputDecoration(labelText: 'Designation / Role *', hintText: 'Detailer, Polisher, PPF Expert'),
+                      validator: Validators.required,
+                    );
+
+                    final salaryTypeField = DropdownButtonFormField<String>(
+                      value: _salaryType,
+                      isExpanded: true,
+                      decoration: const InputDecoration(labelText: 'Salary Structure'),
+                      items: AppConstants.salaryTypes.map((t) => DropdownMenuItem(value: t, child: Text(t, overflow: TextOverflow.ellipsis))).toList(),
+                      onChanged: (val) {
+                        if (val != null) setState(() => _salaryType = val);
+                      },
+                    );
+
+                    final baseSalaryField = TextFormField(
+                      controller: _baseSalaryController,
+                      decoration: const InputDecoration(labelText: 'Base Salary *', prefixIcon: Icon(Icons.payments_outlined)),
+                      keyboardType: TextInputType.number,
+                      validator: Validators.nonNegativeNumber,
+                    );
+
+                    final commissionField = TextFormField(
+                      controller: _commissionRateController,
+                      decoration: const InputDecoration(labelText: 'Commission Rate (%)', hintText: 'e.g. 5'),
+                      keyboardType: TextInputType.number,
+                    );
+
+                    if (isWide) {
+                      return Column(
+                        children: [
+                          Row(children: [Expanded(child: nameField), const SizedBox(width: 12), Expanded(child: fatherNameField)]),
+                          const SizedBox(height: 12),
+                          Row(children: [Expanded(child: cnicField), const SizedBox(width: 12), Expanded(child: phoneField)]),
+                          const SizedBox(height: 12),
+                          Row(children: [Expanded(child: designationField), const SizedBox(width: 12), Expanded(child: salaryTypeField)]),
+                          const SizedBox(height: 12),
+                          Row(children: [Expanded(child: baseSalaryField), const SizedBox(width: 12), Expanded(child: commissionField)]),
+                        ],
+                      );
+                    } else {
+                      return Column(
+                        children: [
+                          nameField,
+                          const SizedBox(height: 10),
+                          fatherNameField,
+                          const SizedBox(height: 10),
+                          cnicField,
+                          const SizedBox(height: 10),
+                          phoneField,
+                          const SizedBox(height: 10),
+                          designationField,
+                          const SizedBox(height: 10),
+                          salaryTypeField,
+                          const SizedBox(height: 10),
+                          baseSalaryField,
+                          const SizedBox(height: 10),
+                          commissionField,
+                        ],
+                      );
+                    }
+                  },
                 ),
                 const SizedBox(height: 12),
 
@@ -211,29 +217,38 @@ class _StaffFormDialogState extends State<StaffFormDialog> {
                 ),
                 const SizedBox(height: 12),
 
-                Row(
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 10,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Expanded(
+                    SizedBox(
+                      width: 220,
                       child: TextFormField(
                         controller: _notesController,
                         decoration: const InputDecoration(labelText: 'Notes / Guarantor Details'),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    DropdownButton<String>(
-                      value: _status,
-                      items: const [
-                        DropdownMenuItem(value: 'Active', child: Text('Active')),
-                        DropdownMenuItem(value: 'On Leave', child: Text('On Leave')),
-                        DropdownMenuItem(value: 'Inactive', child: Text('Inactive')),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('Status: ', style: TextStyle(fontWeight: FontWeight.w600)),
+                        DropdownButton<String>(
+                          value: _status,
+                          items: const [
+                            DropdownMenuItem(value: 'Active', child: Text('Active')),
+                            DropdownMenuItem(value: 'On Leave', child: Text('On Leave')),
+                            DropdownMenuItem(value: 'Inactive', child: Text('Inactive')),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) setState(() => _status = val);
+                          },
+                        ),
                       ],
-                      onChanged: (val) {
-                        if (val != null) setState(() => _status = val);
-                      },
                     ),
                   ],
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
 
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,

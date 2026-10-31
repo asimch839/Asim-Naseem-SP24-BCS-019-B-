@@ -141,6 +141,7 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
                 // Customer Selection
                 DropdownButtonFormField<String>(
                   value: _selectedCustomerId,
+                  isExpanded: true,
                   decoration: const InputDecoration(labelText: 'Vehicle Owner (Customer) *', prefixIcon: Icon(Icons.person_rounded)),
                   items: _customers.map((c) => DropdownMenuItem(value: c.id, child: Text('${c.fullName} (${c.phone})', overflow: TextOverflow.ellipsis))).toList(),
                   onChanged: widget.preselectedCustomerId != null
@@ -150,66 +151,73 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
                 ),
                 const SizedBox(height: 12),
 
-                Row(
-                  children: [
-                    Expanded(
-                      flex: 2,
-                      child: TextFormField(
-                        controller: _regNumberController,
-                        decoration: const InputDecoration(labelText: 'Registration / Plate # *', hintText: 'e.g. LEA-20-4598'),
-                        textCapitalization: TextCapitalization.characters,
-                        validator: Validators.required,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _yearController,
-                        decoration: const InputDecoration(labelText: 'Model Year', hintText: 'e.g. 2022'),
-                        keyboardType: TextInputType.number,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isWide = constraints.maxWidth >= 460;
 
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _makeController,
-                        decoration: const InputDecoration(labelText: 'Vehicle Name / Make *', hintText: 'e.g. Toyota, Honda, Audi'),
-                        validator: Validators.required,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _modelController,
-                        decoration: const InputDecoration(labelText: 'Model', hintText: 'e.g. Fortuner, Civic, A6'),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
+                    final regField = TextFormField(
+                      controller: _regNumberController,
+                      decoration: const InputDecoration(labelText: 'Registration / Plate # *', hintText: 'e.g. LEA-20-4598'),
+                      textCapitalization: TextCapitalization.characters,
+                      validator: Validators.required,
+                    );
 
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _colorController,
-                        decoration: const InputDecoration(labelText: 'Vehicle Color', hintText: 'e.g. Pearl White, Black'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _mileageController,
-                        decoration: const InputDecoration(labelText: 'Current Odometer (KM)', hintText: 'e.g. 45000'),
-                        keyboardType: TextInputType.number,
-                      ),
-                    ),
-                  ],
+                    final yearField = TextFormField(
+                      controller: _yearController,
+                      decoration: const InputDecoration(labelText: 'Model Year', hintText: 'e.g. 2022'),
+                      keyboardType: TextInputType.number,
+                    );
+
+                    final makeField = TextFormField(
+                      controller: _makeController,
+                      decoration: const InputDecoration(labelText: 'Vehicle Name / Make *', hintText: 'e.g. Toyota, Honda, Audi'),
+                      validator: Validators.required,
+                    );
+
+                    final modelField = TextFormField(
+                      controller: _modelController,
+                      decoration: const InputDecoration(labelText: 'Model', hintText: 'e.g. Fortuner, Civic, A6'),
+                    );
+
+                    final colorField = TextFormField(
+                      controller: _colorController,
+                      decoration: const InputDecoration(labelText: 'Vehicle Color', hintText: 'e.g. Pearl White, Black'),
+                    );
+
+                    final mileageField = TextFormField(
+                      controller: _mileageController,
+                      decoration: const InputDecoration(labelText: 'Current Odometer (KM)', hintText: 'e.g. 45000'),
+                      keyboardType: TextInputType.number,
+                    );
+
+                    if (isWide) {
+                      return Column(
+                        children: [
+                          Row(children: [Expanded(flex: 2, child: regField), const SizedBox(width: 12), Expanded(child: yearField)]),
+                          const SizedBox(height: 12),
+                          Row(children: [Expanded(child: makeField), const SizedBox(width: 12), Expanded(child: modelField)]),
+                          const SizedBox(height: 12),
+                          Row(children: [Expanded(child: colorField), const SizedBox(width: 12), Expanded(child: mileageField)]),
+                        ],
+                      );
+                    } else {
+                      return Column(
+                        children: [
+                          regField,
+                          const SizedBox(height: 10),
+                          yearField,
+                          const SizedBox(height: 10),
+                          makeField,
+                          const SizedBox(height: 10),
+                          modelField,
+                          const SizedBox(height: 10),
+                          colorField,
+                          const SizedBox(height: 10),
+                          mileageField,
+                        ],
+                      );
+                    }
+                  },
                 ),
                 const SizedBox(height: 12),
 

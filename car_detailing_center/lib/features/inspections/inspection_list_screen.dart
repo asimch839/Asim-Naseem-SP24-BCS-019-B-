@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/responsive/responsive_layout.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/services/pdf_service.dart';
@@ -10,6 +11,7 @@ import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/loading_indicator.dart';
 import '../../data/models/inspection_model.dart';
 import '../../data/repositories/inspection_repository.dart';
+import 'inspection_create_screen.dart';
 
 class InspectionListScreen extends StatefulWidget {
   const InspectionListScreen({super.key});
@@ -49,26 +51,58 @@ class _InspectionListScreenState extends State<InspectionListScreen> {
     }
   }
 
+  void _startNewInspection() async {
+    final res = await Get.to(() => const InspectionCreateScreen());
+    if (res == true) _fetchInspections();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isMobile = ResponsiveLayout.isMobile(context);
+
     return AppScaffold(
       currentRoute: AppRoutes.inspections,
       title: 'Vehicle Inspections Audit Trail',
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _startNewInspection,
+        icon: const Icon(Icons.add_task_rounded),
+        label: const Text('New Car Inspection'),
+      ),
+      actions: [
+        if (!isMobile)
+          Padding(
+            padding: const EdgeInsets.only(right: 14),
+            child: ElevatedButton.icon(
+              onPressed: _startNewInspection,
+              icon: const Icon(Icons.add_rounded, size: 18),
+              label: const Text('New Inspection'),
+            ),
+          )
+        else
+          IconButton(
+            onPressed: _startNewInspection,
+            icon: const Icon(Icons.add_task_rounded),
+            tooltip: 'New Inspection',
+          ),
+      ],
       body: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(isMobile ? 12 : 24),
         child: Column(
           children: [
             Card(
               child: Padding(
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 16, vertical: 10),
                 child: Row(
                   children: [
                     Expanded(
                       child: TextField(
                         controller: _searchController,
-                        decoration: const InputDecoration(
-                          hintText: 'Search inspections by Vehicle, Plate #, or Customer Name...',
-                          prefixIcon: Icon(Icons.search_rounded),
+                        decoration: InputDecoration(
+                          hintText: isMobile
+                              ? 'Search inspections...'
+                              : 'Search inspections by Vehicle, Plate #, or Customer Name...',
+                          prefixIcon: const Icon(Icons.search_rounded),
+                          isDense: isMobile,
                         ),
                         onChanged: (val) {
                           _searchQuery = val.trim();
@@ -95,9 +129,9 @@ class _InspectionListScreenState extends State<InspectionListScreen> {
                       ? AppEmptyState(
                           icon: Icons.fact_check_outlined,
                           title: 'No Inspections Performed',
-                          description: 'To conduct a digital vehicle audit, open any Vehicle in the Vehicles registry and tap "Inspect".',
-                          actionLabel: 'Go to Vehicles',
-                          onAction: () => Get.toNamed(AppRoutes.vehicles),
+                          description: 'Conduct a digital vehicle audit with interactive body diagram defect marking.',
+                          actionLabel: 'New Car Inspection',
+                          onAction: _startNewInspection,
                         )
                       : Card(
                           child: ListView.separated(
@@ -116,7 +150,7 @@ class _InspectionListScreenState extends State<InspectionListScreen> {
                               final photosCount = row['photos_count'] ?? 0;
 
                               return ListTile(
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                                contentPadding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 20, vertical: 8),
                                 leading: Container(
                                   padding: const EdgeInsets.all(10),
                                   decoration: BoxDecoration(

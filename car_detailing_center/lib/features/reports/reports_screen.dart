@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/responsive/responsive_layout.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/services/pdf_service.dart';
 import '../../core/services/storage_service.dart';
@@ -120,25 +121,29 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = ResponsiveLayout.isMobile(context);
+
     return AppScaffold(
       currentRoute: AppRoutes.reports,
       title: 'Management Reports & Audits',
       body: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(isMobile ? 12 : 24),
         child: Column(
           children: [
             // Controls Bar (Report Type, Date Pickers, CSV, Print)
             Card(
               child: Padding(
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.all(isMobile ? 12 : 16),
                 child: Wrap(
-                  spacing: 16,
-                  runSpacing: 12,
+                  spacing: 12,
+                  runSpacing: 10,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     // Report Type Selector
                     ConstrainedBox(
-                      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width > 500 ? 340 : MediaQuery.of(context).size.width - 64),
+                      constraints: BoxConstraints(
+                        maxWidth: isMobile ? double.infinity : 340,
+                      ),
                       child: DropdownButton<String>(
                         value: _selectedReport,
                         isExpanded: true,

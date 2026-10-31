@@ -194,6 +194,24 @@ class AppTheme {
         thickness: 1,
         space: 1,
       ),
+      dataTableTheme: DataTableThemeData(
+        headingRowColor: WidgetStateProperty.all(const Color(0xFFF1F5F9)),
+        dataRowColor: WidgetStateProperty.all(Colors.white),
+        dividerThickness: 1,
+        headingTextStyle: const TextStyle(
+          color: AppColors.textLightPrimary,
+          fontWeight: FontWeight.w600,
+          fontSize: 13,
+        ),
+        dataTextStyle: const TextStyle(
+          color: AppColors.textLightSecondary,
+          fontSize: 13,
+        ),
+      ),
+      listTileTheme: const ListTileThemeData(
+        textColor: AppColors.textLightPrimary,
+        iconColor: AppColors.textLightSecondary,
+      ),
     );
   }
 }

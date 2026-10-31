@@ -10,6 +10,26 @@ class DashboardController extends GetxController {
   final Rx<DateFilter> selectedFilter = DateFilter.thisMonth.obs;
   final Rx<DateTimeRange?> customDateRange = Rx<DateTimeRange?>(null);
   final RxBool isLoading = true.obs;
+  final RxString filterLabel = 'This Month'.obs;
+  final RxBool isLineChart = false.obs;
+
+  void toggleChartType() {
+    isLineChart.value = !isLineChart.value;
+  }
+
+  DateTime get fromDate => _currentDateRange.start;
+  DateTime get toDate => _currentDateRange.end;
+
+  void updateDateRange(DateTime from, DateTime to, String label) {
+    filterLabel.value = label;
+    customDateRange.value = DateTimeRange(start: from, end: to);
+    selectedFilter.value = DateFilter.custom;
+    loadDashboardData();
+  }
+
+  Future<void> refreshData() async {
+    await loadDashboardData();
+  }
 
   // Real SQLite KPI Metrics
   final Rx<DashboardMetrics?> metrics = Rx<DashboardMetrics?>(null);
@@ -34,6 +54,23 @@ class DashboardController extends GetxController {
     selectedFilter.value = filter;
     if (range != null) {
       customDateRange.value = range;
+    }
+    switch (filter) {
+      case DateFilter.today:
+        filterLabel.value = 'Today';
+        break;
+      case DateFilter.thisWeek:
+        filterLabel.value = 'This Week';
+        break;
+      case DateFilter.thisMonth:
+        filterLabel.value = 'This Month';
+        break;
+      case DateFilter.lastMonth:
+        filterLabel.value = 'Last Month';
+        break;
+      case DateFilter.custom:
+        filterLabel.value = 'Custom Range';
+        break;
     }
     loadDashboardData();
   }

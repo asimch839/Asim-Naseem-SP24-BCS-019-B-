@@ -18,6 +18,7 @@ import 'data/repositories/dashboard_report_repository.dart';
 import 'data/repositories/settings_repository.dart';
 import 'data/repositories/notification_repository.dart';
 import 'data/repositories/vendor_repository.dart';
+import 'data/repositories/detailing_package_repository.dart';
 import 'features/notifications/notification_controller.dart';
 
 void main() async {
@@ -47,7 +48,7 @@ void main() async {
   Get.put(AuthService(), permanent: true);
 
   // Repositories
-  Get.put(SettingsRepository(), permanent: true);
+  final settingsRepo = Get.put(SettingsRepository(), permanent: true);
   Get.put(CustomerRepository(), permanent: true);
   Get.put(VehicleRepository(), permanent: true);
   Get.put(InspectionRepository(), permanent: true);
@@ -59,15 +60,22 @@ void main() async {
   Get.put(InvoicePaymentRepository(), permanent: true);
   Get.put(DashboardReportRepository(), permanent: true);
   Get.put(NotificationRepository(), permanent: true);
+  Get.put(DetailingPackageRepository(), permanent: true);
 
   // Notification / Local Reminders Controller
   Get.put(NotificationController(), permanent: true);
 
-  runApp(const AutoDetailProApp());
+  final savedTheme = await settingsRepo.getSetting('theme_mode', defaultValue: 'dark');
+  final initialThemeMode = savedTheme == 'light'
+      ? ThemeMode.light
+      : (savedTheme == 'system' ? ThemeMode.system : ThemeMode.dark);
+
+  runApp(AutoDetailProApp(initialThemeMode: initialThemeMode));
 }
 
 class AutoDetailProApp extends StatelessWidget {
-  const AutoDetailProApp({super.key});
+  final ThemeMode initialThemeMode;
+  const AutoDetailProApp({super.key, this.initialThemeMode = ThemeMode.dark});
 
   @override
   Widget build(BuildContext context) {
@@ -76,7 +84,7 @@ class AutoDetailProApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.dark,
+      themeMode: initialThemeMode,
       initialRoute: AppPages.initial,
       getPages: AppPages.routes,
       defaultTransition: Transition.fadeIn,

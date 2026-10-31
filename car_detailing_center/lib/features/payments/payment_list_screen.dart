@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/responsive/responsive_layout.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/utils/formatters.dart';
@@ -50,6 +51,7 @@ class _PaymentListScreenState extends State<PaymentListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = ResponsiveLayout.isMobile(context);
     final currency = AuthService.to.currentBusiness.value?.currency ?? AppConstants.defaultCurrency;
     final totalCollected = _payments.fold<double>(
       0.0,
@@ -60,21 +62,24 @@ class _PaymentListScreenState extends State<PaymentListScreen> {
       currentRoute: AppRoutes.payments,
       title: 'Payment Transactions & Collection Receipts',
       body: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(isMobile ? 12 : 24),
         child: Column(
           children: [
             // Search Bar & Inflow Summary
             Card(
               child: Padding(
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 16, vertical: 10),
                 child: Row(
                   children: [
                     Expanded(
                       child: TextField(
                         controller: _searchController,
-                        decoration: const InputDecoration(
-                          hintText: 'Search payments by Invoice #, Customer Name, or Reference...',
-                          prefixIcon: Icon(Icons.search_rounded),
+                        decoration: InputDecoration(
+                          hintText: isMobile
+                              ? 'Search payments...'
+                              : 'Search payments by Invoice #, Customer Name, or Reference...',
+                          prefixIcon: const Icon(Icons.search_rounded),
+                          isDense: isMobile,
                         ),
                         onChanged: (val) {
                           _searchQuery = val.trim();
@@ -82,7 +87,7 @@ class _PaymentListScreenState extends State<PaymentListScreen> {
                         },
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(width: 8),
                     IconButton(
                       icon: const Icon(Icons.refresh_rounded),
                       tooltip: 'Refresh Ledger',
@@ -150,7 +155,7 @@ class _PaymentListScreenState extends State<PaymentListScreen> {
                               final isRefund = (p['is_refund'] as int? ?? 0) == 1;
 
                               return ListTile(
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                                contentPadding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 20, vertical: 8),
                                 leading: Container(
                                   padding: const EdgeInsets.all(10),
                                   decoration: BoxDecoration(
@@ -162,16 +167,15 @@ class _PaymentListScreenState extends State<PaymentListScreen> {
                                     color: isRefund ? AppColors.error : AppColors.success,
                                   ),
                                 ),
-                                title: Row(
+                                title: Wrap(
+                                  spacing: 8,
+                                  runSpacing: 4,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
                                   children: [
-                                    Flexible(
-                                      child: Text(
-                                        customerName,
-                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
+                                    Text(
+                                      customerName,
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                                     ),
-                                    const SizedBox(width: 8),
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                       decoration: BoxDecoration(
@@ -184,7 +188,6 @@ class _PaymentListScreenState extends State<PaymentListScreen> {
                                       ),
                                     ),
                                     if (isRefund) ...[
-                                      const SizedBox(width: 8),
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                         decoration: BoxDecoration(

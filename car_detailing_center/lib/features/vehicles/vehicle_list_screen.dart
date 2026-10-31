@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/responsive/responsive_layout.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/widgets/app_scaffold.dart';
 import '../../core/widgets/empty_state.dart';
@@ -51,6 +52,8 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = ResponsiveLayout.isMobile(context);
+
     return AppScaffold(
       currentRoute: AppRoutes.vehicles,
       title: 'Vehicles',
@@ -66,21 +69,24 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
         label: const Text('Add Vehicle'),
       ),
       body: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(isMobile ? 12 : 24),
         child: Column(
           children: [
             // Search Bar
             Card(
               child: Padding(
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 16, vertical: 10),
                 child: Row(
                   children: [
                     Expanded(
                       child: TextField(
                         controller: _searchController,
-                        decoration: const InputDecoration(
-                          hintText: 'Search by Vehicle Name, Number Plate, Customer Name, or Phone...',
-                          prefixIcon: Icon(Icons.search_rounded),
+                        decoration: InputDecoration(
+                          hintText: isMobile
+                              ? 'Search vehicles...'
+                              : 'Search by Vehicle Name, Number Plate, Customer Name, or Phone...',
+                          prefixIcon: const Icon(Icons.search_rounded),
+                          isDense: isMobile,
                         ),
                         onChanged: (val) {
                           _searchQuery = val.trim();
@@ -133,7 +139,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                               final odo = (row['current_odometer'] as num?)?.toDouble() ?? 0.0;
 
                               return ListTile(
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                                contentPadding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 20, vertical: 8),
                                 leading: Container(
                                   padding: const EdgeInsets.all(10),
                                   decoration: BoxDecoration(
@@ -142,18 +148,15 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                                   ),
                                   child: const Icon(Icons.directions_car_rounded, color: AppColors.primary),
                                 ),
-                                title: Row(
+                                title: Wrap(
+                                  spacing: 8,
+                                  runSpacing: 4,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
                                   children: [
-                                    // Vehicle Name & Model Year
-                                    Flexible(
-                                      child: Text(
-                                        '${v.make} ${v.model} ($modelYear)',
-                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
+                                    Text(
+                                      '${v.make} ${v.model} ($modelYear)',
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                                     ),
-                                    const SizedBox(width: 8),
-                                    // Vehicle Number / Plate Number
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                       decoration: BoxDecoration(

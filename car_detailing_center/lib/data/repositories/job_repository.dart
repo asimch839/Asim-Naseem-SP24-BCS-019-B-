@@ -235,6 +235,54 @@ class JobRepository {
     }
   }
 
+  /// Update services, labour subtotal, discount, and grand total for an existing job card
+  Future<void> updateJobServices({
+    required String jobId,
+    required List<Map<String, dynamic>> services,
+    required double serviceLabour,
+    required double discount,
+  }) async {
+    final db = await _db;
+    final now = DateTime.now().toIso8601String();
+
+    await db.transaction((txn) async {
+      final existing = await txn.query('jobs', where: 'id = ?', whereArgs: [jobId]);
+      if (existing.isEmpty) return;
+
+      final partsTotal = (existing.first['parts_total'] as num?)?.toDouble() ?? 0.0;
+      final paidAmount = (existing.first['paid_amount'] as num?)?.toDouble() ?? 0.0;
+      final grandTotal = (serviceLabour + partsTotal) - discount;
+      final remainingAmount = (grandTotal - paidAmount) > 0 ? (grandTotal - paidAmount) : 0.0;
+
+      await txn.update(
+        'jobs',
+        {
+          'service_labour': serviceLabour,
+          'discount': discount,
+          'grand_total': grandTotal,
+          'remaining_amount': remainingAmount,
+          'updated_at': now,
+        },
+        where: 'id = ?',
+        whereArgs: [jobId],
+      );
+
+      await txn.delete('job_services', where: 'job_id = ?', whereArgs: [jobId]);
+      for (var i = 0; i < services.length; i++) {
+        final s = services[i];
+        final serviceId = 'jsvc_${const Uuid().v4().substring(0, 8)}';
+        await txn.insert('job_services', {
+          'id': serviceId,
+          'job_id': jobId,
+          'sr_no': i + 1,
+          'description': s['description'] ?? 'Detailing Service',
+          'amount': (s['amount'] as num?)?.toDouble() ?? 0.0,
+          'created_at': now,
+        });
+      }
+    });
+  }
+
   Future<void> deleteJob(String id) async {
     final db = await _db;
     await db.delete('jobs', where: 'id = ?', whereArgs: [id]);

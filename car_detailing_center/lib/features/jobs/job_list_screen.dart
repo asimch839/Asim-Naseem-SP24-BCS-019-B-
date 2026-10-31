@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/responsive/responsive_layout.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/utils/formatters.dart';
@@ -74,7 +75,7 @@ class _JobListScreenState extends State<JobListScreen> {
         label: const Text('New Job Card'),
       ),
       body: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(ResponsiveLayout.isMobile(context) ? 12 : 24),
         child: Column(
           children: [
             // Filter Bar with Quick Status Chips
@@ -206,6 +207,8 @@ class _JobListScreenState extends State<JobListScreen> {
                                 createdAt: recDate,
                               );
 
+                              final isMobile = ResponsiveLayout.isMobile(context);
+
                               return ListTile(
                                 onTap: () async {
                                   await Navigator.push(
@@ -216,7 +219,7 @@ class _JobListScreenState extends State<JobListScreen> {
                                   );
                                   _fetchJobs();
                                 },
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                                contentPadding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 20, vertical: 8),
                                 leading: Container(
                                   padding: const EdgeInsets.all(10),
                                   decoration: BoxDecoration(
@@ -228,73 +231,88 @@ class _JobListScreenState extends State<JobListScreen> {
                                     color: AppColors.getJobStatusColor(status),
                                   ),
                                 ),
-                                title: Row(
-                                  children: [
-                                    Text(jobNum, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                                    const SizedBox(width: 8),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.getJobStatusColor(status).withValues(alpha: 0.15),
-                                        borderRadius: BorderRadius.circular(4),
+                                title: isMobile
+                                    ? Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Text(jobNum, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                              const SizedBox(width: 6),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: AppColors.getJobStatusColor(status).withValues(alpha: 0.15),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: Text(
+                                                  status,
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: AppColors.getJobStatusColor(status),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            customerName,
+                                            style: const TextStyle(fontSize: 13),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      )
+                                    : Row(
+                                        children: [
+                                          Text(jobNum, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.getJobStatusColor(status).withValues(alpha: 0.15),
+                                              borderRadius: BorderRadius.circular(4),
+                                            ),
+                                            child: Text(
+                                              status,
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.bold,
+                                                color: AppColors.getJobStatusColor(status),
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Flexible(
+                                            child: Text(
+                                              '• $customerName',
+                                              style: const TextStyle(fontSize: 13),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                      child: Text(
-                                        status,
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                          color: AppColors.getJobStatusColor(status),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Flexible(
-                                      child: Text(
-                                        '• $customerName',
-                                        style: const TextStyle(fontSize: 13),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ),
                                 subtitle: Padding(
                                   padding: const EdgeInsets.only(top: 4),
                                   child: Text(
-                                    '$vehicleName ($plate) • Date: ${Formatters.date(recDate)}',
+                                    '$vehicleName ($plate) • ${Formatters.date(recDate)}',
                                     style: const TextStyle(fontSize: 12, color: AppColors.textDarkSecondary),
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
+                                trailing: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
-                                    Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      crossAxisAlignment: CrossAxisAlignment.end,
-                                      children: [
-                                        Text(
-                                          Formatters.currency(grandTotal, symbol: currency),
-                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                                        ),
-                                        Text(
-                                          'Paid: ${Formatters.currency(paidAmount, symbol: currency)}',
-                                          style: const TextStyle(fontSize: 11, color: AppColors.textDarkSecondary),
-                                        ),
-                                      ],
+                                    Text(
+                                      Formatters.currency(grandTotal, symbol: currency),
+                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: isMobile ? 13 : 15),
                                     ),
-                                    const SizedBox(width: 12),
-                                    IconButton(
-                                      icon: const Icon(Icons.chevron_right_rounded),
-                                      onPressed: () async {
-                                        await Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) => JobDetailScreen(job: jobModel),
-                                          ),
-                                        );
-                                        _fetchJobs();
-                                      },
+                                    Text(
+                                      'Paid: ${Formatters.currency(paidAmount, symbol: currency)}',
+                                      style: const TextStyle(fontSize: 11, color: AppColors.textDarkSecondary),
                                     ),
                                   ],
                                 ),

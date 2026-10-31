@@ -87,9 +87,11 @@ class _VendorFormDialogState extends State<VendorFormDialog> {
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Container(
-        width: 520,
-        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 520,
+          maxHeight: MediaQuery.of(context).size.height * 0.85,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [

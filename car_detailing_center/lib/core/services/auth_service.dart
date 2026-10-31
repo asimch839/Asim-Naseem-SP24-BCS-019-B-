@@ -41,12 +41,12 @@ class AuthService extends GetxService {
       }
       currentBusiness.value = BusinessModel(
         id: 'default_business',
-        name: map['business_name'] ?? 'Apex Car Detailing & Studio',
+        name: map['business_name'] ?? "DAWOOD'S GARAGE DETAIL & PERFORMANCE",
         ownerId: 'admin',
-        phone: map['phone'] ?? '+92 300 1234567',
-        whatsapp: map['whatsapp'],
-        email: map['email'] ?? 'admin@autodetail.com',
-        address: map['address'] ?? 'Plot 42, Auto Sector, Main Boulevard',
+        phone: map['phone'] ?? '0306-1361676 | 0335-0001676',
+        whatsapp: map['whatsapp'] ?? '0306-1361676',
+        email: map['email'] ?? 'contact@dawoodsgarage.com',
+        address: map['address'] ?? 'Behind HBL bank, Hasilpur road Vehari.',
         currency: map['currency'] ?? 'Rs.',
         timezone: map['timezone'] ?? 'Asia/Karachi (PKT +05:00)',
         taxRate: double.tryParse(map['tax_rate'] ?? '0') ?? 0.0,

@@ -89,9 +89,11 @@ class _VendorDetailDialogState extends State<VendorDetailDialog> {
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Container(
-        width: 680,
-        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.9),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 680,
+          maxHeight: MediaQuery.of(context).size.height * 0.9,
+        ),
         child: Column(
           children: [
             // Header
@@ -255,26 +257,38 @@ class _VendorDetailDialogState extends State<VendorDetailDialog> {
                     const SizedBox(height: 18),
 
                     // Spend & Transaction History
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _statCard(
-                            title: 'Total Invoiced Spend',
-                            value: Formatters.currency(totalSpend, symbol: currency),
-                            icon: Icons.receipt_long_rounded,
-                            color: AppColors.info,
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: _statCard(
-                            title: 'Expenses Recorded',
-                            value: '${_expenses.length}',
-                            icon: Icons.history_rounded,
-                            color: AppColors.primaryLight,
-                          ),
-                        ),
-                      ],
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final card1 = _statCard(
+                          title: 'Total Invoiced Spend',
+                          value: Formatters.currency(totalSpend, symbol: currency),
+                          icon: Icons.receipt_long_rounded,
+                          color: AppColors.info,
+                        );
+                        final card2 = _statCard(
+                          title: 'Expenses Recorded',
+                          value: '${_expenses.length}',
+                          icon: Icons.history_rounded,
+                          color: AppColors.primaryLight,
+                        );
+
+                        if (constraints.maxWidth < 420) {
+                          return Column(
+                            children: [
+                              card1,
+                              const SizedBox(height: 10),
+                              card2,
+                            ],
+                          );
+                        }
+                        return Row(
+                          children: [
+                            Expanded(child: card1),
+                            const SizedBox(width: 14),
+                            Expanded(child: card2),
+                          ],
+                        );
+                      },
                     ),
                     const SizedBox(height: 16),
 

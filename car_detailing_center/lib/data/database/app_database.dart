@@ -2,7 +2,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart' show sqfliteFfiInit, databaseFactoryFfi;
 import '../../core/constants/app_constants.dart';
 
 class AppDatabase {
@@ -377,6 +378,7 @@ class AppDatabase {
         brand TEXT,
         unit TEXT NOT NULL,
         purchase_price REAL DEFAULT 0,
+        selling_price REAL DEFAULT 0,
         purchase_date TEXT,
         description TEXT,
         notes TEXT,
@@ -413,7 +415,7 @@ class AppDatabase {
         invoice_number TEXT NOT NULL UNIQUE,
         date TEXT NOT NULL,
         customer_id TEXT NOT NULL,
-        vehicle_id TEXT NOT NULL,
+        vehicle_id TEXT,
         job_id TEXT,
         description TEXT,
         subtotal REAL DEFAULT 0,
@@ -427,8 +429,8 @@ class AppDatabase {
         notes TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
-        FOREIGN KEY (customer_id) REFERENCES customers (id),
-        FOREIGN KEY (vehicle_id) REFERENCES vehicles (id)
+        FOREIGN KEY (customer_id) REFERENCES customers (id) ON DELETE CASCADE,
+        FOREIGN KEY (vehicle_id) REFERENCES vehicles (id) ON DELETE SET NULL
       )
     ''');
 
@@ -635,6 +637,138 @@ class AppDatabase {
     if (count == 0) {
       await _seedDefaultVendors(db);
     }
+
+    // Ensure detailing_packages table exists
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS detailing_packages (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        price REAL NOT NULL DEFAULT 0,
+        description TEXT,
+        category TEXT DEFAULT 'Detailing',
+        sort_order INTEGER DEFAULT 0,
+        is_active INTEGER DEFAULT 1,
+        is_deleted INTEGER DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_detailing_packages_name ON detailing_packages(name)');
+
+    final resPackages = await db.rawQuery('SELECT COUNT(*) as c FROM detailing_packages WHERE is_deleted = 0');
+    final countPackages = (resPackages.first['c'] as num?)?.toInt() ?? 0;
+    if (countPackages == 0) {
+      await _seedDefaultDetailingPackages(db);
+    }
+
+    // Ensure selling_price column exists in inventory_items for product sales & invoicing
+    try {
+      await db.execute('ALTER TABLE inventory_items ADD COLUMN selling_price REAL DEFAULT 0');
+    } catch (_) {}
+    try {
+      await db.execute('UPDATE inventory_items SET selling_price = purchase_price WHERE selling_price IS NULL OR selling_price = 0');
+    } catch (_) {}
+
+    // Ensure invoices table allows NULL vehicle_id for counter sales
+    await ensureInvoicesTableSchema(db);
+  }
+
+  Future<void> ensureInvoicesTableSchema(Database db) async {
+    try {
+      final invoicesInfo = await db.rawQuery('PRAGMA table_info(invoices)');
+      bool isNotNull = false;
+      for (final col in invoicesInfo) {
+        if (col['name'] == 'vehicle_id' && (col['notnull'] == 1 || col['notnull'] == '1')) {
+          isNotNull = true;
+          break;
+        }
+      }
+
+      if (isNotNull) {
+        await db.execute('PRAGMA foreign_keys = OFF');
+        await db.execute('''
+          CREATE TABLE invoices_new (
+            id TEXT PRIMARY KEY,
+            invoice_number TEXT NOT NULL UNIQUE,
+            date TEXT NOT NULL,
+            customer_id TEXT NOT NULL,
+            vehicle_id TEXT,
+            job_id TEXT,
+            description TEXT,
+            subtotal REAL DEFAULT 0,
+            discount REAL DEFAULT 0,
+            tax_rate REAL DEFAULT 0,
+            tax_amount REAL DEFAULT 0,
+            grand_total REAL DEFAULT 0,
+            paid_amount REAL DEFAULT 0,
+            remaining_amount REAL DEFAULT 0,
+            status TEXT DEFAULT 'Unpaid',
+            notes TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (customer_id) REFERENCES customers (id) ON DELETE CASCADE,
+            FOREIGN KEY (vehicle_id) REFERENCES vehicles (id) ON DELETE SET NULL
+          )
+        ''');
+        await db.execute('''
+          INSERT INTO invoices_new (
+            id, invoice_number, date, customer_id, vehicle_id, job_id,
+            description, subtotal, discount, tax_rate, tax_amount,
+            grand_total, paid_amount, remaining_amount, status, notes,
+            created_at, updated_at
+          )
+          SELECT 
+            id, invoice_number, date, customer_id, 
+            CASE WHEN vehicle_id = '' THEN NULL ELSE vehicle_id END, 
+            CASE WHEN job_id = '' THEN NULL ELSE job_id END, 
+            description, subtotal, discount, tax_rate, tax_amount, 
+            grand_total, paid_amount, remaining_amount, status, notes, 
+            created_at, updated_at 
+          FROM invoices
+        ''');
+        await db.execute('DROP TABLE invoices');
+        await db.execute('ALTER TABLE invoices_new RENAME TO invoices');
+        await db.execute('CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices(status)');
+        await db.execute('CREATE INDEX IF NOT EXISTS idx_invoices_customer ON invoices(customer_id)');
+        await db.execute('PRAGMA foreign_keys = ON');
+      } else {
+        // Clean any existing empty strings to NULL to prevent FK check failures
+        try {
+          await db.execute("UPDATE invoices SET vehicle_id = NULL WHERE vehicle_id = ''");
+          await db.execute("UPDATE invoices SET job_id = NULL WHERE job_id = ''");
+        } catch (_) {}
+      }
+    } catch (e) {
+      debugPrint('ensureInvoicesTableSchema error: $e');
+    }
+  }
+
+  Future<void> _seedDefaultDetailingPackages(Database db) async {
+    final now = DateTime.now().toIso8601String();
+    final batch = db.batch();
+    final defaultPackages = [
+      {'id': 'pkg_ceramic_9h', 'name': 'Full Body Ceramic Coating (9H)', 'price': 25000.0, 'sort_order': 1},
+      {'id': 'pkg_interior_deep', 'name': 'Interior Deep Detailing & Shampoo', 'price': 6000.0, 'sort_order': 2},
+      {'id': 'pkg_paint_corr', 'name': 'Paint Correction (3-Stage Buffing)', 'price': 12000.0, 'sort_order': 3},
+      {'id': 'pkg_rust_protect', 'name': 'Underchassis Rust Protection', 'price': 5000.0, 'sort_order': 4},
+      {'id': 'pkg_headlight_rest', 'name': 'Headlight Restoration & UV Seal', 'price': 2500.0, 'sort_order': 5},
+      {'id': 'pkg_leather_cond', 'name': 'Leather Conditioning & Treatment', 'price': 4000.0, 'sort_order': 6},
+      {'id': 'pkg_engine_bay', 'name': 'Engine Bay Detailing & Dressing', 'price': 2500.0, 'sort_order': 7},
+      {'id': 'pkg_foam_wash', 'name': 'Standard Detailing Foam Wash', 'price': 1500.0, 'sort_order': 8},
+    ];
+
+    for (final p in defaultPackages) {
+      batch.insert('detailing_packages', {
+        ...p,
+        'description': '',
+        'category': 'Detailing',
+        'is_active': 1,
+        'is_deleted': 0,
+        'created_at': now,
+        'updated_at': now,
+      });
+    }
+    await batch.commit(noResult: true);
   }
 
   Future<void> _seedDefaultVendors(Database db) async {

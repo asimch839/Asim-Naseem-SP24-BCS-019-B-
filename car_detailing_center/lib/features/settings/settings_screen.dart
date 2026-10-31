@@ -12,10 +12,14 @@ import '../../core/routes/app_routes.dart';
 import '../../core/services/auth_service.dart';
 import '../../data/repositories/settings_repository.dart';
 import '../../core/services/local_storage_service.dart';
+import '../../core/constants/app_constants.dart';
+import '../../core/utils/formatters.dart';
 import '../../core/services/storage_service.dart';
 import '../../core/widgets/app_scaffold.dart';
 import '../../core/widgets/app_image.dart';
 import '../../data/models/business_model.dart';
+import '../../data/models/detailing_package_model.dart';
+import '../../data/repositories/detailing_package_repository.dart';
 import '../../data/database/app_database.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -58,10 +62,16 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
   late List<String> _inspectionSections;
   late List<String> _checklistItems;
 
+  ThemeMode _currentThemeMode = ThemeMode.dark;
+  List<DetailingPackageModel> _detailingPackages = [];
+  bool _isLoadingPackages = false;
+
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 6, vsync: this);
+    _initTheme();
+    _tabController = TabController(length: 7, vsync: this);
+    _loadDetailingPackages();
     final b = AuthService.to.currentBusiness.value;
     final u = AuthService.to.currentUser.value;
 
@@ -98,14 +108,24 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     ]);
 
     _checklistItems = List.from(b?.checklistItems ?? [
-      'Spare Wheel & Jack',
-      'Toolkit & Rod',
-      'Floor Mats (Front & Rear)',
-      'Audio / Media Player & Remote',
-      'Perfume / Freshener',
-      'Original Documents / Tax Token',
-      'Cigarette Lighter',
-      'Personal Valuables & Belongings',
+      'Battery Code',
+      'EVB/CR/USB',
+      'CIG-LIGHTER',
+      'ASHTRAY',
+      'RADIO ANTENA',
+      'FLOOR MATS',
+      'WIPER BLADES',
+      'MONOGRAMS',
+      'WHEEL CAPS',
+      'SPARE WHEEL',
+      'SEAT COVERS',
+      'LCD WORKING',
+      'BACK CAMERA',
+      'FRONT CAMERA',
+      'JACK & WHEEL BRACE',
+      'TOOLS',
+      'NAVIGATION CARD',
+      'Others',
     ]);
   }
 
@@ -457,6 +477,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
               unselectedLabelColor: AppColors.textDarkSecondary,
               tabs: const [
                 Tab(icon: Icon(Icons.business_rounded), text: 'Business Information'),
+                Tab(icon: Icon(Icons.car_repair_rounded), text: 'Detailing Packages'),
                 Tab(icon: Icon(Icons.manage_accounts_rounded), text: 'Users & Permissions'),
                 Tab(icon: Icon(Icons.inventory_2_rounded), text: 'Inventory Settings'),
                 Tab(icon: Icon(Icons.fact_check_rounded), text: 'Inspection Settings'),
@@ -470,6 +491,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
               controller: _tabController,
               children: [
                 _buildBusinessInfoTab(),
+                _buildDetailingPackagesTab(),
                 _buildUsersTab(),
                 _buildInventoryTab(),
                 _buildInspectionSettingsTab(),
@@ -702,7 +724,9 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                         children: [
                           Icon(Icons.security_rounded, color: AppColors.primaryLight),
                           SizedBox(width: 8),
-                          Text('System User Roles & Access Control', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          Expanded(
+                            child: Text('System User Roles & Access Control', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 8),
@@ -796,7 +820,9 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                         children: [
                           Icon(Icons.inventory_2_rounded, color: AppColors.primaryLight),
                           SizedBox(width: 8),
-                          Text('Global Inventory Configuration', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          Expanded(
+                            child: Text('Global Inventory Configuration', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 8),
@@ -994,7 +1020,9 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                     children: [
                       Icon(Icons.palette_rounded, color: AppColors.primaryLight),
                       SizedBox(width: 8),
-                      Text('Appearance & Theme Mode', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      Expanded(
+                        child: Text('Appearance & Theme Mode', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -1002,22 +1030,30 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                     title: const Text('Dark Mode (Recommended for Studios)'),
                     subtitle: const Text('High-contrast sleek automotive dark theme'),
                     leading: const Icon(Icons.dark_mode_rounded),
-                    trailing: const Icon(Icons.check_circle_rounded, color: AppColors.success),
-                    onTap: () => Get.changeThemeMode(ThemeMode.dark),
+                    trailing: _currentThemeMode == ThemeMode.dark
+                        ? const Icon(Icons.check_circle_rounded, color: AppColors.success)
+                        : null,
+                    onTap: () => _changeTheme(ThemeMode.dark),
                   ),
                   const Divider(),
                   ListTile(
                     title: const Text('Light Mode'),
                     subtitle: const Text('Classic high-brightness light theme'),
                     leading: const Icon(Icons.light_mode_rounded),
-                    onTap: () => Get.changeThemeMode(ThemeMode.light),
+                    trailing: _currentThemeMode == ThemeMode.light
+                        ? const Icon(Icons.check_circle_rounded, color: AppColors.success)
+                        : null,
+                    onTap: () => _changeTheme(ThemeMode.light),
                   ),
                   const Divider(),
                   ListTile(
                     title: const Text('System Mode'),
                     subtitle: const Text('Follow operating system theme preferences'),
                     leading: const Icon(Icons.settings_brightness_rounded),
-                    onTap: () => Get.changeThemeMode(ThemeMode.system),
+                    trailing: _currentThemeMode == ThemeMode.system
+                        ? const Icon(Icons.check_circle_rounded, color: AppColors.success)
+                        : null,
+                    onTap: () => _changeTheme(ThemeMode.system),
                   ),
                 ],
               ),
@@ -1026,6 +1062,30 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
         ),
       ),
     );
+  }
+
+  void _initTheme() async {
+    final repo = Get.find<SettingsRepository>();
+    final val = await repo.getSetting('theme_mode', defaultValue: 'dark');
+    if (mounted) {
+      setState(() {
+        _currentThemeMode = val == 'light'
+            ? ThemeMode.light
+            : (val == 'system' ? ThemeMode.system : ThemeMode.dark);
+      });
+    }
+  }
+
+  void _changeTheme(ThemeMode mode) async {
+    setState(() {
+      _currentThemeMode = mode;
+    });
+    Get.changeThemeMode(mode);
+    final repo = Get.find<SettingsRepository>();
+    final modeStr = mode == ThemeMode.light
+        ? 'light'
+        : (mode == ThemeMode.system ? 'system' : 'dark');
+    await repo.setSetting('theme_mode', modeStr);
   }
 
   // 6. BACKUP & RESTORE TAB
@@ -1085,7 +1145,9 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                         children: [
                           Icon(Icons.archive_rounded, color: AppColors.success),
                           SizedBox(width: 10),
-                          Text('Create Complete Offline Backup (.ZIP)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          Expanded(
+                            child: Text('Create Complete Offline Backup (.ZIP)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 10),
@@ -1099,11 +1161,9 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                         icon: _isBackingUp
                             ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                             : const Icon(Icons.download_rounded),
-                        label: Flexible(
-                          child: Text(
-                            _isBackingUp ? 'Generating Backup Archive...' : 'Choose Destination & Backup Now (.ZIP)',
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                        label: Text(
+                          _isBackingUp ? 'Generating Backup Archive...' : 'Choose Destination & Backup Now (.ZIP)',
+                          overflow: TextOverflow.ellipsis,
                         ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
@@ -1128,7 +1188,9 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                         children: [
                           Icon(Icons.unarchive_rounded, color: AppColors.warning),
                           SizedBox(width: 10),
-                          Text('Restore Database & Media Archive', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          Expanded(
+                            child: Text('Restore Database & Media Archive', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 10),
@@ -1158,11 +1220,9 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                         icon: _isRestoring
                             ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                             : const Icon(Icons.upload_file_rounded),
-                        label: Flexible(
-                          child: Text(
-                            _isRestoring ? 'Restoring System...' : 'Select Backup Archive (.ZIP) to Restore',
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                        label: Text(
+                          _isRestoring ? 'Restoring System...' : 'Select Backup Archive (.ZIP) to Restore',
+                          overflow: TextOverflow.ellipsis,
                         ),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.warning,
@@ -1187,7 +1247,9 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                         children: [
                           Icon(Icons.table_chart_rounded, color: AppColors.info),
                           SizedBox(width: 10),
-                          Text('CSV Spreadsheets Export', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          Expanded(
+                            child: Text('CSV Spreadsheets Export', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 8),
@@ -1227,5 +1289,276 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
       label: Text(label),
       onPressed: () => _exportTableToCsv(tableName),
     );
+  }
+
+  // --- DETAILING PACKAGES MANAGEMENT TAB ---
+  Future<void> _loadDetailingPackages() async {
+    setState(() => _isLoadingPackages = true);
+    try {
+      final repo = Get.find<DetailingPackageRepository>();
+      final list = await repo.getPackages(activeOnly: true);
+      if (mounted) {
+        setState(() {
+          _detailingPackages = list;
+          _isLoadingPackages = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingPackages = false);
+    }
+  }
+
+  Widget _buildDetailingPackagesTab() {
+    final currency = AuthService.to.currentBusiness.value?.currency ?? AppConstants.defaultCurrency;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Center(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 820),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Row(
+                    children: [
+                      const CircleAvatar(
+                        radius: 22,
+                        backgroundColor: AppColors.primary,
+                        child: Icon(Icons.car_repair_rounded, color: Colors.white, size: 24),
+                      ),
+                      const SizedBox(width: 16),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Detailing Operations & Packages',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'Add or modify detailing services. Only packages listed here will appear in Job Cards.',
+                              style: TextStyle(fontSize: 12, color: AppColors.textDarkSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.add_rounded, size: 18),
+                        label: const Text('Add Package'),
+                        onPressed: _showSettingsAddPackageDialog,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              if (_isLoadingPackages)
+                const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator()))
+              else if (_detailingPackages.isEmpty)
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Center(
+                      child: Column(
+                        children: [
+                          const Icon(Icons.cleaning_services_outlined, size: 48, color: AppColors.textDarkSecondary),
+                          const SizedBox(height: 12),
+                          const Text('No detailing packages configured yet.'),
+                          const SizedBox(height: 12),
+                          ElevatedButton.icon(
+                            onPressed: _showSettingsAddPackageDialog,
+                            icon: const Icon(Icons.add_rounded),
+                            label: const Text('Add First Package'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                )
+              else
+                Card(
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: _detailingPackages.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final p = _detailingPackages[index];
+                      return ListTile(
+                        leading: CircleAvatar(
+                          radius: 16,
+                          backgroundColor: AppColors.accent.withValues(alpha: 0.15),
+                          child: Text('${index + 1}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.accent)),
+                        ),
+                        title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                        subtitle: Text(
+                          Formatters.currency(p.price, symbol: currency),
+                          style: const TextStyle(fontSize: 13, color: AppColors.success, fontWeight: FontWeight.w600),
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit_rounded, size: 18, color: AppColors.info),
+                              tooltip: 'Edit Package',
+                              onPressed: () => _showSettingsEditPackageDialog(p),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline_rounded, size: 18, color: AppColors.error),
+                              tooltip: 'Delete Package',
+                              onPressed: () => _confirmDeletePackage(p),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showSettingsAddPackageDialog() async {
+    final nameCtrl = TextEditingController();
+    final priceCtrl = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Add Detailing Package', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: nameCtrl,
+                autofocus: true,
+                decoration: const InputDecoration(labelText: 'Package Name *'),
+                validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: priceCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Price (PKR) *'),
+                validator: (v) => (v == null || double.tryParse(v.trim()) == null) ? 'Enter valid price' : null,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              if (!formKey.currentState!.validate()) return;
+              final repo = Get.find<DetailingPackageRepository>();
+              final newPkg = DetailingPackageModel(
+                id: 'pkg_${const Uuid().v4().substring(0, 8)}',
+                name: nameCtrl.text.trim(),
+                price: double.parse(priceCtrl.text.trim()),
+                sortOrder: _detailingPackages.length + 1,
+              );
+              await repo.savePackage(newPkg);
+              if (ctx.mounted) Navigator.pop(ctx);
+              await _loadDetailingPackages();
+              Get.snackbar('Added', '${newPkg.name} saved successfully',
+                  backgroundColor: AppColors.success.withValues(alpha: 0.2));
+            },
+            child: const Text('Save Package'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSettingsEditPackageDialog(DetailingPackageModel pkg) async {
+    final nameCtrl = TextEditingController(text: pkg.name);
+    final priceCtrl = TextEditingController(text: pkg.price.toStringAsFixed(0));
+    final formKey = GlobalKey<FormState>();
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Edit Detailing Package', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: nameCtrl,
+                decoration: const InputDecoration(labelText: 'Package Name *'),
+                validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: priceCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Price (PKR) *'),
+                validator: (v) => (v == null || double.tryParse(v.trim()) == null) ? 'Enter valid price' : null,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              if (!formKey.currentState!.validate()) return;
+              final repo = Get.find<DetailingPackageRepository>();
+              final updated = pkg.copyWith(
+                name: nameCtrl.text.trim(),
+                price: double.parse(priceCtrl.text.trim()),
+                updatedAt: DateTime.now(),
+              );
+              await repo.savePackage(updated);
+              if (ctx.mounted) Navigator.pop(ctx);
+              await _loadDetailingPackages();
+              Get.snackbar('Updated', '${updated.name} updated successfully',
+                  backgroundColor: AppColors.success.withValues(alpha: 0.2));
+            },
+            child: const Text('Update'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDeletePackage(DetailingPackageModel pkg) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Delete Detailing Package?'),
+        content: Text('Are you sure you want to remove "${pkg.name}" from available packages?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      final repo = Get.find<DetailingPackageRepository>();
+      await repo.deletePackage(pkg.id);
+      await _loadDetailingPackages();
+      Get.snackbar('Deleted', '${pkg.name} removed from packages',
+          backgroundColor: AppColors.error.withValues(alpha: 0.2));
+    }
   }
 }

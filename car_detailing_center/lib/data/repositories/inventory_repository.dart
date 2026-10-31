@@ -30,6 +30,11 @@ class InventoryRepository {
     );
 
     return maps.map((m) {
+      final purchase = (m['purchase_price'] as num).toDouble();
+      final selling = (m['selling_price'] != null && (m['selling_price'] as num) > 0)
+          ? (m['selling_price'] as num).toDouble()
+          : purchase;
+
       return InventoryItemModel(
         id: m['id'] as String,
         businessId: 'local',
@@ -37,8 +42,10 @@ class InventoryRepository {
         brand: m['brand'] as String? ?? '',
         unit: m['unit'] as String,
         quantity: (m['current_quantity'] as num).toDouble(),
-        unitCost: (m['purchase_price'] as num).toDouble(),
-        unitPrice: (m['purchase_price'] as num).toDouble(), // Compatible with model
+        purchasePrice: purchase,
+        sellingPrice: selling,
+        unitCost: purchase,
+        unitPrice: selling,
         description: m['description'] as String?,
         notes: m['notes'] as String?,
         purchaseDate: m['purchase_date'] != null ? DateTime.tryParse(m['purchase_date'] as String) : null,
@@ -56,6 +63,11 @@ class InventoryRepository {
     if (maps.isEmpty) return null;
     final m = maps.first;
 
+    final purchase = (m['purchase_price'] as num).toDouble();
+    final selling = (m['selling_price'] != null && (m['selling_price'] as num) > 0)
+        ? (m['selling_price'] as num).toDouble()
+        : purchase;
+
     return InventoryItemModel(
       id: m['id'] as String,
       businessId: 'local',
@@ -63,8 +75,10 @@ class InventoryRepository {
       brand: m['brand'] as String? ?? '',
       unit: m['unit'] as String,
       quantity: (m['current_quantity'] as num).toDouble(),
-      unitCost: (m['purchase_price'] as num).toDouble(),
-      unitPrice: (m['purchase_price'] as num).toDouble(),
+      purchasePrice: purchase,
+      sellingPrice: selling,
+      unitCost: purchase,
+      unitPrice: selling,
       description: m['description'] as String?,
       notes: m['notes'] as String?,
       purchaseDate: m['purchase_date'] != null ? DateTime.tryParse(m['purchase_date'] as String) : null,
@@ -82,6 +96,7 @@ class InventoryRepository {
     String? brand,
     required String unit,
     double purchasePrice = 0,
+    double sellingPrice = 0,
     DateTime? purchaseDate,
     String? description,
     String? notes,
@@ -90,6 +105,7 @@ class InventoryRepository {
     final itemId = id ?? 'itm_${const Uuid().v4().substring(0, 8)}';
     final now = DateTime.now().toIso8601String();
     final pDateStr = purchaseDate?.toIso8601String() ?? now;
+    final finalSelling = sellingPrice > 0 ? sellingPrice : purchasePrice;
 
     await db.transaction((txn) async {
       final existing = await txn.query('inventory_items', where: 'id = ?', whereArgs: [itemId]);
@@ -102,6 +118,7 @@ class InventoryRepository {
           'brand': brand?.trim() ?? '',
           'unit': unit.trim(),
           'purchase_price': purchasePrice >= 0 ? purchasePrice : 0,
+          'selling_price': finalSelling >= 0 ? finalSelling : 0,
           'purchase_date': pDateStr,
           'description': description?.trim() ?? '',
           'notes': notes?.trim() ?? '',
@@ -135,6 +152,7 @@ class InventoryRepository {
             'brand': brand?.trim() ?? '',
             'unit': unit.trim(),
             'purchase_price': purchasePrice >= 0 ? purchasePrice : 0,
+            'selling_price': finalSelling >= 0 ? finalSelling : 0,
             'purchase_date': pDateStr,
             'description': description?.trim() ?? '',
             'notes': notes?.trim() ?? '',
@@ -245,7 +263,8 @@ class InventoryRepository {
 
     final allItems = await db.rawQuery('''
       SELECT COUNT(*) as total_items,
-             COALESCE(SUM(current_quantity * purchase_price), 0.0) as total_val
+             COALESCE(SUM(current_quantity * purchase_price), 0.0) as total_val,
+             COALESCE(SUM(current_quantity * CASE WHEN selling_price > 0 THEN selling_price ELSE purchase_price END), 0.0) as total_retail_val
       FROM inventory_items
       WHERE is_deleted = 0 AND is_active = 1
     ''');
@@ -265,6 +284,7 @@ class InventoryRepository {
     return {
       'total_items': Sqflite.firstIntValue(allItems) ?? 0,
       'total_purchase_value': (allItems.first['total_val'] as num?)?.toDouble() ?? 0.0,
+      'total_retail_value': (allItems.first['total_retail_val'] as num?)?.toDouble() ?? 0.0,
       'out_of_stock': Sqflite.firstIntValue(outOfStockRes) ?? 0,
       'low_stock': Sqflite.firstIntValue(lowStockRes) ?? 0,
       'threshold': threshold,

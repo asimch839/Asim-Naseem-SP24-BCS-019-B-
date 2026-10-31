@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/responsive/responsive_layout.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/utils/formatters.dart';
@@ -131,6 +132,7 @@ class _VendorListScreenState extends State<VendorListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = ResponsiveLayout.isMobile(context);
     final currency = AuthService.to.currentBusiness.value?.currency ?? AppConstants.defaultCurrency;
     final totalVendors = _metrics['total_vendors'] ?? _vendors.length;
     final totalSpend = (_metrics['total_spend'] as num?)?.toDouble() ?? 0.0;
@@ -145,45 +147,59 @@ class _VendorListScreenState extends State<VendorListScreen> {
         label: const Text('Add Vendor'),
       ),
       body: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(isMobile ? 12 : 24),
         child: Column(
           children: [
             // 1. Clean KPI Overview Header
-            Row(
-              children: [
-                Expanded(
-                  child: _kpiCard(
-                    title: 'Total Vendors',
-                    value: '$totalVendors',
-                    icon: Icons.storefront_rounded,
-                    color: AppColors.primaryLight,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _kpiCard(
-                    title: 'Total Invoiced Spend',
-                    value: Formatters.currency(totalSpend, symbol: currency),
-                    icon: Icons.receipt_long_rounded,
-                    color: AppColors.info,
-                  ),
-                ),
-              ],
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final isNarrow = constraints.maxWidth < 550;
+                final totalVendorsCard = _kpiCard(
+                  title: 'Total Vendors',
+                  value: '$totalVendors',
+                  icon: Icons.storefront_rounded,
+                  color: AppColors.primaryLight,
+                );
+                final totalSpendCard = _kpiCard(
+                  title: 'Total Invoiced Spend',
+                  value: Formatters.currency(totalSpend, symbol: currency),
+                  icon: Icons.receipt_long_rounded,
+                  color: AppColors.info,
+                );
+
+                if (isNarrow) {
+                  return Column(
+                    children: [
+                      totalVendorsCard,
+                      const SizedBox(height: 10),
+                      totalSpendCard,
+                    ],
+                  );
+                }
+                return Row(
+                  children: [
+                    Expanded(child: totalVendorsCard),
+                    const SizedBox(width: 16),
+                    Expanded(child: totalSpendCard),
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 16),
 
             // 2. Search & Action Bar
             Card(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 16, vertical: 10),
                 child: Row(
                   children: [
                     Expanded(
                       child: TextField(
                         controller: _searchController,
-                        decoration: const InputDecoration(
-                          hintText: 'Search by Person Name, Shop Name, Phone, or Description...',
-                          prefixIcon: Icon(Icons.search_rounded),
+                        decoration: InputDecoration(
+                          hintText: isMobile ? 'Search vendors...' : 'Search by Person Name, Shop Name, Phone, or Description...',
+                          prefixIcon: const Icon(Icons.search_rounded),
+                          isDense: isMobile,
                         ),
                         onChanged: (val) {
                           _searchQuery = val.trim();
@@ -191,18 +207,20 @@ class _VendorListScreenState extends State<VendorListScreen> {
                         },
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 8),
                     IconButton(
                       icon: const Icon(Icons.refresh_rounded),
                       tooltip: 'Refresh',
                       onPressed: _fetchData,
                     ),
-                    const SizedBox(width: 8),
-                    ElevatedButton.icon(
-                      onPressed: () => _openVendorForm(),
-                      icon: const Icon(Icons.add_rounded, size: 18),
-                      label: const Text('New Vendor'),
-                    ),
+                    if (!isMobile) ...[
+                      const SizedBox(width: 8),
+                      ElevatedButton.icon(
+                        onPressed: () => _openVendorForm(),
+                        icon: const Icon(Icons.add_rounded, size: 18),
+                        label: const Text('New Vendor'),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -230,6 +248,146 @@ class _VendorListScreenState extends State<VendorListScreen> {
                             itemBuilder: (context, index) {
                               final vendor = _vendors[index];
                               final spend = _vendorSpends[vendor.id] ?? 0.0;
+
+                              if (isMobile) {
+                                return InkWell(
+                                  onTap: () => _openVendorDetail(vendor),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            CircleAvatar(
+                                              radius: 20,
+                                              backgroundColor: AppColors.primary.withValues(alpha: 0.15),
+                                              child: Text(
+                                                vendor.name.isNotEmpty ? vendor.name[0].toUpperCase() : 'V',
+                                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.primaryLight),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    vendor.name,
+                                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                  if (vendor.company != null && vendor.company!.isNotEmpty) ...[
+                                                    const SizedBox(height: 2),
+                                                    Text(
+                                                      vendor.company!,
+                                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primaryLight),
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ],
+                                                ],
+                                              ),
+                                            ),
+                                            PopupMenuButton<String>(
+                                              icon: const Icon(Icons.more_vert_rounded, size: 20),
+                                              onSelected: (val) async {
+                                                if (val == 'expense') {
+                                                  final res = await showDialog<bool>(
+                                                    context: context,
+                                                    builder: (_) => GarageExpenseFormDialog(
+                                                      prefillVendorName: vendor.name,
+                                                      prefillVendorCompany: vendor.company,
+                                                      prefillVendorPhone: vendor.phone,
+                                                    ),
+                                                  );
+                                                  if (res == true) _fetchData();
+                                                } else if (val == 'edit') {
+                                                  _openVendorForm(vendor);
+                                                } else if (val == 'delete') {
+                                                  _deleteVendor(vendor);
+                                                }
+                                              },
+                                              itemBuilder: (context) => [
+                                                const PopupMenuItem(
+                                                  value: 'expense',
+                                                  child: Row(
+                                                    children: [
+                                                      Icon(Icons.add_shopping_cart_rounded, size: 18, color: AppColors.primaryLight),
+                                                      SizedBox(width: 8),
+                                                      Text('Log Expense'),
+                                                    ],
+                                                  ),
+                                                ),
+                                                const PopupMenuItem(
+                                                  value: 'edit',
+                                                  child: Row(
+                                                    children: [
+                                                      Icon(Icons.edit_rounded, size: 18),
+                                                      SizedBox(width: 8),
+                                                      Text('Edit'),
+                                                    ],
+                                                  ),
+                                                ),
+                                                const PopupMenuItem(
+                                                  value: 'delete',
+                                                  child: Row(
+                                                    children: [
+                                                      Icon(Icons.delete_outline_rounded, size: 18, color: AppColors.error),
+                                                      SizedBox(width: 8),
+                                                      Text('Delete', style: TextStyle(color: AppColors.error)),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            InkWell(
+                                              onTap: () => _copyToClipboard(vendor.phone, 'Phone number'),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  const Icon(Icons.phone_rounded, size: 13, color: AppColors.textDarkMuted),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    vendor.phone,
+                                                    style: const TextStyle(fontSize: 12, color: AppColors.textDarkSecondary),
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  const Icon(Icons.copy_rounded, size: 11, color: AppColors.textDarkMuted),
+                                                ],
+                                              ),
+                                            ),
+                                            Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                const Text('Spend: ', style: TextStyle(fontSize: 11, color: AppColors.textDarkMuted)),
+                                                Text(
+                                                  Formatters.currency(spend, symbol: currency),
+                                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.info),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                        if (vendor.notes != null && vendor.notes!.trim().isNotEmpty) ...[
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            vendor.notes!.trim(),
+                                            style: const TextStyle(fontSize: 11, color: AppColors.textDarkMuted),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }
 
                               return InkWell(
                                 onTap: () => _openVendorDetail(vendor),
