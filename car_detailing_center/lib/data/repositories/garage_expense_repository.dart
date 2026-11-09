@@ -12,14 +12,18 @@ class GarageExpenseRepository {
     String? endDate,
     String? vendorQuery,
     String? searchQuery,
+    bool? onlyPending,
   }) async {
     final db = await _db;
-    String sql = 'SELECT * FROM garage_expenses WHERE 1=1';
     final List<dynamic> args = [];
+    String sql = 'SELECT * FROM garage_expenses WHERE 1=1';
 
+    if (onlyPending == true) {
+      sql += ' AND isCompleted = 0';
+    }
     if (category != null && category.isNotEmpty && category != 'All') {
-      sql += ' AND category = ?';
-      args.add(category);
+      sql += ' AND (category = ? OR name = ?)';
+      args.addAll([category, category]);
     }
     if (startDate != null && endDate != null) {
       sql += ' AND date BETWEEN ? AND ?';
@@ -32,57 +36,35 @@ class GarageExpenseRepository {
     }
     if (searchQuery != null && searchQuery.trim().isNotEmpty) {
       final q = '%${searchQuery.trim().toLowerCase()}%';
-      sql += ' AND (LOWER(description) LIKE ? OR LOWER(category) LIKE ? OR LOWER(vendor_name) LIKE ?)';
+      sql += ' AND (LOWER(name) LIKE ? OR LOWER(description) LIKE ? OR LOWER(vendor_name) LIKE ?)';
       args.addAll([q, q, q]);
     }
-
     sql += ' ORDER BY date DESC';
     final maps = await db.rawQuery(sql, args);
-
-    return maps.map((m) {
-      return ExpenseModel(
-        id: m['id'] as String,
-        businessId: 'local',
-        category: m['category'] as String,
-        description: m['description'] as String,
-        amount: (m['amount'] as num).toDouble(),
-        date: DateTime.tryParse(m['date'] as String) ?? DateTime.now(),
-        paymentMethod: m['payment_method'] as String,
-        vendorName: m['vendor_name'] as String?,
-        vendorCompany: m['vendor_company'] as String?,
-        vendorPhone: m['vendor_contact'] as String?,
-        vendorAddress: m['vendor_address'] as String?,
-        referenceNumber: m['vendor_invoice_ref'] as String?,
-        notes: m['notes'] as String?,
-        receiptUrl: m['receipt_path'] as String?,
-        createdAt: DateTime.tryParse(m['created_at'] as String) ?? DateTime.now(),
-      );
-    }).toList();
+    return maps.map((m) => ExpenseModel.fromMap(m, m['id'] as String)).toList();
   }
 
   Future<void> saveExpense(ExpenseModel expense) async {
     final db = await _db;
-    final expId = expense.id.isNotEmpty ? expense.id : 'gexp_${const Uuid().v4().substring(0, 8)}';
-
+    final expId = expense.id.isNotEmpty
+        ? expense.id
+        : 'gexp_${const Uuid().v4().substring(0, 8)}';
+    final data = expense.toMap();
+    data['id'] = expId;
     await db.insert(
       'garage_expenses',
-      {
-        'id': expId,
-        'category': expense.category.trim(),
-        'description': expense.description.trim(),
-        'amount': expense.amount,
-        'date': expense.date.toIso8601String(),
-        'payment_method': expense.paymentMethod,
-        'vendor_name': expense.vendorName ?? '',
-        'vendor_company': expense.vendorCompany ?? '',
-        'vendor_contact': expense.vendorPhone ?? '',
-        'vendor_address': expense.vendorAddress ?? '',
-        'vendor_invoice_ref': expense.referenceNumber ?? '',
-        'receipt_path': expense.receiptUrl ?? '',
-        'notes': expense.notes ?? '',
-        'created_at': expense.createdAt.toIso8601String(),
-      },
+      data,
       conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> markCompleted(String expenseId) async {
+    final db = await _db;
+    await db.update(
+      'garage_expenses',
+      {'isCompleted': 1},
+      where: 'id = ?',
+      whereArgs: [expenseId],
     );
   }
 
@@ -93,7 +75,11 @@ class GarageExpenseRepository {
 
   Future<List<String>> getUniqueCategories() async {
     final db = await _db;
-    final res = await db.rawQuery('SELECT DISTINCT category FROM garage_expenses ORDER BY category ASC');
-    return res.map((r) => r['category'] as String).where((c) => c.isNotEmpty).toList();
+    final res = await db.rawQuery(
+        'SELECT DISTINCT category FROM garage_expenses ORDER BY category ASC');
+    return res
+        .map((r) => r['category'] as String? ?? '')
+        .where((c) => c.isNotEmpty)
+        .toList();
   }
 }

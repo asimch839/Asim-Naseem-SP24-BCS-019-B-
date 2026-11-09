@@ -228,108 +228,124 @@ class _GarageExpenseScreenState extends State<GarageExpenseScreen> {
                             separatorBuilder: (_, __) => const Divider(height: 1),
                             itemBuilder: (context, index) {
                               final exp = list[index];
-                              final isStaff = exp.category.toLowerCase().contains('staff');
+                              final isStaff = (exp.category ?? '').toLowerCase().contains('staff');
 
-                              return ListTile(
-                                leading: CircleAvatar(
-                                  backgroundColor: isStaff ? AppColors.warning.withValues(alpha: 0.15) : AppColors.primary.withValues(alpha: 0.15),
-                                  child: Icon(
-                                    isStaff ? Icons.badge_outlined : Icons.receipt_long_rounded,
-                                    color: isStaff ? AppColors.warning : AppColors.primaryLight,
-                                    size: 20,
+                              return Card(
+                      color: exp.isCompleted ? Colors.grey.shade200 : null,
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: isStaff ? AppColors.warning.withValues(alpha: 0.15) : AppColors.primary.withValues(alpha: 0.15),
+                          child: Icon(
+                            isStaff ? Icons.badge_outlined : Icons.receipt_long_rounded,
+                            color: isStaff ? AppColors.warning : AppColors.primaryLight,
+                            size: 20,
+                          ),
+                        ),
+                        title: Row(
+                          children: [
+                            Text(exp.category ?? exp.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                            if (exp.vendorName != null && exp.vendorName!.isNotEmpty) ...[
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: isStaff ? AppColors.warning.withValues(alpha: 0.12) : AppColors.primary.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    isStaff
+                                        ? 'Staff: ${exp.vendorName}'
+                                        : 'Vendor: ${exp.vendorName}${exp.vendorCompany != null && exp.vendorCompany!.isNotEmpty ? " (${exp.vendorCompany})" : ""}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: isStaff ? AppColors.warning : AppColors.primaryLight,
+                                      fontWeight: isStaff ? FontWeight.w600 : FontWeight.normal,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
-                                title: Row(
-                                  children: [
-                                    Text(exp.category, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                    if (exp.vendorName != null && exp.vendorName!.isNotEmpty) ...[
-                                      const SizedBox(width: 8),
-                                      Flexible(
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: isStaff ? AppColors.warning.withValues(alpha: 0.12) : AppColors.primary.withValues(alpha: 0.12),
-                                            borderRadius: BorderRadius.circular(6),
-                                          ),
-                                          child: Text(
-                                            isStaff
-                                                ? 'Staff: ${exp.vendorName}'
-                                                : 'Vendor: ${exp.vendorName}${exp.vendorCompany != null && exp.vendorCompany!.isNotEmpty ? " (${exp.vendorCompany})" : ""}',
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              color: isStaff ? AppColors.warning : AppColors.primaryLight,
-                                              fontWeight: isStaff ? FontWeight.w600 : FontWeight.normal,
-                                            ),
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 4),
+                            Text(
+                              '${Formatters.date(exp.date)} • Method: ${exp.paymentMethod} ${exp.referenceNumber != null && exp.referenceNumber!.isNotEmpty ? "• Ref: ${exp.referenceNumber}" : ""}',
+                              style: const TextStyle(fontSize: 12, color: AppColors.textDarkSecondary),
+                            ),
+                            if (exp.description.isNotEmpty)
+                              Text(
+                                exp.description,
+                                style: const TextStyle(fontSize: 12, color: AppColors.textDark),
+                              ),
+                            if (exp.notes != null && exp.notes!.isNotEmpty)
+                              Text(
+                                'Notes: ${exp.notes}',
+                                style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: AppColors.textDarkSecondary),
+                              ),
+                            if (exp.staffName != null && exp.staffName!.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4.0),
+                                child: Text(
+                                  'Technician: ${exp.staffName}',
+                                  style: const TextStyle(fontSize: 12, color: AppColors.info),
+                                ),
+                              ),
+                          ],
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              Formatters.currency(exp.amount, symbol: currency),
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.error),
+                            ),
+                            const SizedBox(width: 8),
+                            IconButton(
+                              icon: const Icon(Icons.edit_outlined, size: 18),
+                              onPressed: () => _openExpenseDialog(exp),
+                            ),
+                            if (!exp.isCompleted)
+                              IconButton(
+                                icon: const Icon(Icons.check_circle, color: Colors.green, size: 18),
+                                tooltip: 'Mark as completed',
+                                onPressed: () async {
+                                  await _expenseRepo.markCompleted(exp.id);
+                                  setState(() {});
+                                },
+                              ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline_rounded, size: 18, color: AppColors.error),
+                              onPressed: () async {
+                                final confirm = await Get.dialog<bool>(
+                                  AlertDialog(
+                                    title: const Text('Delete Expense Record'),
+                                    content: Text('Are you sure you want to delete this expense of ${Formatters.currency(exp.amount, symbol: currency)}?'),
+                                    actions: [
+                                      TextButton(onPressed: () => Get.back(result: false), child: const Text('Cancel')),
+                                      ElevatedButton(
+                                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+                                        onPressed: () => Get.back(result: true),
+                                        child: const Text('Delete'),
                                       ),
                                     ],
-                                  ],
-                                ),
-                                subtitle: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      '${Formatters.date(exp.date)} • Method: ${exp.paymentMethod} ${exp.referenceNumber != null && exp.referenceNumber!.isNotEmpty ? "• Ref: ${exp.referenceNumber}" : ""}',
-                                      style: const TextStyle(fontSize: 12, color: AppColors.textDarkSecondary),
-                                    ),
-                                    if (exp.description.isNotEmpty)
-                                      Text(
-                                        exp.description,
-                                        style: const TextStyle(fontSize: 12, color: AppColors.textDark),
-                                      ),
-                                    if (exp.notes != null && exp.notes!.isNotEmpty)
-                                      Text(
-                                        'Notes: ${exp.notes}',
-                                        style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: AppColors.textDarkSecondary),
-                                      ),
-                                  ],
-                                ),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      Formatters.currency(exp.amount, symbol: currency),
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.error),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    IconButton(
-                                      icon: const Icon(Icons.edit_outlined, size: 18),
-                                      onPressed: () => _openExpenseDialog(exp),
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.delete_outline_rounded, size: 18, color: AppColors.error),
-                                      onPressed: () async {
-                                        final confirm = await Get.dialog<bool>(
-                                          AlertDialog(
-                                            title: const Text('Delete Expense Record'),
-                                            content: Text('Are you sure you want to delete this expense of ${Formatters.currency(exp.amount, symbol: currency)}?'),
-                                            actions: [
-                                              TextButton(onPressed: () => Get.back(result: false), child: const Text('Cancel')),
-                                              ElevatedButton(
-                                                style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-                                                onPressed: () => Get.back(result: true),
-                                                child: const Text('Delete'),
-                                              ),
-                                            ],
-                                          ),
-                                        );
-                                        if (confirm == true) {
-                                          await _expenseRepo.deleteExpense(exp.id);
-                                          _loadCategories();
-                                          if (Get.isRegistered<DashboardController>()) {
-                                            Get.find<DashboardController>().refreshData();
-                                          }
-                                          Get.snackbar('Deleted', 'Garage expense deleted', backgroundColor: AppColors.error.withValues(alpha: 0.2));
-                                          if (mounted) setState(() {});
-                                        }
-                                      },
-                                    ),
-                                  ],
-                                ),
-                              );
+                                  ),
+                                );
+                                if (confirm == true) {
+                                  await _expenseRepo.deleteExpense(exp.id);
+                                  _loadCategories();
+                                  setState(() {});
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
                             },
                           ),
                         ),
@@ -387,7 +403,7 @@ class _GarageExpenseFormDialogState extends State<GarageExpenseFormDialog> {
   void initState() {
     super.initState();
     final e = widget.existing;
-    _categoryController = TextEditingController(text: e?.category ?? '');
+    _categoryController = TextEditingController(text: e?.category ?? e?.name ?? '');
     _descController = TextEditingController(text: e?.description ?? '');
     _amountController = TextEditingController(text: e != null ? e.amount.toStringAsFixed(0) : '');
     _notesController = TextEditingController(text: e?.notes ?? '');
@@ -436,6 +452,7 @@ class _GarageExpenseFormDialogState extends State<GarageExpenseFormDialog> {
       id: id,
       businessId: 'local',
       expenseType: 'center',
+      name: _categoryController.text.trim(),
       category: _categoryController.text.trim(),
       description: _descController.text.trim().isNotEmpty ? _descController.text.trim() : _categoryController.text.trim(),
       amount: amount,

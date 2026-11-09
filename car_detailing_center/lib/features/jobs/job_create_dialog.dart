@@ -170,10 +170,6 @@ class _JobCreateDialogState extends State<JobCreateDialog> {
       Get.snackbar('Required', 'Please enter or select a Customer', backgroundColor: AppColors.error.withValues(alpha: 0.2));
       return;
     }
-    if (_selectedServices.isEmpty) {
-      Get.snackbar('Required', 'Please select at least one detailing service', backgroundColor: AppColors.error.withValues(alpha: 0.2));
-      return;
-    }
 
     setState(() => _isSaving = true);
     final odoIn = double.tryParse(_odometerInController.text.trim()) ?? (_selectedVehicle?.mileage?.toDouble() ?? 0.0);
@@ -728,236 +724,18 @@ class _JobCreateDialogState extends State<JobCreateDialog> {
 
                           const SizedBox(height: 12),
 
-                          // Odometer In & Staff
-                          if (isWide)
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: TextFormField(
-                                    controller: _odometerInController,
-                                    keyboardType: TextInputType.number,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Odometer In (KM)',
-                                      prefixIcon: Icon(Icons.speed_rounded),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: DropdownButtonFormField<StaffModel>(
-                                    decoration: const InputDecoration(labelText: 'Assign Primary Technician', prefixIcon: Icon(Icons.badge_rounded)),
-                                    items: _staffList.map((st) => DropdownMenuItem(value: st, child: Text('${st.name} (${st.designation})', overflow: TextOverflow.ellipsis))).toList(),
-                                    onChanged: (val) {
-                                      if (val != null && !_assignedStaff.contains(val)) {
-                                        setState(() => _assignedStaff.add(val));
-                                      }
-                                    },
-                                  ),
-                                ),
-                              ],
-                            )
-                          else ...[
-                            TextFormField(
-                              controller: _odometerInController,
-                              keyboardType: TextInputType.number,
-                              decoration: const InputDecoration(
-                                labelText: 'Odometer In (KM)',
-                                prefixIcon: Icon(Icons.speed_rounded),
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            DropdownButtonFormField<StaffModel>(
-                              decoration: const InputDecoration(labelText: 'Assign Primary Technician', prefixIcon: Icon(Icons.badge_rounded)),
-                              items: _staffList.map((st) => DropdownMenuItem(value: st, child: Text('${st.name} (${st.designation})', overflow: TextOverflow.ellipsis))).toList(),
-                              onChanged: (val) {
-                                if (val != null && !_assignedStaff.contains(val)) {
-                                  setState(() => _assignedStaff.add(val));
-                                }
-                              },
-                            ),
-                          ],
-                          const SizedBox(height: 14),
-
-                          // Services Selection Header with Dynamic Add & Manage Buttons
-                          Wrap(
-                            alignment: WrapAlignment.spaceBetween,
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Text('Detailing Operations & Packages',
-                                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                                  const SizedBox(width: 8),
-                                  Text('(${_selectedServices.length} Selected)',
-                                      style: const TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold, fontSize: 13)),
-                                ],
-                              ),
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  ElevatedButton.icon(
-                                    icon: const Icon(Icons.add_rounded, size: 15),
-                                    label: const Text('Add Package', style: TextStyle(fontSize: 11)),
-                                    style: ElevatedButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                      visualDensity: VisualDensity.compact,
-                                    ),
-                                    onPressed: _showAddPackageDialog,
-                                  ),
-                                  const SizedBox(width: 6),
-                                  OutlinedButton.icon(
-                                    icon: const Icon(Icons.tune_rounded, size: 15),
-                                    label: const Text('Manage', style: TextStyle(fontSize: 11)),
-                                    style: OutlinedButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                                      visualDensity: VisualDensity.compact,
-                                    ),
-                                    onPressed: _showManagePackagesDialog,
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-
-                          // Dynamic Packages List
-                          SizedBox(
-                            height: isWide ? 200 : 160,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                border: Border.all(color: Theme.of(context).dividerColor),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: _availablePackages.isEmpty
-                                  ? Center(
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const Icon(Icons.inventory_2_outlined, size: 36, color: AppColors.textDarkSecondary),
-                                          const SizedBox(height: 8),
-                                          const Text('No detailing operations added yet.'),
-                                          const SizedBox(height: 8),
-                                          ElevatedButton.icon(
-                                            onPressed: _showAddPackageDialog,
-                                            icon: const Icon(Icons.add_rounded, size: 16),
-                                            label: const Text('Add Detailing Package'),
-                                          ),
-                                        ],
-                                      ),
-                                    )
-                                  : ListView.separated(
-                                      itemCount: _availablePackages.length,
-                                      separatorBuilder: (_, __) => const Divider(height: 1),
-                                      itemBuilder: (context, index) {
-                                        final s = _availablePackages[index];
-                                        final selectedItem = _selectedServices.firstWhereOrNull((item) => item.name == s.name);
-                                        final isSelected = selectedItem != null;
-
-                                        return Container(
-                                          color: isSelected ? AppColors.primary.withValues(alpha: 0.08) : Colors.transparent,
-                                          child: ListTile(
-                                            dense: true,
-                                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                                            leading: Checkbox(
-                                              value: isSelected,
-                                              activeColor: AppColors.primary,
-                                              onChanged: (val) {
-                                                setState(() {
-                                                  if (val == true) {
-                                                    _selectedServices.add(SimpleServiceItem(s.name, s.price, id: s.id));
-                                                  } else {
-                                                    _selectedServices.removeWhere((item) => item.name == s.name);
-                                                  }
-                                                });
-                                              },
-                                            ),
-                                            title: Text(
-                                              s.name,
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.w600,
-                                                fontSize: 14,
-                                                color: isSelected ? AppColors.primaryLight : null,
-                                              ),
-                                            ),
-                                            subtitle: isSelected && selectedItem.price != s.price
-                                                ? Text(
-                                                    'Customized (Standard: ${Formatters.currency(s.price, symbol: currency)})',
-                                                    style: const TextStyle(fontSize: 11, color: AppColors.warning, fontWeight: FontWeight.w500),
-                                                  )
-                                                : Text(
-                                                    'Standard: ${Formatters.currency(s.price, symbol: currency)}',
-                                                    style: const TextStyle(fontSize: 11, color: AppColors.textDarkMuted),
-                                                  ),
-                                            trailing: isSelected
-                                                ? Row(
-                                                    mainAxisSize: MainAxisSize.min,
-                                                    children: [
-                                                      InkWell(
-                                                        onTap: () => _editServicePrice(selectedItem),
-                                                        borderRadius: BorderRadius.circular(8),
-                                                        child: Container(
-                                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                                          decoration: BoxDecoration(
-                                                            color: AppColors.primary.withValues(alpha: 0.15),
-                                                            borderRadius: BorderRadius.circular(8),
-                                                            border: Border.all(color: AppColors.primary),
-                                                          ),
-                                                          child: Row(
-                                                            mainAxisSize: MainAxisSize.min,
-                                                            children: [
-                                                              Text(
-                                                                Formatters.currency(selectedItem.price, symbol: currency),
-                                                                style: const TextStyle(
-                                                                  fontSize: 13,
-                                                                  fontWeight: FontWeight.bold,
-                                                                  color: AppColors.primaryLight,
-                                                                ),
-                                                              ),
-                                                              const SizedBox(width: 6),
-                                                              const Icon(Icons.edit_rounded, size: 14, color: AppColors.primaryLight),
-                                                            ],
-                                                          ),
-                                                        ),
-                                                      ),
-                                                      if (selectedItem.price != s.price) ...[
-                                                        const SizedBox(width: 4),
-                                                        IconButton(
-                                                          icon: const Icon(Icons.restart_alt_rounded, size: 18, color: AppColors.textDarkMuted),
-                                                          tooltip: 'Reset to standard price',
-                                                          onPressed: () {
-                                                            setState(() {
-                                                              selectedItem.price = s.price;
-                                                            });
-                                                          },
-                                                        ),
-                                                      ],
-                                                    ],
-                                                  )
-                                                : Text(
-                                                    Formatters.currency(s.price, symbol: currency),
-                                                    style: const TextStyle(fontSize: 13, color: AppColors.textDarkSecondary),
-                                                  ),
-                                            onTap: () {
-                                              setState(() {
-                                                if (!isSelected) {
-                                                  _selectedServices.add(SimpleServiceItem(s.name, s.price, id: s.id));
-                                                } else {
-                                                  _selectedServices.removeWhere((item) => item.name == s.name);
-                                                }
-                                              });
-                                            },
-                                          ),
-                                        );
-                                      },
-                                    ),
+                          // Odometer In only (Assign Technician removed)
+                          TextFormField(
+                            controller: _odometerInController,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'Odometer In (KM)',
+                              prefixIcon: Icon(Icons.speed_rounded),
                             ),
                           ),
                           const SizedBox(height: 14),
 
-                          // Financial Summary Box
+                          // Financial Summary
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                             decoration: BoxDecoration(
