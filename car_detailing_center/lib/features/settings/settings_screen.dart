@@ -515,51 +515,6 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Logo uploader
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Row(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(36),
-                        child: SizedBox(
-                          width: 72,
-                          height: 72,
-                          child: AppImage(
-                            imagePath: _logoUrl,
-                            placeholder: Container(
-                              color: AppColors.primary.withValues(alpha: 0.15),
-                              child: const Icon(Icons.business_rounded, size: 36, color: AppColors.primaryLight),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 20),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Business Logo', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                            const SizedBox(height: 4),
-                            const Text('Upload PNG or JPG logo to appear on job cards and tax invoices.', style: TextStyle(fontSize: 12, color: AppColors.textDarkSecondary)),
-                            const SizedBox(height: 10),
-                            OutlinedButton.icon(
-                              onPressed: _isUploadingLogo ? null : _pickLogo,
-                              icon: _isUploadingLogo
-                                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                                  : const Icon(Icons.upload_file_rounded, size: 16),
-                              label: const Text('Change Logo'),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-
               // Form fields
               Card(
                 child: Padding(

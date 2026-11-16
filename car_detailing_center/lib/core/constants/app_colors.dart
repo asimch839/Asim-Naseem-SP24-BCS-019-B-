@@ -18,6 +18,7 @@ class AppColors {
   // Aliases for compatibility
   static const Color backgroundDark = darkBackground;
   static const Color cardDark = darkCard;
+  static const Color surfaceDark = darkSurface;
   static const Color borderDark = darkBorder;
   static const Color secondary = accent;
 

@@ -80,7 +80,7 @@ class AutoDetailProApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GetMaterialApp(
-      title: 'AutoDetail Pro - Car Detailing Center Management',
+      title: "Dawood's Garage - Detailing & Performance",
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,

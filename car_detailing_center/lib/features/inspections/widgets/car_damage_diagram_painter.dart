@@ -482,19 +482,29 @@ class CarDamageDiagramPainter extends CustomPainter {
     final pos = Offset(marker.x * size.width, marker.y * size.height);
     final isSelected = marker.id == hoveredOrSelectedMarkerId;
 
-    // Pin Shadow
-    canvas.drawCircle(pos, 13, Paint()..color = Colors.black.withValues(alpha: 0.35));
+    // 1. Glowing Highlight Aura on the car part
+    final haloPaint = Paint()
+      ..color = marker.color.withValues(alpha: 0.30)
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(pos, 22, haloPaint);
 
-    // Outer Circle with Defect Color
+    final haloBorder = Paint()
+      ..color = marker.color.withValues(alpha: 0.80)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+    canvas.drawCircle(pos, 22, haloBorder);
+
+    // 2. Pin Badge
+    canvas.drawCircle(pos, 13, Paint()..color = Colors.black.withValues(alpha: 0.60));
+
     final pinPaint = Paint()
       ..color = marker.color
       ..style = PaintingStyle.fill;
     canvas.drawCircle(pos, isSelected ? 13 : 11, pinPaint);
 
-    // White Border
     final borderPaint = Paint()
       ..color = Colors.white
-      ..strokeWidth = isSelected ? 2.5 : 1.8
+      ..strokeWidth = isSelected ? 2.5 : 2.0
       ..style = PaintingStyle.stroke;
     canvas.drawCircle(pos, isSelected ? 13 : 11, borderPaint);
 
@@ -502,31 +512,86 @@ class CarDamageDiagramPainter extends CustomPainter {
     final tp = TextPainter(
       text: TextSpan(
         text: marker.shortCode,
-        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+        style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.bold),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
     tp.paint(canvas, Offset(pos.dx - (tp.width / 2), pos.dy - (tp.height / 2)));
 
-    // Defect Note Tag (if note is present)
-    if (marker.note.trim().isNotEmpty) {
-      final noteSpan = TextSpan(
-        text: marker.note,
-        style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w600),
-      );
-      final noteTp = TextPainter(text: noteSpan, textDirection: TextDirection.ltr)..layout();
-      final tagRect = RRect.fromRectAndRadius(
-        Rect.fromLTWH(pos.dx - (noteTp.width / 2) - 4, pos.dy + 14, noteTp.width + 8, noteTp.height + 4),
-        const Radius.circular(4),
-      );
-      canvas.drawRRect(tagRect, Paint()..color = Colors.black.withValues(alpha: 0.85));
-      canvas.drawRRect(tagRect, Paint()..color = marker.color..style = PaintingStyle.stroke..strokeWidth = 1);
-      noteTp.paint(canvas, Offset(pos.dx - (noteTp.width / 2), pos.dy + 16));
-    }
+    // 3. Highlighted Defect Label Tag (Panel Name + Note)
+    final label = marker.note.trim().isNotEmpty
+        ? '${marker.panelName}: ${marker.note.trim()}'
+        : '${marker.panelName} (${marker.defectType})';
+
+    final noteSpan = TextSpan(
+      text: label,
+      style: const TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.bold),
+    );
+    final noteTp = TextPainter(text: noteSpan, textDirection: TextDirection.ltr)..layout();
+    final tagW = noteTp.width + 12;
+    final tagH = noteTp.height + 6;
+    final tagLeft = (pos.dx - tagW / 2).clamp(4.0, size.width - tagW - 4.0);
+    final tagTop = (pos.dy + 15 + tagH < size.height) ? pos.dy + 15 : pos.dy - tagH - 15;
+
+    final tagRect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(tagLeft, tagTop, tagW, tagH),
+      const Radius.circular(5),
+    );
+    canvas.drawRRect(tagRect, Paint()..color = const Color(0xFF0F172A).withValues(alpha: 0.94));
+    canvas.drawRRect(tagRect, Paint()..color = marker.color..style = PaintingStyle.stroke..strokeWidth = 1.2);
+    noteTp.paint(canvas, Offset(tagLeft + 6, tagTop + 3));
   }
 
   @override
   bool shouldRepaint(covariant CarDamageDiagramPainter oldDelegate) => true;
+
+  // Resolves default diagram coordinate for any car panel name
+  static Offset getPositionForPanel(String panel, {String? view}) {
+    final p = panel.toLowerCase().trim();
+    final v = (view ?? '').toLowerCase().trim();
+
+    // Left Side / Driver Side
+    if (v.contains('left') || p.startsWith('left')) {
+      if (p.contains('fender') || p.contains('front wheel')) return const Offset(0.26, 0.15);
+      if (p.contains('front door')) return const Offset(0.44, 0.15);
+      if (p.contains('rear door') || p.contains('back door')) return const Offset(0.61, 0.15);
+      if (p.contains('quarter') || p.contains('rear wheel')) return const Offset(0.78, 0.15);
+      return const Offset(0.50, 0.15);
+    }
+
+    // Right Side / Passenger Side
+    if (v.contains('right') || p.startsWith('right')) {
+      if (p.contains('fender') || p.contains('front wheel')) return const Offset(0.26, 0.84);
+      if (p.contains('front door')) return const Offset(0.44, 0.84);
+      if (p.contains('rear door') || p.contains('back door')) return const Offset(0.61, 0.84);
+      if (p.contains('quarter') || p.contains('rear wheel')) return const Offset(0.78, 0.84);
+      return const Offset(0.50, 0.84);
+    }
+
+    // Front View
+    if (v.contains('front') || p.contains('front') || p.contains('bumper') || p.contains('grille') || p.contains('headlight')) {
+      if (p.contains('windshield') || p.contains('glass')) return const Offset(0.12, 0.36);
+      if (p.contains('grille') || p.contains('headlight')) return const Offset(0.12, 0.48);
+      if (p.contains('bumper') || p.contains('fog')) return const Offset(0.12, 0.60);
+      return const Offset(0.12, 0.48);
+    }
+
+    // Rear View
+    if (v.contains('rear') || p.contains('rear') || p.contains('tail') || p.contains('boot') || p.contains('diffuser')) {
+      if (p.contains('windshield') || p.contains('glass')) return const Offset(0.88, 0.36);
+      if (p.contains('boot') || p.contains('tail')) return const Offset(0.88, 0.48);
+      if (p.contains('bumper') || p.contains('diffuser')) return const Offset(0.88, 0.60);
+      return const Offset(0.88, 0.48);
+    }
+
+    // Top View (Bonnet, Roof, Trunk, Windshield)
+    if (p.contains('bonnet') || p.contains('hood')) return const Offset(0.33, 0.48);
+    if (p.contains('windshield') || p.contains('windscreen')) return const Offset(0.45, 0.48);
+    if (p.contains('roof') || p.contains('sunroof')) return const Offset(0.58, 0.48);
+    if (p.contains('trunk') || p.contains('boot') || p.contains('dick')) return const Offset(0.86, 0.48);
+
+    return const Offset(0.50, 0.48);
+  }
 
   // Static hit detection helper to identify car view and panel from tap coordinate
   static Map<String, String> detectPanelFromPosition(Offset rel) {

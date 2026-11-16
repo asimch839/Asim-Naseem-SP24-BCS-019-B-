@@ -44,6 +44,17 @@ class _InventoryScreenState extends State<InventoryScreen> {
     if (mounted) setState(() => _lowStockThreshold = t);
   }
 
+  Future<void> _openAddStockDialog() async {
+    final res = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const InventoryFormDialog(),
+    );
+    if (res == true && mounted) {
+      setState(() {});
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final currency = AuthService.to.currentBusiness.value?.currency ?? AppConstants.defaultCurrency;
@@ -53,14 +64,22 @@ class _InventoryScreenState extends State<InventoryScreen> {
       currentRoute: AppRoutes.inventory,
       currentSubItem: 'Stock Details',
       title: 'Stock Details',
+      actions: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          child: ElevatedButton.icon(
+            onPressed: _openAddStockDialog,
+            icon: const Icon(Icons.add_rounded, size: 18),
+            label: const Text('Add Stock Item'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ),
+      ],
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          final res = await showDialog<bool>(
-            context: context,
-            builder: (_) => const InventoryFormDialog(),
-          );
-          if (res == true && mounted) setState(() {});
-        },
+        onPressed: _openAddStockDialog,
         icon: const Icon(Icons.add_rounded),
         label: const Text('Add Stock Item'),
       ),
@@ -265,13 +284,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       title: 'No Stock Items Found',
                       description: 'Add your garage inventory items to track real-time stock levels, usage, and purchase prices.',
                       actionLabel: 'Add Stock Item',
-                      onAction: () async {
-                        final res = await showDialog<bool>(
-                          context: context,
-                          builder: (_) => const InventoryFormDialog(),
-                        );
-                        if (res == true && mounted) setState(() {});
-                      },
+                      onAction: _openAddStockDialog,
                     );
                   }
 

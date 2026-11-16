@@ -1,8 +1,8 @@
 /// Application Constants for Car Detailing Center Management Software
 class AppConstants {
-  static const String appName = 'AutoDetail Pro';
+  static const String appName = "Dawood's Garage";
   static const String appVersion = '1.0.0';
-  static const String companyName = 'Devnix Limited';
+  static const String companyName = "Dawood's Garage Detail & Performance";
 
   // Local Storage Keys
   static const String keyActiveBusinessId = 'active_business_id';

@@ -353,8 +353,13 @@ class AppDatabase {
     batch.execute('''
       CREATE TABLE garage_expenses (
         id TEXT PRIMARY KEY,
-        category TEXT NOT NULL,
-        description TEXT NOT NULL,
+        businessId TEXT,
+        expenseType TEXT DEFAULT 'center',
+        staffId TEXT,
+        staffName TEXT,
+        name TEXT,
+        category TEXT,
+        description TEXT,
         amount REAL NOT NULL,
         date TEXT NOT NULL,
         payment_method TEXT NOT NULL,
@@ -363,8 +368,12 @@ class AppDatabase {
         vendor_contact TEXT,
         vendor_address TEXT,
         vendor_invoice_ref TEXT,
+        referenceNumber TEXT,
         receipt_path TEXT,
         notes TEXT,
+        isSalaryPayment INTEGER DEFAULT 0,
+        isDeleted INTEGER DEFAULT 0,
+        isCompleted INTEGER DEFAULT 0,
         created_at TEXT NOT NULL
       )
     ''');
@@ -667,6 +676,27 @@ class AppDatabase {
     } catch (_) {}
     try {
       await db.execute('UPDATE inventory_items SET selling_price = purchase_price WHERE selling_price IS NULL OR selling_price = 0');
+    } catch (_) {}
+
+    // Ensure garage_expenses columns exist for updated schema
+    final expenseCols = [
+      'ALTER TABLE garage_expenses ADD COLUMN name TEXT',
+      'ALTER TABLE garage_expenses ADD COLUMN staffId TEXT',
+      'ALTER TABLE garage_expenses ADD COLUMN staffName TEXT',
+      'ALTER TABLE garage_expenses ADD COLUMN isCompleted INTEGER DEFAULT 0',
+      'ALTER TABLE garage_expenses ADD COLUMN businessId TEXT',
+      'ALTER TABLE garage_expenses ADD COLUMN expenseType TEXT DEFAULT \'center\'',
+      'ALTER TABLE garage_expenses ADD COLUMN referenceNumber TEXT',
+      'ALTER TABLE garage_expenses ADD COLUMN isSalaryPayment INTEGER DEFAULT 0',
+      'ALTER TABLE garage_expenses ADD COLUMN isDeleted INTEGER DEFAULT 0',
+    ];
+    for (final colSql in expenseCols) {
+      try {
+        await db.execute(colSql);
+      } catch (_) {}
+    }
+    try {
+      await db.execute('UPDATE garage_expenses SET name = category WHERE name IS NULL OR name = \'\'');
     } catch (_) {}
 
     // Ensure invoices table allows NULL vehicle_id for counter sales

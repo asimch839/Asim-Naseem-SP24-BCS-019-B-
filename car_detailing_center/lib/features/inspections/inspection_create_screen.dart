@@ -1,6 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:uuid/uuid.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:printing/printing.dart';
+import '../../core/services/clipboard_service.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/services/auth_service.dart';
 import '../../data/repositories/inspection_repository.dart';
@@ -14,6 +19,7 @@ import '../../data/models/customer_model.dart';
 import 'widgets/vehicle_diagram_widget.dart';
 import 'widgets/part_inspection_dialog.dart';
 import 'models/diagram_marker_model.dart';
+import 'services/vehicle_diagram_renderer.dart';
 
 class InspectionCreateScreen extends StatefulWidget {
   final VehicleModel? vehicle;
@@ -143,7 +149,7 @@ class _InspectionCreateScreenState extends State<InspectionCreateScreen> {
     final business = AuthService.to.currentBusiness.value;
     final checklistSource = business?.checklistItems ?? _defaultChecklistTitles;
     for (var item in checklistSource) {
-      _checklistItems.add(ChecklistRecordItem(item: item, status: 'Present'));
+      _checklistItems.add(ChecklistRecordItem(item: item, status: ''));
     }
 
     // Default Sections
@@ -378,9 +384,8 @@ class _InspectionCreateScreenState extends State<InspectionCreateScreen> {
     }
   }
 
-  void _saveAndGeneratePdf() async {
+  void _saveInspection() async {
     setState(() => _isSaving = true);
-    final businessId = AuthService.to.businessId;
     final staff = AuthService.to.currentUser.value;
     final inspectionId = const Uuid().v4();
 
@@ -484,27 +489,8 @@ class _InspectionCreateScreenState extends State<InspectionCreateScreen> {
       allPhotos.addAll(p.photoUrls);
     }
 
-    final inspection = InspectionModel(
-      id: inspectionId,
-      businessId: businessId,
-      vehicleId: activeVehicle.id,
-      customerId: activeVehicle.customerId,
-      jobId: widget.jobId,
-      inspectorStaffId: staff?.uid ?? 'inspector',
-      inspectorStaffName: staff?.fullName ?? 'Service Advisor',
-      inspectionDate: DateTime.now(),
-      diagramParts: _diagramParts,
-      sectionConditions: sectionConditions,
-      driveCondition: driveCondition,
-      checklist: _checklistItems,
-      staffRemarks: _staffRemarksController.text.trim().isNotEmpty ? _staffRemarksController.text.trim() : null,
-      customerRemarks: _customerRemarksController.text.trim().isNotEmpty ? _customerRemarksController.text.trim() : null,
-      damagePhotoUrls: allPhotos,
-    );
-
     try {
       final inspRepo = Get.find<InspectionRepository>();
-      final custRepo = Get.find<CustomerRepository>();
 
       final List<Map<String, dynamic>> itemsToSave = [];
       for (var p in _diagramParts) {
@@ -537,6 +523,30 @@ class _InspectionCreateScreenState extends State<InspectionCreateScreen> {
           });
         }
       }
+      for (var c in _checklistItems) {
+        if (c.status.isNotEmpty) {
+          itemsToSave.add({
+            'section_name': 'Checklist',
+            'part_name': c.item,
+            'condition': c.status,
+            'view_type': 'Inventory',
+          });
+        }
+      }
+
+      // Save defect markers with coordinates
+      for (var m in _diagramMarkers) {
+        itemsToSave.add({
+          'section_name': 'Diagram Marker',
+          'part_name': m.panelName,
+          'condition': m.defectType,
+          'damage_description': m.defectType,
+          'notes': m.note,
+          'view_type': m.viewName,
+          'x_pos': m.x,
+          'y_pos': m.y,
+        });
+      }
 
       final List<Map<String, dynamic>> photosToSave = [];
       for (var ph in allPhotos) {
@@ -545,6 +555,27 @@ class _InspectionCreateScreenState extends State<InspectionCreateScreen> {
           'file_path': ph,
         });
       }
+
+      // Render & save vehicle diagram image
+      try {
+        final carDiagramBytes = await VehicleDiagramRenderer.renderToPngBytes(
+          markers: _diagramMarkers,
+          strokes: _drawingStrokes,
+          isDarkMode: true,
+        );
+        final appDir = await getApplicationDocumentsDirectory();
+        final diagDir = Directory('${appDir.path}/inspection_diagrams');
+        if (!await diagDir.exists()) {
+          await diagDir.create(recursive: true);
+        }
+        final diagFile = File('${diagDir.path}/diag_$inspectionId.png');
+        await diagFile.writeAsBytes(carDiagramBytes);
+        photosToSave.add({
+          'photo_type': 'diagram',
+          'file_path': diagFile.path,
+          'description': 'Vehicle 5-View Inspection Diagram',
+        });
+      } catch (_) {}
 
       await inspRepo.saveInspection(
         id: inspectionId,
@@ -558,26 +589,355 @@ class _InspectionCreateScreenState extends State<InspectionCreateScreen> {
         notes: _staffRemarksController.text.trim(),
       );
 
-      final business = AuthService.to.currentBusiness.value;
-      if (business != null) {
-        final cust = await custRepo.getCustomerById(targetCustomerId);
-        await PdfService.printInspectionReport(
-          business: business,
-          inspection: inspection,
-          vehicleReg: targetVehicle.registrationNumber,
-          vehicleName: '${targetVehicle.make} ${targetVehicle.model}',
-          customerName: cust?.fullName ?? widget.preselectedCustomerName ?? 'Customer',
-        );
-      }
-
-      Get.back(result: true);
+      // Save only — do not print automatically!
+      if (!mounted) return;
       Get.snackbar(
-        'Inspection Complete',
-        'Inspection saved to SQLite & comprehensive PDF generated',
+        'Inspection Saved',
+        'Inspection for ${targetVehicle.make} (${targetVehicle.registrationNumber}) saved successfully.',
         backgroundColor: AppColors.success.withValues(alpha: 0.2),
+        duration: const Duration(seconds: 4),
+      );
+
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(
+            children: [
+              Icon(Icons.check_circle_rounded, color: AppColors.success),
+              SizedBox(width: 8),
+              Text('Inspection Saved', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('${targetVehicle.make} ${targetVehicle.model} (${targetVehicle.registrationNumber})',
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+              const SizedBox(height: 6),
+              const Text('Saved to SQLite database without printing. Choose an action:',
+                  style: TextStyle(fontSize: 12, color: AppColors.textDarkSecondary)),
+            ],
+          ),
+          actions: [
+            OutlinedButton.icon(
+              icon: const Icon(Icons.visibility_rounded, size: 16),
+              label: const Text('View Sheet'),
+              onPressed: () async {
+                Navigator.pop(ctx);
+                await _viewInspectionSheet();
+                Get.back(result: true);
+              },
+            ),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.share_rounded, size: 16),
+              label: const Text('WhatsApp'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF25D366),
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () async {
+                Navigator.pop(ctx);
+                await _shareOnWhatsApp();
+                Get.back(result: true);
+              },
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                Get.back(result: true);
+              },
+              child: const Text('Done'),
+            ),
+          ],
+        ),
       );
     } catch (e) {
       Get.snackbar('Error', 'Failed to save inspection: $e', backgroundColor: AppColors.error.withValues(alpha: 0.2));
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  Future<void> _viewInspectionSheet() async {
+    final business = AuthService.to.currentBusiness.value;
+    if (business == null) {
+      Get.snackbar('Error', 'Business info not available', backgroundColor: AppColors.error.withValues(alpha: 0.2));
+      return;
+    }
+
+    final staff = AuthService.to.currentUser.value;
+    final custRepo = Get.find<CustomerRepository>();
+
+    VehicleModel targetVehicle;
+    String targetCustomerId;
+
+    if (_selectedVehicle != null) {
+      targetVehicle = _selectedVehicle!;
+      targetCustomerId = _selectedVehicle!.customerId;
+    } else {
+      Get.snackbar('Required', 'Please select a Customer and Vehicle first', backgroundColor: AppColors.error.withValues(alpha: 0.2));
+      return;
+    }
+
+    setState(() => _isSaving = true);
+    try {
+      final cust = await custRepo.getCustomerById(targetCustomerId);
+      final customerName = cust?.fullName ?? widget.preselectedCustomerName ?? 'Customer';
+
+      // Sync diagram parts
+      for (final m in _diagramMarkers) {
+        if (!_diagramParts.any((p) => p.partName == m.panelName && p.view == m.viewName)) {
+          _diagramParts.add(InspectionPartItem(
+            partName: m.panelName,
+            view: m.viewName,
+            condition: m.defectType,
+            damageDescription: m.note.isNotEmpty ? m.note : m.defectType,
+            hasDamage: true,
+          ));
+        }
+      }
+
+      final Map<String, String> sectionConditions = {};
+      for (var entry in _sectionControllers.entries) {
+        if (entry.value.text.trim().isNotEmpty) sectionConditions[entry.key] = entry.value.text.trim();
+      }
+
+      final inspection = InspectionModel(
+        id: const Uuid().v4(),
+        businessId: business.id,
+        vehicleId: targetVehicle.id,
+        customerId: targetCustomerId,
+        jobId: widget.jobId,
+        inspectorStaffId: staff?.uid ?? 'inspector',
+        inspectorStaffName: staff?.fullName ?? 'Service Advisor',
+        inspectionDate: DateTime.now(),
+        diagramParts: _diagramParts,
+        sectionConditions: sectionConditions,
+        driveCondition: {},
+        checklist: _checklistItems,
+        staffRemarks: _staffRemarksController.text.trim().isNotEmpty ? _staffRemarksController.text.trim() : null,
+      );
+
+      final carDiagramBytes = await VehicleDiagramRenderer.renderToPngBytes(
+        markers: _diagramMarkers,
+        strokes: _drawingStrokes,
+        isDarkMode: true,
+      );
+
+      final pdfBytes = await PdfService.buildInspectionReportBytes(
+        business: business,
+        inspection: inspection,
+        vehicleReg: targetVehicle.registrationNumber,
+        vehicleName: '${targetVehicle.make} ${targetVehicle.model}',
+        customerName: customerName,
+        carDiagramBytes: carDiagramBytes,
+      );
+
+      if (!mounted) return;
+
+      await showDialog(
+        context: context,
+        builder: (ctx) => Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 950, maxHeight: 850),
+            child: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardTheme.color,
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                    border: Border(bottom: BorderSide(color: Theme.of(context).dividerColor)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.description_rounded, color: AppColors.primary),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Inspection Sheet: ${targetVehicle.make} ${targetVehicle.model} (${targetVehicle.registrationNumber})',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.share_rounded, size: 16),
+                        label: const Text('Share WhatsApp'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF25D366),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        ),
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _shareOnWhatsApp();
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: PdfPreview(
+                    build: (format) async => pdfBytes,
+                    canChangeOrientation: false,
+                    canChangePageFormat: false,
+                    canDebug: false,
+                    allowPrinting: true,
+                    allowSharing: true,
+                    pdfFileName: 'Inspection_${targetVehicle.registrationNumber}.pdf',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    } catch (e) {
+      Get.snackbar('Error', 'Failed to render inspection sheet: $e', backgroundColor: AppColors.error.withValues(alpha: 0.2));
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  Future<void> _shareOnWhatsApp() async {
+    final business = AuthService.to.currentBusiness.value;
+    if (business == null) {
+      Get.snackbar('Error', 'Business info not available', backgroundColor: AppColors.error.withValues(alpha: 0.2));
+      return;
+    }
+
+    final staff = AuthService.to.currentUser.value;
+    final custRepo = Get.find<CustomerRepository>();
+
+    VehicleModel targetVehicle;
+    String targetCustomerId;
+
+    if (_selectedVehicle != null) {
+      targetVehicle = _selectedVehicle!;
+      targetCustomerId = _selectedVehicle!.customerId;
+    } else {
+      Get.snackbar('Required', 'Please select a Customer and Vehicle first', backgroundColor: AppColors.error.withValues(alpha: 0.2));
+      return;
+    }
+
+    setState(() => _isSaving = true);
+    try {
+      final cust = await custRepo.getCustomerById(targetCustomerId);
+      final customerName = cust?.fullName ?? widget.preselectedCustomerName ?? 'Customer';
+
+      // Sync diagram parts
+      for (final m in _diagramMarkers) {
+        if (!_diagramParts.any((p) => p.partName == m.panelName && p.view == m.viewName)) {
+          _diagramParts.add(InspectionPartItem(
+            partName: m.panelName,
+            view: m.viewName,
+            condition: m.defectType,
+            damageDescription: m.note.isNotEmpty ? m.note : m.defectType,
+            hasDamage: true,
+          ));
+        }
+      }
+
+      final Map<String, String> sectionConditions = {};
+      for (var entry in _sectionControllers.entries) {
+        if (entry.value.text.trim().isNotEmpty) sectionConditions[entry.key] = entry.value.text.trim();
+      }
+
+      final inspection = InspectionModel(
+        id: const Uuid().v4(),
+        businessId: business.id,
+        vehicleId: targetVehicle.id,
+        customerId: targetCustomerId,
+        jobId: widget.jobId,
+        inspectorStaffId: staff?.uid ?? 'inspector',
+        inspectorStaffName: staff?.fullName ?? 'Service Advisor',
+        inspectionDate: DateTime.now(),
+        diagramParts: _diagramParts,
+        sectionConditions: sectionConditions,
+        driveCondition: {},
+        checklist: _checklistItems,
+        staffRemarks: _staffRemarksController.text.trim().isNotEmpty ? _staffRemarksController.text.trim() : null,
+      );
+
+      final carDiagramBytes = await VehicleDiagramRenderer.renderToPngBytes(
+        markers: _diagramMarkers,
+        strokes: _drawingStrokes,
+        isDarkMode: true,
+      );
+
+      final pdfBytes = await PdfService.buildInspectionReportBytes(
+        business: business,
+        inspection: inspection,
+        vehicleReg: targetVehicle.registrationNumber,
+        vehicleName: '${targetVehicle.make} ${targetVehicle.model}',
+        customerName: customerName,
+        carDiagramBytes: carDiagramBytes,
+      );
+
+      // Save PDF to temp file
+      final tempDir = await getTemporaryDirectory();
+      final baseName = 'Inspection_${targetVehicle.registrationNumber.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_')}_${DateTime.now().millisecondsSinceEpoch}';
+      final pdfFile = File('${tempDir.path}/$baseName.pdf');
+      await pdfFile.writeAsBytes(pdfBytes);
+
+      // Render high-res A4 picture (PNG)
+      String? imagePath;
+      final imageBytes = await PdfService.renderInspectionReportToImage(
+        business: business,
+        inspection: inspection,
+        vehicleReg: targetVehicle.registrationNumber,
+        vehicleName: '${targetVehicle.make} ${targetVehicle.model}',
+        customerName: customerName,
+        carDiagramBytes: carDiagramBytes,
+      );
+
+      if (imageBytes != null) {
+        final imgFile = File('${tempDir.path}/$baseName.png');
+        await imgFile.writeAsBytes(imageBytes);
+        imagePath = imgFile.path;
+      }
+
+      // Copy to Windows Clipboard as Image & File Drop
+      if (imagePath != null) {
+        await WindowsClipboardService.copyImageToClipboard(imagePath, pdfPath: pdfFile.path);
+      } else {
+        await WindowsClipboardService.copyFileToClipboard(pdfFile.path);
+      }
+
+      // Try to open WhatsApp (Windows desktop or Web)
+      final phone = cust?.phone.replaceAll(RegExp(r'[^0-9+]'), '') ?? '';
+      final whatsappUri = Uri.parse(phone.isNotEmpty ? 'whatsapp://send?phone=$phone' : 'whatsapp://send');
+      final webWhatsappUri = Uri.parse(phone.isNotEmpty ? 'https://web.whatsapp.com/send?phone=$phone' : 'https://web.whatsapp.com');
+
+      if (await canLaunchUrl(whatsappUri)) {
+        await launchUrl(whatsappUri);
+      } else if (await canLaunchUrl(webWhatsappUri)) {
+        await launchUrl(webWhatsappUri);
+      }
+
+      if (!mounted) return;
+
+      Get.snackbar(
+        'Copied to Clipboard!',
+        'A4 Inspection Sheet copied. Press Ctrl + V in WhatsApp chat to paste!',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: const Color(0xFF25D366).withValues(alpha: 0.25),
+        colorText: Colors.white,
+        icon: const Icon(Icons.check_circle_rounded, color: Color(0xFF25D366)),
+        duration: const Duration(seconds: 4),
+      );
+    } catch (e) {
+      Get.snackbar('Error', 'Failed to generate PDF: $e', backgroundColor: AppColors.error.withValues(alpha: 0.2));
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -608,11 +968,11 @@ class _InspectionCreateScreenState extends State<InspectionCreateScreen> {
               tooltip: allCollapsed ? 'Expand All' : 'Collapse All',
             ),
             IconButton(
-              onPressed: _isSaving ? null : _saveAndGeneratePdf,
+              onPressed: _isSaving ? null : _saveInspection,
               icon: _isSaving
                   ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.check_circle_rounded, color: AppColors.success),
-              tooltip: 'Save & PDF',
+                  : const Icon(Icons.save_rounded, color: AppColors.success),
+              tooltip: 'Save Inspection',
             ),
           ] else ...[
             // Expand/Collapse all toggle
@@ -622,12 +982,22 @@ class _InspectionCreateScreenState extends State<InspectionCreateScreen> {
               label: Text(allCollapsed ? 'Expand All' : 'Collapse All', style: const TextStyle(fontSize: 12)),
             ),
             const SizedBox(width: 8),
+            OutlinedButton.icon(
+              onPressed: _isSaving ? null : _viewInspectionSheet,
+              icon: const Icon(Icons.visibility_rounded, size: 16),
+              label: const Text('View Sheet'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primaryLight,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              ),
+            ),
+            const SizedBox(width: 8),
             ElevatedButton.icon(
-              onPressed: _isSaving ? null : _saveAndGeneratePdf,
+              onPressed: _isSaving ? null : _saveInspection,
               icon: _isSaving
                   ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.check_circle_rounded, size: 16),
-              label: const Text('Save & PDF'),
+                  : const Icon(Icons.save_rounded, size: 16),
+              label: const Text('Save Inspection'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.success,
                 foregroundColor: Colors.white,
@@ -682,6 +1052,16 @@ class _InspectionCreateScreenState extends State<InspectionCreateScreen> {
                   setState(() {
                     _diagramMarkers.clear();
                     _diagramMarkers.addAll(mList);
+                    _diagramParts.removeWhere((p) => p.view != 'Custom');
+                    for (final m in mList) {
+                      _diagramParts.add(InspectionPartItem(
+                        partName: m.panelName,
+                        view: m.viewName,
+                        condition: m.defectType,
+                        damageDescription: m.note.isNotEmpty ? m.note : m.defectType,
+                        hasDamage: true,
+                      ));
+                    }
                   });
                 },
                 onStrokesChanged: (sList) {
@@ -1680,15 +2060,39 @@ class _InspectionCreateScreenState extends State<InspectionCreateScreen> {
               ],
             );
             final saveBtn = ElevatedButton.icon(
-              onPressed: _isSaving ? null : _saveAndGeneratePdf,
+              onPressed: _isSaving ? null : _saveInspection,
               icon: _isSaving
                   ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.picture_as_pdf_rounded, size: 18),
-              label: Text(_isSaving ? 'Saving...' : 'Save & Print PDF'),
+                  : const Icon(Icons.save_rounded, size: 18),
+              label: Text(_isSaving ? 'Saving...' : 'Save Inspection'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.success,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            );
+
+            final viewBtn = OutlinedButton.icon(
+              onPressed: _isSaving ? null : _viewInspectionSheet,
+              icon: const Icon(Icons.visibility_rounded, size: 18),
+              label: const Text('View Sheet'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primaryLight,
+                side: const BorderSide(color: AppColors.primaryLight),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            );
+
+            final whatsappBtn = ElevatedButton.icon(
+              onPressed: _isSaving ? null : _shareOnWhatsApp,
+              icon: const Icon(Icons.share_rounded, size: 18),
+              label: const Text('Share WhatsApp'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF25D366),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
             );
@@ -1701,6 +2105,14 @@ class _InspectionCreateScreenState extends State<InspectionCreateScreen> {
                   Center(child: statPills),
                   const SizedBox(height: 8),
                   saveBtn,
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Expanded(child: viewBtn),
+                      const SizedBox(width: 8),
+                      Expanded(child: whatsappBtn),
+                    ],
+                  ),
                 ],
               );
             }
@@ -1708,7 +2120,11 @@ class _InspectionCreateScreenState extends State<InspectionCreateScreen> {
             return Row(
               children: [
                 Expanded(child: statPills),
-                const SizedBox(width: 16),
+                const SizedBox(width: 8),
+                viewBtn,
+                const SizedBox(width: 8),
+                whatsappBtn,
+                const SizedBox(width: 8),
                 saveBtn,
               ],
             );

@@ -10,6 +10,7 @@ import '../../data/models/job_model.dart';
 import '../../data/models/inventory_item_model.dart';
 import '../../data/repositories/job_repository.dart';
 import '../../data/repositories/inventory_repository.dart';
+import '../inventory/inventory_form_dialog.dart';
 import '../invoices/invoice_create_dialog.dart';
 
 class JobDetailScreen extends StatefulWidget {
@@ -69,17 +70,175 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     }
   }
 
+  void _showAddServiceDialog() async {
+    final currency = AuthService.to.currentBusiness.value?.currency ?? AppConstants.defaultCurrency;
+    final nameCtrl = TextEditingController();
+    final priceCtrl = TextEditingController();
+    final jobRepo = Get.find<JobRepository>();
+
+    final presets = [
+      'Detailing Service',
+      'Compound Polish',
+      'Interior Deep Clean',
+      'Exterior Wash & Wax',
+      'Ceramic Coating',
+      'PPF Installation',
+      'Engine Bay Cleaning',
+      'Leather Treatment',
+      'Headlight Restoration',
+      'Labour Charges',
+    ];
+
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Row(
+                children: const [
+                  Icon(Icons.add_circle_outline_rounded, color: AppColors.primary, size: 22),
+                  SizedBox(width: 8),
+                  Text('Add Service / Labour', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                ],
+              ),
+              content: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 440),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: nameCtrl,
+                      autofocus: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Service / Operation Name *',
+                        hintText: 'e.g. Polish, Wash, Labour, Wax',
+                        prefixIcon: Icon(Icons.build_rounded, size: 18),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: priceCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: 'Price / Labour Charge ($currency) *',
+                        hintText: '0.00',
+                        prefixIcon: const Icon(Icons.payments_rounded, size: 18),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    const Text('Quick Presets:', style: TextStyle(fontSize: 11, color: AppColors.textDarkSecondary, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: presets.map((p) {
+                        return ActionChip(
+                          visualDensity: VisualDensity.compact,
+                          label: Text(p, style: const TextStyle(fontSize: 11)),
+                          onPressed: () {
+                            setDialogState(() {
+                              nameCtrl.text = p;
+                            });
+                          },
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+                ElevatedButton(
+                  onPressed: () async {
+                    final name = nameCtrl.text.trim();
+                    if (name.isEmpty) {
+                      Get.snackbar('Required', 'Please enter a service name', backgroundColor: AppColors.error.withValues(alpha: 0.2));
+                      return;
+                    }
+                    final price = double.tryParse(priceCtrl.text.trim()) ?? 0.0;
+                    try {
+                      await jobRepo.addServiceToJob(
+                        jobId: _job.id,
+                        description: name,
+                        amount: price,
+                      );
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      await _loadJobDetails();
+                      Get.snackbar(
+                        'Service Added',
+                        'Added "$name" ($currency $price) to Job #${_job.jobNumber}',
+                        backgroundColor: AppColors.success.withValues(alpha: 0.2),
+                      );
+                    } catch (e) {
+                      Get.snackbar('Error', '$e', backgroundColor: AppColors.error.withValues(alpha: 0.2));
+                    }
+                  },
+                  child: const Text('Add Service'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   void _recordStockDeductionDialog() async {
     final invRepo = Get.find<InventoryRepository>();
+    final jobRepo = Get.find<JobRepository>();
     final allItems = await invRepo.getItems();
 
     if (allItems.isEmpty) {
-      Get.snackbar('Inventory Empty', 'Please register stock items in the Inventory module first', backgroundColor: AppColors.warning.withValues(alpha: 0.2));
+      final shouldAdd = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: const [
+              Icon(Icons.inventory_2_outlined, color: AppColors.warning, size: 22),
+              SizedBox(width: 8),
+              Text('Inventory is Empty', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: const Text(
+            'No stock items or chemicals are registered in the inventory yet.\n\nWould you like to register a new stock item now?',
+            style: TextStyle(fontSize: 13),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton.icon(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              icon: const Icon(Icons.add_rounded, size: 18),
+              label: const Text('Add Stock Item Now'),
+            ),
+          ],
+        ),
+      );
+
+      if (shouldAdd == true && mounted) {
+        final added = await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => const InventoryFormDialog(),
+        );
+        if (added == true && mounted) {
+          _recordStockDeductionDialog();
+        }
+      }
       return;
     }
 
     InventoryItemModel selectedItem = allItems.first;
     final qtyCtrl = TextEditingController(text: '1');
+    final defaultPrice = selectedItem.sellingPrice > 0 ? selectedItem.sellingPrice : selectedItem.purchasePrice;
+    final priceCtrl = TextEditingController(text: defaultPrice.toStringAsFixed(0));
+    bool billToCustomer = true;
 
     if (!mounted) return;
     await showDialog(
@@ -87,36 +246,115 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (ctx, setDialogState) {
+            final currency = AuthService.to.currentBusiness.value?.currency ?? AppConstants.defaultCurrency;
             return AlertDialog(
-              title: const Text('Record Consumable / Material Usage'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Select materials used from garage inventory for this job card:'),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<InventoryItemModel>(
-                    value: selectedItem,
-                    decoration: const InputDecoration(labelText: 'Stock Item'),
-                    items: allItems.map((item) => DropdownMenuItem(value: item, child: Text('${item.name} (${item.quantity} ${item.unit} available)'))).toList(),
-                    onChanged: (val) {
-                      if (val != null) setDialogState(() => selectedItem = val);
-                    },
+                  Row(
+                    children: const [
+                      Icon(Icons.inventory_2_rounded, color: AppColors.primaryLight, size: 22),
+                      SizedBox(width: 8),
+                      Text('Stock / Chemical Usage', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                    ],
                   ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: qtyCtrl,
-                    decoration: InputDecoration(labelText: 'Quantity Used (${selectedItem.unit})'),
-                    keyboardType: TextInputType.number,
+                  TextButton.icon(
+                    onPressed: () async {
+                      final added = await showDialog<bool>(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (_) => const InventoryFormDialog(),
+                      );
+                      if (added == true && mounted) {
+                        Navigator.of(ctx).pop();
+                        _recordStockDeductionDialog();
+                      }
+                    },
+                    icon: const Icon(Icons.add, size: 14),
+                    label: const Text('New Item', style: TextStyle(fontSize: 12)),
                   ),
                 ],
+              ),
+              content: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 440),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Select chemical or material used for this job:', style: TextStyle(fontSize: 12, color: AppColors.textDarkSecondary)),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<InventoryItemModel>(
+                      value: selectedItem,
+                      isExpanded: true,
+                      decoration: const InputDecoration(labelText: 'Stock Item *'),
+                      items: allItems.map((item) => DropdownMenuItem(
+                        value: item,
+                        child: Text('${item.name} (${item.quantity} ${item.unit} available)', overflow: TextOverflow.ellipsis),
+                      )).toList(),
+                      onChanged: (val) {
+                        if (val != null) {
+                          setDialogState(() {
+                            selectedItem = val;
+                            final qty = double.tryParse(qtyCtrl.text.trim()) ?? 1.0;
+                            final unitP = val.sellingPrice > 0 ? val.sellingPrice : val.purchasePrice;
+                            priceCtrl.text = (unitP * qty).toStringAsFixed(0);
+                          });
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: qtyCtrl,
+                            decoration: InputDecoration(labelText: 'Quantity (${selectedItem.unit}) *'),
+                            keyboardType: TextInputType.number,
+                            onChanged: (v) {
+                              final qty = double.tryParse(v.trim()) ?? 0.0;
+                              final unitP = selectedItem.sellingPrice > 0 ? selectedItem.sellingPrice : selectedItem.purchasePrice;
+                              priceCtrl.text = (unitP * qty).toStringAsFixed(0);
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: priceCtrl,
+                            decoration: InputDecoration(
+                              labelText: 'Price ($currency)',
+                              helperText: '0 if complimentary',
+                            ),
+                            keyboardType: TextInputType.number,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      value: billToCustomer,
+                      title: const Text('Add to Job Card / Invoice', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                      subtitle: const Text('Appears in Services & Labour list and adds to grand total', style: TextStyle(fontSize: 11)),
+                      onChanged: (v) => setDialogState(() => billToCustomer = v ?? true),
+                      controlAffinity: ListTileControlAffinity.leading,
+                    ),
+                  ],
+                ),
               ),
               actions: [
                 TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
                 ElevatedButton(
                   onPressed: () async {
                     final qty = double.tryParse(qtyCtrl.text.trim()) ?? 0.0;
-                    if (qty <= 0) return;
+                    if (qty <= 0) {
+                      Get.snackbar('Invalid Quantity', 'Please enter a valid quantity greater than 0', backgroundColor: AppColors.error.withValues(alpha: 0.2));
+                      return;
+                    }
+                    final charge = double.tryParse(priceCtrl.text.trim()) ?? 0.0;
                     try {
+                      // 1. Deduct from Inventory
                       await invRepo.adjustStock(
                         itemId: selectedItem.id,
                         changeAmount: -qty,
@@ -124,13 +362,29 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                         reasonNotes: 'Material usage on Job #${_job.jobNumber}',
                         jobId: _job.id,
                       );
+
+                      // 2. Add as item on Job Card if checked
+                      if (billToCustomer) {
+                        final desc = '${selectedItem.name} (${qty.toStringAsFixed(qty.truncateToDouble() == qty ? 0 : 2)} ${selectedItem.unit})';
+                        await jobRepo.addServiceToJob(
+                          jobId: _job.id,
+                          description: desc,
+                          amount: charge,
+                        );
+                      }
+
                       if (ctx.mounted) Navigator.pop(ctx);
-                      Get.snackbar('Stock Deducted', 'Deducted $qty ${selectedItem.unit} of ${selectedItem.name}', backgroundColor: AppColors.success.withValues(alpha: 0.2));
+                      await _loadJobDetails();
+                      Get.snackbar(
+                        'Stock & Job Updated',
+                        'Deducted $qty ${selectedItem.unit} of ${selectedItem.name}${billToCustomer ? " and added to Job Card ($currency $charge)" : ""}',
+                        backgroundColor: AppColors.success.withValues(alpha: 0.2),
+                      );
                     } catch (e) {
                       Get.snackbar('Error', '$e', backgroundColor: AppColors.error.withValues(alpha: 0.2));
                     }
                   },
-                  child: const Text('Deduct From Stock'),
+                  child: const Text('Deduct & Add to Job'),
                 ),
               ],
             );
@@ -554,19 +808,27 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
+                    ElevatedButton.icon(
+                      onPressed: _showAddServiceDialog,
+                      icon: const Icon(Icons.add_rounded, size: 16),
+                      label: const Text('Add Service / Labour'),
+                      style: ElevatedButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
                     OutlinedButton.icon(
-                      onPressed: _showEditServicesPricesDialog,
-                      icon: const Icon(Icons.edit_note_rounded, size: 16),
-                      label: const Text('Edit Prices & Services'),
+                      onPressed: _recordStockDeductionDialog,
+                      icon: const Icon(Icons.inventory_2_rounded, size: 16),
+                      label: const Text('Record Chemical / Stock Usage'),
                       style: OutlinedButton.styleFrom(
                         visualDensity: VisualDensity.compact,
                       ),
                     ),
-                    ElevatedButton.icon(
-                      onPressed: _recordStockDeductionDialog,
-                      icon: const Icon(Icons.inventory_2_rounded, size: 16),
-                      label: const Text('Record Chemical / Stock Usage'),
-                      style: ElevatedButton.styleFrom(
+                    OutlinedButton.icon(
+                      onPressed: _showEditServicesPricesDialog,
+                      icon: const Icon(Icons.tune_rounded, size: 16),
+                      label: const Text('Adjust Pricing'),
+                      style: OutlinedButton.styleFrom(
                         visualDensity: VisualDensity.compact,
                       ),
                     ),
@@ -576,7 +838,45 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             ),
             const SizedBox(height: 12),
             if (_jobServices.isEmpty)
-              const Card(child: Padding(padding: EdgeInsets.all(20), child: Center(child: Text('No service items listed.'))))
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.cleaning_services_rounded, size: 38, color: AppColors.textDarkSecondary.withValues(alpha: 0.5)),
+                        const SizedBox(height: 10),
+                        const Text('No service items listed yet', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Add detailing services, labour, or chemicals from stock for this job card.',
+                          style: TextStyle(fontSize: 12, color: AppColors.textDarkSecondary),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 8,
+                          alignment: WrapAlignment.center,
+                          children: [
+                            ElevatedButton.icon(
+                              onPressed: _showAddServiceDialog,
+                              icon: const Icon(Icons.add_rounded, size: 16),
+                              label: const Text('Add Service / Labour'),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: _recordStockDeductionDialog,
+                              icon: const Icon(Icons.inventory_2_rounded, size: 16),
+                              label: const Text('Record Chemical / Stock'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              )
             else
               Card(
                 child: ListView.separated(
@@ -588,7 +888,13 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                     final item = _jobServices[i];
                     final desc = item['description'] ?? 'Detailing Service';
                     final amt = (item['amount'] as num?)?.toDouble() ?? 0.0;
+                    final sId = item['id']?.toString() ?? '';
                     return ListTile(
+                      leading: CircleAvatar(
+                        radius: 14,
+                        backgroundColor: AppColors.primary.withValues(alpha: 0.15),
+                        child: Text('${i + 1}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primaryLight)),
+                      ),
                       title: Text(desc, style: const TextStyle(fontWeight: FontWeight.bold)),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -596,10 +902,21 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                           Text(Formatters.currency(amt, symbol: currency), style: const TextStyle(fontWeight: FontWeight.bold)),
                           const SizedBox(width: 8),
                           IconButton(
-                            icon: const Icon(Icons.edit_rounded, size: 16, color: AppColors.primaryLight),
+                            icon: const Icon(Icons.edit_rounded, size: 18, color: AppColors.primaryLight),
                             tooltip: 'Edit price',
                             onPressed: _showEditServicesPricesDialog,
                           ),
+                          if (sId.isNotEmpty)
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline_rounded, size: 18, color: AppColors.error),
+                              tooltip: 'Delete item',
+                              onPressed: () async {
+                                final jobRepo = Get.find<JobRepository>();
+                                await jobRepo.removeServiceFromJob(jobId: _job.id, serviceId: sId);
+                                await _loadJobDetails();
+                                Get.snackbar('Removed', 'Removed "$desc" from Job Card', backgroundColor: AppColors.warning.withValues(alpha: 0.2));
+                              },
+                            ),
                         ],
                       ),
                     );

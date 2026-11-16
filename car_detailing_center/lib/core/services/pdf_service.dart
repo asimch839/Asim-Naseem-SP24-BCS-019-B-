@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -10,6 +12,19 @@ import '../../data/models/inspection_model.dart';
 import '../../data/models/salary_model.dart';
 
 class PdfService {
+  static pw.MemoryImage? _cachedLogoImage;
+
+  /// Loads the brand logo image for PDF documents
+  static Future<pw.MemoryImage?> _getLogoImage() async {
+    if (_cachedLogoImage != null) return _cachedLogoImage;
+    try {
+      final byteData = await rootBundle.load('assets/images/app_logo.png');
+      _cachedLogoImage = pw.MemoryImage(byteData.buffer.asUint8List());
+      return _cachedLogoImage;
+    } catch (_) {
+      return null;
+    }
+  }
   // -------------------------------------------------------------
   // INVOICE & RECEIPT PDF
   // -------------------------------------------------------------
@@ -17,6 +32,7 @@ class PdfService {
     required BusinessModel business,
     required InvoiceModel invoice,
   }) async {
+    final logoImage = await _getLogoImage();
     final doc = pw.Document();
 
     doc.addPage(
@@ -30,21 +46,34 @@ class PdfService {
               // Header
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: pw.CrossAxisAlignment.center,
                 children: [
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  pw.Row(
+                    crossAxisAlignment: pw.CrossAxisAlignment.center,
                     children: [
-                      pw.Text(
-                        business.name,
-                        style: pw.TextStyle(
-                          fontSize: 20,
-                          fontWeight: pw.FontWeight.bold,
-                          color: PdfColors.blue900,
+                      if (logoImage != null)
+                        pw.Container(
+                          width: 48,
+                          height: 48,
+                          margin: const pw.EdgeInsets.only(right: 10),
+                          child: pw.Image(logoImage, fit: pw.BoxFit.contain),
                         ),
+                      pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text(
+                            business.name,
+                            style: pw.TextStyle(
+                              fontSize: 18,
+                              fontWeight: pw.FontWeight.bold,
+                              color: PdfColors.blue900,
+                            ),
+                          ),
+                          pw.Text(business.address, style: const pw.TextStyle(fontSize: 10)),
+                          pw.Text('Phone: ${business.phone} | Email: ${business.email}',
+                              style: const pw.TextStyle(fontSize: 10)),
+                        ],
                       ),
-                      pw.Text(business.address, style: const pw.TextStyle(fontSize: 10)),
-                      pw.Text('Phone: ${business.phone} | Email: ${business.email}',
-                          style: const pw.TextStyle(fontSize: 10)),
                     ],
                   ),
                   pw.Column(
@@ -324,6 +353,7 @@ class PdfService {
 
     final effectiveTypes = selectedServiceTypes ?? ['PPF', 'Detailing'];
 
+    final logoImage = await _getLogoImage();
     final doc = pw.Document();
 
     final greenColor = PdfColor.fromHex('#0A6836');
@@ -344,25 +374,32 @@ class PdfService {
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
                   // Logo block
-                  pw.Container(
-                    padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: pw.BoxDecoration(
-                      border: pw.Border.all(color: greenColor, width: 1.5),
-                      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+                  if (logoImage != null)
+                    pw.Container(
+                      width: 60,
+                      height: 60,
+                      child: pw.Image(logoImage, fit: pw.BoxFit.contain),
+                    )
+                  else
+                    pw.Container(
+                      padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: pw.BoxDecoration(
+                        border: pw.Border.all(color: greenColor, width: 1.5),
+                        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+                      ),
+                      child: pw.Column(
+                        children: [
+                          pw.Text("Dawood's", style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: greenColor, fontStyle: pw.FontStyle.italic)),
+                          pw.Container(
+                            padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                            color: greenColor,
+                            child: pw.Text('GARAGE', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.white, letterSpacing: 1.2)),
+                          ),
+                          pw.SizedBox(height: 2),
+                          pw.Text('Detailing & Performance', style: pw.TextStyle(fontSize: 6, fontWeight: pw.FontWeight.bold, color: greenColor)),
+                        ],
+                      ),
                     ),
-                    child: pw.Column(
-                      children: [
-                        pw.Text("Dawood's", style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: greenColor, fontStyle: pw.FontStyle.italic)),
-                        pw.Container(
-                          padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                          color: greenColor,
-                          child: pw.Text('GARAGE', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.white, letterSpacing: 1.2)),
-                        ),
-                        pw.SizedBox(height: 2),
-                        pw.Text('Detailing & Performance', style: pw.TextStyle(fontSize: 6, fontWeight: pw.FontWeight.bold, color: greenColor)),
-                      ],
-                    ),
-                  ),
 
                   // Center Titles
                   pw.Column(
@@ -1107,6 +1144,7 @@ class PdfService {
     required BusinessModel business,
     required SalaryModel salary,
   }) async {
+    final logoImage = await _getLogoImage();
     final doc = pw.Document();
 
     doc.addPage(
@@ -1117,13 +1155,37 @@ class PdfService {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              pw.Center(
-                child: pw.Column(
-                  children: [
-                    pw.Text(business.name, style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900)),
-                    pw.Text('STAFF SALARY SLIP - ${salary.month}', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
-                  ],
-                ),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: pw.CrossAxisAlignment.center,
+                children: [
+                  pw.Row(
+                    crossAxisAlignment: pw.CrossAxisAlignment.center,
+                    children: [
+                      if (logoImage != null)
+                        pw.Container(
+                          width: 45,
+                          height: 45,
+                          margin: const pw.EdgeInsets.only(right: 10),
+                          child: pw.Image(logoImage, fit: pw.BoxFit.contain),
+                        ),
+                      pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text(business.name, style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900)),
+                          pw.Text('Phone: ${business.phone} | Email: ${business.email}', style: const pw.TextStyle(fontSize: 8)),
+                        ],
+                      ),
+                    ],
+                  ),
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.end,
+                    children: [
+                      pw.Text('STAFF SALARY SLIP', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColors.grey800)),
+                      pw.Text('Month: ${salary.month}', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                    ],
+                  ),
+                ],
               ),
               pw.Divider(thickness: 1.5),
               pw.SizedBox(height: 12),
@@ -1217,13 +1279,15 @@ class PdfService {
   // -------------------------------------------------------------
   // VEHICLE INSPECTION REPORT PDF (5-VIEW & ALL SECTIONS)
   // -------------------------------------------------------------
-  static Future<void> printInspectionReport({
+  static pw.Document _buildInspectionDoc({
     required BusinessModel business,
     required InspectionModel inspection,
     required String vehicleReg,
     required String vehicleName,
     required String customerName,
-  }) async {
+    Uint8List? carDiagramBytes,
+    pw.MemoryImage? logoImage,
+  }) {
     final doc = pw.Document();
 
     doc.addPage(
@@ -1235,17 +1299,29 @@ class PdfService {
             // Business & Inspection Header
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              crossAxisAlignment: pw.CrossAxisAlignment.center,
               children: [
-                pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                pw.Row(
+                  crossAxisAlignment: pw.CrossAxisAlignment.center,
                   children: [
-                    pw.Text(
-                      business.name,
-                      style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900),
+                    if (logoImage != null)
+                      pw.Container(
+                        width: 48,
+                        height: 48,
+                        margin: const pw.EdgeInsets.only(right: 10),
+                        child: pw.Image(logoImage, fit: pw.BoxFit.contain),
+                      ),
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text(
+                          business.name,
+                          style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900),
+                        ),
+                        pw.Text(business.address, style: const pw.TextStyle(fontSize: 9)),
+                        pw.Text('Phone: ${business.phone} | Email: ${business.email}', style: const pw.TextStyle(fontSize: 9)),
+                      ],
                     ),
-                    pw.Text(business.address, style: const pw.TextStyle(fontSize: 9)),
-                    pw.Text('Phone: ${business.phone} | Email: ${business.email}', style: const pw.TextStyle(fontSize: 9)),
                   ],
                 ),
                 pw.Column(
@@ -1289,12 +1365,51 @@ class PdfService {
                 ],
               ),
             ),
-            pw.SizedBox(height: 12),
+            pw.SizedBox(height: 10),
 
-            // 1. Interactive Diagram Parts Inspection
+            // 1. Interactive 5-View Car Diagram Picture (As seen during inspection)
+            if (carDiagramBytes != null) ...[
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text(
+                    '1. VEHICLE INSPECTION DIAGRAM (5-VIEW BLUEPRINT)',
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10, color: PdfColors.blue900),
+                  ),
+                  pw.Text(
+                    '* Front, Rear, Top, Left & Right Profiles with Marked Defects',
+                    style: const pw.TextStyle(fontSize: 7.5, color: PdfColors.grey700),
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 4),
+              pw.Container(
+                width: double.infinity,
+                height: 200,
+                decoration: pw.BoxDecoration(
+                  border: pw.Border.all(color: PdfColors.grey400, width: 1),
+                  borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+                ),
+                child: pw.ClipRRect(
+                  horizontalRadius: 6,
+                  verticalRadius: 6,
+                  child: pw.Center(
+                    child: pw.Image(
+                      pw.MemoryImage(carDiagramBytes),
+                      fit: pw.BoxFit.contain,
+                    ),
+                  ),
+                ),
+              ),
+              pw.SizedBox(height: 10),
+            ],
+
+            // 2. Interactive Diagram Parts Inspection Table
             if (inspection.diagramParts.isNotEmpty) ...[
               pw.Text(
-                '1. VEHICLE DIAGRAM PARTS INSPECTION (5 VIEWS & BODY)',
+                carDiagramBytes != null
+                    ? '2. MARKED DAMAGE & DEFECT DETAILS'
+                    : '1. VEHICLE DIAGRAM PARTS INSPECTION (5 VIEWS & BODY)',
                 style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10, color: PdfColors.blue900),
               ),
               pw.SizedBox(height: 4),
@@ -1357,35 +1472,41 @@ class PdfService {
                   }),
                 ],
               ),
-              pw.SizedBox(height: 12),
+              pw.SizedBox(height: 10),
             ],
 
-            // 2. Sections Inspection (Exterior, Interior, Engine, Tires, Suspension, etc.)
+            // 3. Sections Inspection (Exterior, Interior, Engine, Tires, Suspension, etc.)
             if (inspection.sectionConditions.isNotEmpty) ...[
               pw.Text(
-                '2. DETAILED SYSTEMS & SECTIONS CONDITION',
+                carDiagramBytes != null
+                    ? '3. DETAILED SYSTEMS & SECTIONS CONDITION'
+                    : '2. DETAILED SYSTEMS & SECTIONS CONDITION',
                 style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10, color: PdfColors.blue900),
               ),
               pw.SizedBox(height: 4),
               _buildAreaConditionsGrid(inspection.sectionConditions),
-              pw.SizedBox(height: 12),
+              pw.SizedBox(height: 10),
             ],
 
-            // 3. Drive & Mechanical Condition
+            // 4. Drive & Mechanical Condition
             if (inspection.driveCondition.isNotEmpty) ...[
               pw.Text(
-                '3. DRIVE & MECHANICAL PERFORMANCE',
+                carDiagramBytes != null
+                    ? '4. DRIVE & MECHANICAL PERFORMANCE'
+                    : '3. DRIVE & MECHANICAL PERFORMANCE',
                 style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10, color: PdfColors.blue900),
               ),
               pw.SizedBox(height: 4),
               _buildAreaConditionsGrid(inspection.driveCondition),
-              pw.SizedBox(height: 12),
+              pw.SizedBox(height: 10),
             ],
 
-            // 4. Vehicle Belongings & Checklist
+            // 5. Vehicle Belongings & Checklist
             if (inspection.checklist.isNotEmpty) ...[
               pw.Text(
-                '4. VEHICLE BELONGINGS & INVENTORY CHECKLIST',
+                carDiagramBytes != null
+                    ? '5. VEHICLE BELONGINGS & INVENTORY CHECKLIST'
+                    : '4. VEHICLE BELONGINGS & INVENTORY CHECKLIST',
                 style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10, color: PdfColors.blue900),
               ),
               pw.SizedBox(height: 4),
@@ -1416,7 +1537,7 @@ class PdfService {
                   );
                 }).toList(),
               ),
-              pw.SizedBox(height: 12),
+              pw.SizedBox(height: 10),
             ],
 
             // Remarks
@@ -1431,9 +1552,9 @@ class PdfService {
               pw.SizedBox(height: 6),
             ],
 
-            pw.SizedBox(height: 16),
+            pw.SizedBox(height: 14),
             pw.Divider(color: PdfColors.grey300),
-            pw.SizedBox(height: 12),
+            pw.SizedBox(height: 10),
 
             // Signatures Row
             pw.Row(
@@ -1464,10 +1585,79 @@ class PdfService {
       ),
     );
 
+    return doc;
+  }
+
+  static Future<void> printInspectionReport({
+    required BusinessModel business,
+    required InspectionModel inspection,
+    required String vehicleReg,
+    required String vehicleName,
+    required String customerName,
+    Uint8List? carDiagramBytes,
+  }) async {
+    final logoImage = await _getLogoImage();
+    final doc = _buildInspectionDoc(
+      business: business,
+      inspection: inspection,
+      vehicleReg: vehicleReg,
+      vehicleName: vehicleName,
+      customerName: customerName,
+      carDiagramBytes: carDiagramBytes,
+      logoImage: logoImage,
+    );
+
     await Printing.layoutPdf(
       onLayout: (PdfPageFormat format) async => doc.save(),
       name: 'Inspection_$vehicleReg.pdf',
     );
+  }
+
+  /// Returns raw PDF bytes for the inspection report (use for sharing/saving to file).
+  static Future<Uint8List> buildInspectionReportBytes({
+    required BusinessModel business,
+    required InspectionModel inspection,
+    required String vehicleReg,
+    required String vehicleName,
+    required String customerName,
+    Uint8List? carDiagramBytes,
+  }) async {
+    final logoImage = await _getLogoImage();
+    final doc = _buildInspectionDoc(
+      business: business,
+      inspection: inspection,
+      vehicleReg: vehicleReg,
+      vehicleName: vehicleName,
+      customerName: customerName,
+      carDiagramBytes: carDiagramBytes,
+      logoImage: logoImage,
+    );
+    return doc.save();
+  }
+
+  /// Converts the inspection report PDF into high-res A4 PNG image bytes
+  static Future<Uint8List?> renderInspectionReportToImage({
+    required BusinessModel business,
+    required InspectionModel inspection,
+    required String vehicleReg,
+    required String vehicleName,
+    required String customerName,
+    Uint8List? carDiagramBytes,
+    double dpi = 180,
+  }) async {
+    final pdfBytes = await buildInspectionReportBytes(
+      business: business,
+      inspection: inspection,
+      vehicleReg: vehicleReg,
+      vehicleName: vehicleName,
+      customerName: customerName,
+      carDiagramBytes: carDiagramBytes,
+    );
+
+    await for (final page in Printing.raster(pdfBytes, dpi: dpi)) {
+      return await page.toPng();
+    }
+    return null;
   }
 
   static pw.Widget _buildAreaConditionsGrid(Map<String, String> conditions) {
@@ -1544,6 +1734,7 @@ class PdfService {
     required List<List<String>> data,
     String? subtitle,
   }) async {
+    final logoImage = await _getLogoImage();
     final doc = pw.Document();
 
     doc.addPage(
@@ -1556,10 +1747,29 @@ class PdfService {
             children: [
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: pw.CrossAxisAlignment.center,
                 children: [
-                  pw.Text(
-                    title,
-                    style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900),
+                  pw.Row(
+                    crossAxisAlignment: pw.CrossAxisAlignment.center,
+                    children: [
+                      if (logoImage != null)
+                        pw.Container(
+                          width: 36,
+                          height: 36,
+                          margin: const pw.EdgeInsets.only(right: 8),
+                          child: pw.Image(logoImage, fit: pw.BoxFit.contain),
+                        ),
+                      pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text(
+                            title,
+                            style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900),
+                          ),
+                          if (subtitle != null) pw.Text(subtitle, style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey800)),
+                        ],
+                      ),
+                    ],
                   ),
                   pw.Text(
                     'Generated: ${DateTime.now().toString().split('.')[0]}',
@@ -1567,7 +1777,6 @@ class PdfService {
                   ),
                 ],
               ),
-              if (subtitle != null) pw.Text(subtitle, style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey800)),
               pw.Divider(thickness: 1, color: PdfColors.grey400),
               pw.SizedBox(height: 8),
             ],

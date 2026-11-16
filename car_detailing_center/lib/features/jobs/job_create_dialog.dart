@@ -8,12 +8,9 @@ import '../../core/utils/formatters.dart';
 import '../../data/models/vehicle_model.dart';
 import '../../data/models/customer_model.dart';
 import '../../data/models/staff_model.dart';
-import '../../data/models/detailing_package_model.dart';
 import '../../data/repositories/customer_repository.dart';
 import '../../data/repositories/vehicle_repository.dart';
-import '../../data/repositories/staff_repository.dart';
 import '../../data/repositories/job_repository.dart';
-import '../../data/repositories/detailing_package_repository.dart';
 
 class SimpleServiceItem {
   final String id;
@@ -42,8 +39,6 @@ class _JobCreateDialogState extends State<JobCreateDialog> {
 
   List<CustomerModel> _customers = [];
   List<VehicleModel> _customerVehicles = [];
-  List<StaffModel> _staffList = [];
-  List<DetailingPackageModel> _availablePackages = [];
 
   CustomerModel? _selectedCustomer;
   VehicleModel? _selectedVehicle;
@@ -77,18 +72,11 @@ class _JobCreateDialogState extends State<JobCreateDialog> {
 
   void _loadData() async {
     final customerRepo = Get.find<CustomerRepository>();
-    final staffRepo = Get.find<StaffRepository>();
-    final packageRepo = Get.find<DetailingPackageRepository>();
-
     final customers = await customerRepo.getCustomers();
-    final staff = await staffRepo.getStaffList();
-    final packages = await packageRepo.getPackages(activeOnly: true);
 
     if (mounted) {
       setState(() {
         _customers = customers;
-        _staffList = staff;
-        _availablePackages = packages;
 
         if (widget.preselectedVehicle != null) {
           _selectedVehicle = widget.preselectedVehicle;
@@ -105,18 +93,6 @@ class _JobCreateDialogState extends State<JobCreateDialog> {
       if (_selectedCustomer != null) {
         _onCustomerSelected(_selectedCustomer!, preselectedVehicle: widget.preselectedVehicle);
       }
-    }
-  }
-
-  Future<void> _reloadPackages() async {
-    final packageRepo = Get.find<DetailingPackageRepository>();
-    final packages = await packageRepo.getPackages(activeOnly: true);
-    if (mounted) {
-      setState(() {
-        _availablePackages = packages;
-        // Remove any selected services that may have been deleted
-        _selectedServices.removeWhere((s) => !packages.any((p) => p.name == s.name));
-      });
     }
   }
 
@@ -259,369 +235,6 @@ class _JobCreateDialogState extends State<JobCreateDialog> {
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
-  }
-
-  // --- Quick Add Package Dialog ---
-  void _showAddPackageDialog() async {
-    final nameCtrl = TextEditingController();
-    final priceCtrl = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-
-    await showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.add_circle_outline_rounded, color: AppColors.primary),
-            SizedBox(width: 8),
-            Text('Add Detailing Package', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          ],
-        ),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: nameCtrl,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  labelText: 'Operation / Package Name *',
-                  hintText: 'e.g. Glass Ceramic Coating (10H)',
-                  prefixIcon: Icon(Icons.car_repair_rounded),
-                ),
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter package name' : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: priceCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Price (PKR) *',
-                  hintText: 'e.g. 5000',
-                  prefixIcon: Icon(Icons.payments_rounded),
-                ),
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Please enter price';
-                  if (double.tryParse(v.trim()) == null) return 'Enter valid number';
-                  return null;
-                },
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () async {
-              if (!formKey.currentState!.validate()) return;
-              final packageRepo = Get.find<DetailingPackageRepository>();
-              final newPkg = DetailingPackageModel(
-                id: 'pkg_${const Uuid().v4().substring(0, 8)}',
-                name: nameCtrl.text.trim(),
-                price: double.parse(priceCtrl.text.trim()),
-                sortOrder: _availablePackages.length + 1,
-              );
-              await packageRepo.savePackage(newPkg);
-              if (ctx.mounted) Navigator.pop(ctx);
-              await _reloadPackages();
-              setState(() {
-                _selectedServices.add(SimpleServiceItem(newPkg.name, newPkg.price, id: newPkg.id));
-              });
-              Get.snackbar(
-                'Package Added',
-                '${newPkg.name} has been added to detailing packages',
-                backgroundColor: AppColors.success.withValues(alpha: 0.2),
-              );
-            },
-            child: const Text('Add & Select'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // --- Manage Packages Dialog ---
-  void _showManagePackagesDialog() async {
-    final currency = AuthService.to.currentBusiness.value?.currency ?? AppConstants.defaultCurrency;
-
-    await showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Row(
-                  children: [
-                    Icon(Icons.tune_rounded, color: AppColors.primary),
-                    SizedBox(width: 8),
-                    Text('Manage Detailing Packages', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                  ],
-                ),
-                IconButton(icon: const Icon(Icons.close_rounded), onPressed: () => Navigator.pop(ctx)),
-              ],
-            ),
-            content: SizedBox(
-              width: 520,
-              height: 420,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Text(
-                    'Admin can add, edit, or remove operations. Only packages listed here will appear in Job Cards.',
-                    style: TextStyle(fontSize: 12, color: AppColors.textDarkSecondary),
-                  ),
-                  const SizedBox(height: 12),
-                  ElevatedButton.icon(
-                    icon: const Icon(Icons.add_rounded, size: 18),
-                    label: const Text('Add New Operation / Package'),
-                    onPressed: () async {
-                      await _quickAddPackage();
-                      await _reloadPackages();
-                      setDialogState(() {});
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Theme.of(context).dividerColor),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: _availablePackages.isEmpty
-                          ? const Center(child: Text('No packages configured. Click "+ Add New" to add one.'))
-                          : ListView.separated(
-                              itemCount: _availablePackages.length,
-                              separatorBuilder: (_, __) => const Divider(height: 1),
-                              itemBuilder: (context, idx) {
-                                final p = _availablePackages[idx];
-                                return ListTile(
-                                  dense: true,
-                                  title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                                  subtitle: Text(Formatters.currency(p.price, symbol: currency),
-                                      style: const TextStyle(fontSize: 12, color: AppColors.accent)),
-                                  trailing: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      IconButton(
-                                        icon: const Icon(Icons.edit_rounded, size: 18, color: AppColors.info),
-                                        tooltip: 'Edit Package',
-                                        onPressed: () async {
-                                          await _editPackage(p);
-                                          await _reloadPackages();
-                                          setDialogState(() {});
-                                        },
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(Icons.delete_outline_rounded, size: 18, color: AppColors.error),
-                                        tooltip: 'Delete Package',
-                                        onPressed: () async {
-                                          await _deletePackage(p);
-                                          await _reloadPackages();
-                                          setDialogState(() {});
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
-                            ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              ElevatedButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Done'),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-    await _reloadPackages();
-  }
-
-  Future<void> _quickAddPackage() async {
-    final nameCtrl = TextEditingController();
-    final priceCtrl = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-
-    await showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Add Operation / Package', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: nameCtrl,
-                autofocus: true,
-                decoration: const InputDecoration(labelText: 'Package Name *'),
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: priceCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Price (PKR) *'),
-                validator: (v) => (v == null || double.tryParse(v.trim()) == null) ? 'Enter valid price' : null,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () async {
-              if (!formKey.currentState!.validate()) return;
-              final packageRepo = Get.find<DetailingPackageRepository>();
-              final newPkg = DetailingPackageModel(
-                id: 'pkg_${const Uuid().v4().substring(0, 8)}',
-                name: nameCtrl.text.trim(),
-                price: double.parse(priceCtrl.text.trim()),
-                sortOrder: _availablePackages.length + 1,
-              );
-              await packageRepo.savePackage(newPkg);
-              if (ctx.mounted) Navigator.pop(ctx);
-            },
-            child: const Text('Save Package'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _editPackage(DetailingPackageModel pkg) async {
-    final nameCtrl = TextEditingController(text: pkg.name);
-    final priceCtrl = TextEditingController(text: pkg.price.toStringAsFixed(0));
-    final formKey = GlobalKey<FormState>();
-
-    await showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Edit Detailing Package', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: nameCtrl,
-                decoration: const InputDecoration(labelText: 'Package Name *'),
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: priceCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Price (PKR) *'),
-                validator: (v) => (v == null || double.tryParse(v.trim()) == null) ? 'Enter valid price' : null,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () async {
-              if (!formKey.currentState!.validate()) return;
-              final packageRepo = Get.find<DetailingPackageRepository>();
-              final updated = pkg.copyWith(
-                name: nameCtrl.text.trim(),
-                price: double.parse(priceCtrl.text.trim()),
-                updatedAt: DateTime.now(),
-              );
-              await packageRepo.savePackage(updated);
-              if (ctx.mounted) Navigator.pop(ctx);
-            },
-            child: const Text('Update'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _deletePackage(DetailingPackageModel pkg) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Delete Detailing Package?'),
-        content: Text('Are you sure you want to remove "${pkg.name}" from available packages?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm == true) {
-      final packageRepo = Get.find<DetailingPackageRepository>();
-      await packageRepo.deletePackage(pkg.id);
-      _selectedServices.removeWhere((s) => s.name == pkg.name);
-    }
-  }
-
-  Future<void> _editServicePrice(SimpleServiceItem service) async {
-    final priceCtrl = TextEditingController(text: service.price.toStringAsFixed(0));
-    final formKey = GlobalKey<FormState>();
-
-    await showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Edit Price: ${service.name}'),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Enter custom job charge for "${service.name}":', style: const TextStyle(fontSize: 13)),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: priceCtrl,
-                keyboardType: TextInputType.number,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  labelText: 'Custom Price (PKR) *',
-                  prefixIcon: Icon(Icons.attach_money_rounded),
-                ),
-                validator: (v) => (v == null || double.tryParse(v.trim()) == null) ? 'Enter valid price' : null,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () {
-              if (!formKey.currentState!.validate()) return;
-              setState(() {
-                service.price = double.parse(priceCtrl.text.trim());
-              });
-              Navigator.pop(ctx);
-            },
-            child: const Text('Save Price'),
-          ),
-        ],
-      ),
-    );
   }
 
   @override

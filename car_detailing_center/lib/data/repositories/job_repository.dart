@@ -283,6 +283,96 @@ class JobRepository {
     });
   }
 
+  /// Add a single service or material line item to an existing job card
+  Future<void> addServiceToJob({
+    required String jobId,
+    required String description,
+    required double amount,
+  }) async {
+    final db = await _db;
+    final now = DateTime.now().toIso8601String();
+
+    await db.transaction((txn) async {
+      final existing = await txn.query('jobs', where: 'id = ?', whereArgs: [jobId]);
+      if (existing.isEmpty) return;
+
+      final currentLabour = (existing.first['service_labour'] as num?)?.toDouble() ?? 0.0;
+      final partsTotal = (existing.first['parts_total'] as num?)?.toDouble() ?? 0.0;
+      final discount = (existing.first['discount'] as num?)?.toDouble() ?? 0.0;
+      final paidAmount = (existing.first['paid_amount'] as num?)?.toDouble() ?? 0.0;
+
+      final newLabour = currentLabour + amount;
+      final grandTotal = (newLabour + partsTotal) - discount;
+      final remainingAmount = (grandTotal - paidAmount) > 0 ? (grandTotal - paidAmount) : 0.0;
+
+      await txn.update(
+        'jobs',
+        {
+          'service_labour': newLabour,
+          'grand_total': grandTotal,
+          'remaining_amount': remainingAmount,
+          'updated_at': now,
+        },
+        where: 'id = ?',
+        whereArgs: [jobId],
+      );
+
+      final countRes = await txn.rawQuery('SELECT COUNT(*) as count FROM job_services WHERE job_id = ?', [jobId]);
+      final nextSr = (Sqflite.firstIntValue(countRes) ?? 0) + 1;
+      final serviceId = 'jsvc_${const Uuid().v4().substring(0, 8)}';
+
+      await txn.insert('job_services', {
+        'id': serviceId,
+        'job_id': jobId,
+        'sr_no': nextSr,
+        'description': description,
+        'amount': amount,
+        'created_at': now,
+      });
+    });
+  }
+
+  /// Remove a single service item by id
+  Future<void> removeServiceFromJob({
+    required String jobId,
+    required String serviceId,
+  }) async {
+    final db = await _db;
+    final now = DateTime.now().toIso8601String();
+
+    await db.transaction((txn) async {
+      final item = await txn.query('job_services', where: 'id = ? AND job_id = ?', whereArgs: [serviceId, jobId]);
+      if (item.isEmpty) return;
+      final amount = (item.first['amount'] as num?)?.toDouble() ?? 0.0;
+
+      await txn.delete('job_services', where: 'id = ?', whereArgs: [serviceId]);
+
+      final existing = await txn.query('jobs', where: 'id = ?', whereArgs: [jobId]);
+      if (existing.isEmpty) return;
+
+      final currentLabour = (existing.first['service_labour'] as num?)?.toDouble() ?? 0.0;
+      final partsTotal = (existing.first['parts_total'] as num?)?.toDouble() ?? 0.0;
+      final discount = (existing.first['discount'] as num?)?.toDouble() ?? 0.0;
+      final paidAmount = (existing.first['paid_amount'] as num?)?.toDouble() ?? 0.0;
+
+      final newLabour = (currentLabour - amount) > 0 ? (currentLabour - amount) : 0.0;
+      final grandTotal = (newLabour + partsTotal) - discount;
+      final remainingAmount = (grandTotal - paidAmount) > 0 ? (grandTotal - paidAmount) : 0.0;
+
+      await txn.update(
+        'jobs',
+        {
+          'service_labour': newLabour,
+          'grand_total': grandTotal,
+          'remaining_amount': remainingAmount,
+          'updated_at': now,
+        },
+        where: 'id = ?',
+        whereArgs: [jobId],
+      );
+    });
+  }
+
   Future<void> deleteJob(String id) async {
     final db = await _db;
     await db.delete('jobs', where: 'id = ?', whereArgs: [id]);

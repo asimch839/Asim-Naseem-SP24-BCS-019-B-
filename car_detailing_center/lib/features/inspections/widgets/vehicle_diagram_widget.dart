@@ -38,10 +38,6 @@ class VehicleDiagramWidget extends StatefulWidget {
 class _VehicleDiagramWidgetState extends State<VehicleDiagramWidget> {
   DiagramInteractionMode _mode = DiagramInteractionMode.placeMarker;
 
-  // Selected Defect Type for Pin Dropping
-  String _selectedDefectType = 'Dent';
-  Color _selectedMarkerColor = const Color(0xFFFF3B30);
-
   // Drawing mode properties
   Color _penColor = const Color(0xFFFF3B30);
   final double _penWidth = 3.0;
@@ -111,220 +107,153 @@ class _VehicleDiagramWidgetState extends State<VehicleDiagramWidget> {
 
   void _showAddMarkerDialog(double x, double y, String view, String panel) {
     final noteCtrl = TextEditingController();
-    String currentType = _selectedDefectType;
-    Color currentColor = _selectedMarkerColor;
+    const String currentType = 'Note';
+    const Color currentColor = Color(0xFF5AC8FA);
 
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDlgState) {
-          return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: Row(
-              children: [
-                CircleAvatar(
-                  radius: 12,
-                  backgroundColor: currentColor,
-                  child: Text(
-                    currentType.substring(0, 1).toUpperCase(),
-                    style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text('Mark $currentType on $panel', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                ),
-              ],
-            ),
-            content: SizedBox(
-              width: 380,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Select Defect Type:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 6,
-                    children: _defectTypes.entries.map((e) {
-                      final isSelected = currentType == e.key;
-                      return ChoiceChip(
-                        label: Text(e.key),
-                        selected: isSelected,
-                        selectedColor: e.value.withValues(alpha: 0.35),
-                        avatar: CircleAvatar(radius: 6, backgroundColor: e.value),
-                        onSelected: (val) {
-                          if (val) {
-                            setDlgState(() {
-                              currentType = e.key;
-                              currentColor = e.value;
-                            });
-                          }
-                        },
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 14),
-                  TextFormField(
-                    controller: noteCtrl,
-                    autofocus: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Defect Description / Notes',
-                      hintText: 'e.g., Deep scratch 6cm, Dent from door impact',
-                      isDense: true,
-                    ),
-                  ),
-                ],
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const CircleAvatar(
+              radius: 12,
+              backgroundColor: Color(0xFF5AC8FA),
+              child: Text(
+                'N',
+                style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
               ),
             ),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-              ElevatedButton(
-                onPressed: () {
-                  final newMarker = DiagramMarker(
-                    id: 'mark_${const Uuid().v4().substring(0, 8)}',
-                    x: x,
-                    y: y,
-                    defectType: currentType,
-                    panelName: panel,
-                    viewName: view,
-                    note: noteCtrl.text.trim(),
-                    color: currentColor,
-                  );
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text('Mark Note on $panel', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: 380,
+          child: TextFormField(
+            controller: noteCtrl,
+            autofocus: true,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              labelText: 'Defect Description / Notes',
+              hintText: 'e.g., Deep scratch 6cm, Dent from door impact',
+              isDense: true,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () {
+              final newMarker = DiagramMarker(
+                id: 'mark_${const Uuid().v4().substring(0, 8)}',
+                x: x,
+                y: y,
+                defectType: currentType,
+                panelName: panel,
+                viewName: view,
+                note: noteCtrl.text.trim(),
+                color: currentColor,
+              );
 
-                  setState(() {
-                    _markers.add(newMarker);
-                  });
-                  _notifyMarkers();
+              setState(() {
+                _markers.add(newMarker);
+              });
+              _notifyMarkers();
 
-                  // Also create or sync with InspectionPartItem
-                  widget.onPartTap?.call(InspectionPartItem(
-                    partName: panel,
-                    view: view,
-                    condition: currentType,
-                    damageDescription: noteCtrl.text.trim().isNotEmpty ? noteCtrl.text.trim() : currentType,
-                    hasDamage: true,
-                  ));
-
-                  Navigator.pop(ctx);
-                },
-                child: const Text('Place Mark'),
-              ),
-            ],
-          );
-        },
+              Navigator.pop(ctx);
+            },
+            child: const Text('Place Mark'),
+          ),
+        ],
       ),
     );
   }
 
   void _showMarkerDetailsDialog(DiagramMarker marker) {
     final noteCtrl = TextEditingController(text: marker.note);
-    String currentType = marker.defectType;
-    Color currentColor = marker.color;
+    final currentType = marker.defectType;
+    final currentColor = marker.color;
 
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDlgState) {
-          return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: Row(
-              children: [
-                CircleAvatar(
-                  radius: 12,
-                  backgroundColor: currentColor,
-                  child: Text(
-                    marker.shortCode,
-                    style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text('${marker.defectType}: ${marker.panelName}',
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                ),
-              ],
-            ),
-            content: SizedBox(
-              width: 380,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('View: ${marker.viewName}', style: const TextStyle(fontSize: 12, color: AppColors.textDarkSecondary)),
-                  const SizedBox(height: 10),
-                  const Text('Defect Type:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 6,
-                    children: _defectTypes.entries.map((e) {
-                      final isSelected = currentType == e.key;
-                      return ChoiceChip(
-                        label: Text(e.key),
-                        selected: isSelected,
-                        selectedColor: e.value.withValues(alpha: 0.35),
-                        avatar: CircleAvatar(radius: 6, backgroundColor: e.value),
-                        onSelected: (val) {
-                          if (val) {
-                            setDlgState(() {
-                              currentType = e.key;
-                              currentColor = e.value;
-                            });
-                          }
-                        },
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 14),
-                  TextFormField(
-                    controller: noteCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Notes / Remarks',
-                      isDense: true,
-                    ),
-                  ),
-                ],
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            CircleAvatar(
+              radius: 12,
+              backgroundColor: currentColor,
+              child: Text(
+                marker.shortCode,
+                style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
               ),
             ),
-            actions: [
-              TextButton(
-                style: TextButton.styleFrom(foregroundColor: AppColors.error),
-                onPressed: () {
-                  setState(() {
-                    _markers.removeWhere((m) => m.id == marker.id);
-                  });
-                  _notifyMarkers();
-                  Navigator.pop(ctx);
-                },
-                child: const Text('Delete Mark'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  final updated = DiagramMarker(
-                    id: marker.id,
-                    x: marker.x,
-                    y: marker.y,
-                    defectType: currentType,
-                    panelName: marker.panelName,
-                    viewName: marker.viewName,
-                    note: noteCtrl.text.trim(),
-                    color: currentColor,
-                  );
-
-                  setState(() {
-                    final idx = _markers.indexWhere((m) => m.id == marker.id);
-                    if (idx != -1) _markers[idx] = updated;
-                  });
-                  _notifyMarkers();
-                  Navigator.pop(ctx);
-                },
-                child: const Text('Save Changes'),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text('Note: ${marker.panelName}',
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: 380,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('View: ${marker.viewName}', style: const TextStyle(fontSize: 12, color: AppColors.textDarkSecondary)),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: noteCtrl,
+                autofocus: true,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: 'Defect Description / Notes',
+                  hintText: 'e.g., Deep scratch 6cm, Dent from door impact',
+                  isDense: true,
+                ),
               ),
             ],
-          );
-        },
+          ),
+        ),
+        actions: [
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            onPressed: () {
+              setState(() {
+                _markers.removeWhere((m) => m.id == marker.id);
+              });
+              _notifyMarkers();
+              Navigator.pop(ctx);
+            },
+            child: const Text('Delete Mark'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final updated = DiagramMarker(
+                id: marker.id,
+                x: marker.x,
+                y: marker.y,
+                defectType: currentType,
+                panelName: marker.panelName,
+                viewName: marker.viewName,
+                note: noteCtrl.text.trim(),
+                color: currentColor,
+              );
+
+              setState(() {
+                final idx = _markers.indexWhere((m) => m.id == marker.id);
+                if (idx != -1) _markers[idx] = updated;
+              });
+              _notifyMarkers();
+              Navigator.pop(ctx);
+            },
+            child: const Text('Save Changes'),
+          ),
+        ],
       ),
     );
   }
@@ -465,31 +394,7 @@ class _VehicleDiagramWidgetState extends State<VehicleDiagramWidget> {
                   ),
 
                   // Mode-Specific Controls
-                  if (_mode == DiagramInteractionMode.placeMarker) ...[
-                    // Defect Type Selector Chips
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
-                      children: _defectTypes.entries.map((e) {
-                        final isSel = _selectedDefectType == e.key;
-                        return ChoiceChip(
-                          label: Text(e.key, style: TextStyle(fontSize: 11, fontWeight: isSel ? FontWeight.bold : FontWeight.normal)),
-                          selected: isSel,
-                          selectedColor: e.value.withValues(alpha: 0.35),
-                          avatar: CircleAvatar(radius: 5, backgroundColor: e.value),
-                          visualDensity: VisualDensity.compact,
-                          onSelected: (val) {
-                            if (val) {
-                              setState(() {
-                                _selectedDefectType = e.key;
-                                _selectedMarkerColor = e.value;
-                              });
-                            }
-                          },
-                        );
-                      }).toList(),
-                    ),
-                  ] else if (_mode == DiagramInteractionMode.freehandDraw) ...[
+                  if (_mode == DiagramInteractionMode.freehandDraw) ...[
                     // Pen Color Palette & Width
                     Row(
                       mainAxisSize: MainAxisSize.min,

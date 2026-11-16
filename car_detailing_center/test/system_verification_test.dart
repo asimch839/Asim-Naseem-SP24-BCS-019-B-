@@ -327,6 +327,7 @@ void main() {
       final expense = ExpenseModel(
         id: 'exp-901',
         businessId: 'local',
+        name: 'Detailing Consumables & Buffing Pads',
         category: 'Detailing Consumables & Buffing Pads',
         amount: 38500.0,
         date: DateTime.parse('2026-10-15'),

@@ -39,22 +39,24 @@ class _SplashScreenState extends State<SplashScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                gradient: AppColors.primaryGradient,
                 borderRadius: BorderRadius.circular(24),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.3),
+                    color: AppColors.primary.withValues(alpha: 0.35),
                     blurRadius: 30,
                     offset: const Offset(0, 10),
                   ),
                 ],
               ),
-              child: const Icon(
-                Icons.directions_car_filled_rounded,
-                size: 64,
-                color: Colors.white,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: Image.asset(
+                  'assets/images/app_logo.png',
+                  width: 140,
+                  height: 140,
+                  fit: BoxFit.contain,
+                ),
               ),
             ),
             const SizedBox(height: 28),

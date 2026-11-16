@@ -33,6 +33,14 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
     _reasonController.text = widget.isAdding ? 'Restock / Purchase Arrival' : 'Used in Detailing Job';
   }
 
+  @override
+  void dispose() {
+    _quantityController.dispose();
+    _reasonController.dispose();
+    _vendorRefController.dispose();
+    super.dispose();
+  }
+
   void _submit() async {
     if (!_formKey.currentState!.validate()) return;
     final qty = double.tryParse(_quantityController.text.trim()) ?? 0.0;
@@ -61,7 +69,9 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
         vendorReference: _vendorRefController.text.trim().isNotEmpty ? _vendorRefController.text.trim() : null,
       );
 
-      Get.back(result: true);
+      if (mounted) {
+        Navigator.of(context).pop(true);
+      }
       Get.snackbar(
         'Stock Updated',
         '${widget.item.name} quantity successfully updated',
@@ -76,82 +86,175 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final title = widget.isAdding ? '+ Add Quantity to ${widget.item.name}' : '- Remove Quantity from ${widget.item.name}';
+    final title = widget.isAdding ? '+ Add Quantity' : '- Remove Quantity';
+    final actionColor = widget.isAdding ? AppColors.success : AppColors.error;
 
-    return AlertDialog(
-      title: Text(
-        title,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      content: ConstrainedBox(
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      backgroundColor: AppColors.surfaceDark,
+      clipBehavior: Clip.antiAlias,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxWidth: 440,
-          maxHeight: MediaQuery.of(context).size.height * 0.88,
+          maxWidth: 480,
+          maxHeight: MediaQuery.of(context).size.height * 0.85,
         ),
-        child: SingleChildScrollView(
-          child: Form(
-            key: _formKey,
-            child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Current Stock: ${widget.item.currentQuantity} ${widget.item.unit}',
-                style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryLight),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              decoration: const BoxDecoration(
+                color: AppColors.cardDark,
+                border: Border(bottom: BorderSide(color: AppColors.borderDark)),
               ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _quantityController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: InputDecoration(
-                  labelText: widget.isAdding ? 'Quantity to Add *' : 'Quantity to Remove *',
-                  suffixText: widget.item.unit,
-                  prefixIcon: Icon(widget.isAdding ? Icons.add_circle_outline_rounded : Icons.remove_circle_outline_rounded),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: actionColor.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      widget.isAdding ? Icons.add_circle_outline_rounded : Icons.remove_circle_outline_rounded,
+                      color: actionColor,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                        ),
+                        Text(
+                          widget.item.name,
+                          style: const TextStyle(fontSize: 12, color: AppColors.textDarkSecondary),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, size: 20, color: AppColors.textDarkMuted),
+                    tooltip: 'Close',
+                    onPressed: () => Navigator.of(context).pop(false),
+                  ),
+                ],
+              ),
+            ),
+
+            // Body
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Current Available Stock:', style: TextStyle(fontSize: 13, color: AppColors.textDarkSecondary)),
+                            Text(
+                              '${widget.item.currentQuantity.toStringAsFixed(1)} ${widget.item.unit}',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.primaryLight),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _quantityController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        decoration: InputDecoration(
+                          labelText: widget.isAdding ? 'Quantity to Add *' : 'Quantity to Remove *',
+                          suffixText: widget.item.unit,
+                          prefixIcon: Icon(
+                            widget.isAdding ? Icons.add_circle_outline_rounded : Icons.remove_circle_outline_rounded,
+                            color: actionColor,
+                          ),
+                        ),
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) return 'Enter quantity';
+                          final parsed = double.tryParse(v.trim());
+                          if (parsed == null || parsed <= 0) return 'Enter a valid quantity';
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 14),
+                      TextFormField(
+                        controller: _reasonController,
+                        decoration: const InputDecoration(
+                          labelText: 'Reason / Purpose *',
+                          hintText: 'e.g. Received new shipment or used for ceramic coat',
+                          prefixIcon: Icon(Icons.comment_rounded),
+                        ),
+                        validator: (v) => v == null || v.trim().isEmpty ? 'Enter reason' : null,
+                      ),
+                      const SizedBox(height: 14),
+                      TextFormField(
+                        controller: _vendorRefController,
+                        decoration: const InputDecoration(
+                          labelText: 'Optional Vendor / Invoice Reference',
+                          hintText: 'e.g. PO-9812 or Vendor invoice #',
+                          prefixIcon: Icon(Icons.tag_rounded),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Enter quantity';
-                  final parsed = double.tryParse(v.trim());
-                  if (parsed == null || parsed <= 0) return 'Enter a valid quantity';
-                  return null;
-                },
               ),
-              const SizedBox(height: 14),
-              TextFormField(
-                controller: _reasonController,
-                decoration: const InputDecoration(
-                  labelText: 'Reason / Purpose *',
-                  hintText: 'e.g. Received new shipment or used for ceramic coat',
-                  prefixIcon: Icon(Icons.comment_rounded),
-                ),
-                validator: (v) => v == null || v.trim().isEmpty ? 'Enter reason' : null,
+            ),
+
+            // Actions
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              decoration: const BoxDecoration(
+                color: AppColors.cardDark,
+                border: Border(top: BorderSide(color: AppColors.borderDark)),
               ),
-              const SizedBox(height: 14),
-              TextFormField(
-                controller: _vendorRefController,
-                decoration: const InputDecoration(
-                  labelText: 'Optional Vendor / Invoice Reference',
-                  hintText: 'e.g. PO-9812 or Vendor invoice #',
-                  prefixIcon: Icon(Icons.tag_rounded),
-                ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: const Text('Cancel'),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton(
+                    onPressed: _isSaving ? null : _submit,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: actionColor,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    ),
+                    child: _isSaving
+                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : Text(widget.isAdding ? '+ Add Stock' : '- Deduct Stock'),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
-    ),
-      actions: [
-        TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
-        ElevatedButton(
-          onPressed: _isSaving ? null : _submit,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: widget.isAdding ? AppColors.success : AppColors.error,
-          ),
-          child: _isSaving
-              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-              : Text(widget.isAdding ? 'Add Stock' : 'Deduct Stock'),
-        ),
-      ],
     );
   }
 }

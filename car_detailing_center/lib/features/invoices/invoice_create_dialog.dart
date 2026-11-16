@@ -15,6 +15,7 @@ import '../../data/repositories/customer_repository.dart';
 import '../../data/repositories/invoice_payment_repository.dart';
 import '../../data/repositories/job_repository.dart';
 import '../../data/repositories/inventory_repository.dart';
+import '../inventory/inventory_form_dialog.dart';
 
 class InvoiceCreateDialog extends StatefulWidget {
   final JobModel? preselectedJob;
@@ -263,7 +264,45 @@ class _InvoiceCreateDialogState extends State<InvoiceCreateDialog> {
     final items = await invRepo.getItems(activeOnly: true);
 
     if (items.isEmpty) {
-      Get.snackbar('No Stock Found', 'No inventory items registered. Please add items in the Inventory screen first.', backgroundColor: AppColors.warning.withValues(alpha: 0.2));
+      final shouldAdd = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: const [
+              Icon(Icons.inventory_2_outlined, color: AppColors.warning, size: 22),
+              SizedBox(width: 8),
+              Text('No Inventory Items', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: const Text(
+            'No inventory products registered yet.\n\nWould you like to register a new stock item now?',
+            style: TextStyle(fontSize: 13),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton.icon(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              icon: const Icon(Icons.add_rounded, size: 18),
+              label: const Text('Add Stock Item Now'),
+            ),
+          ],
+        ),
+      );
+
+      if (shouldAdd == true && mounted) {
+        final added = await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => const InventoryFormDialog(),
+        );
+        if (added == true && mounted) {
+          _addStockItemDialog();
+        }
+      }
       return;
     }
 

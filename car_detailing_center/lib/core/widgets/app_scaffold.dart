@@ -282,13 +282,14 @@ class _AppScaffoldState extends State<AppScaffold> {
             ),
             child: Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    gradient: AppColors.primaryGradient,
-                    borderRadius: BorderRadius.circular(10),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.asset(
+                    'assets/images/app_logo.png',
+                    width: 38,
+                    height: 38,
+                    fit: BoxFit.cover,
                   ),
-                  child: const Icon(Icons.directions_car_filled_rounded, color: Colors.white, size: 24),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -302,7 +303,7 @@ class _AppScaffoldState extends State<AppScaffold> {
                         overflow: TextOverflow.ellipsis,
                       ),
                       Text(
-                        'Car Detailing Center Management',
+                        'Detail & Performance',
                         style: TextStyle(fontSize: 11, color: textSecondary),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -398,9 +399,16 @@ class _AppScaffoldState extends State<AppScaffold> {
                                 color: isModuleActive ? activeIcon : textMuted,
                               ),
                               onTap: () {
-                                setState(() {
-                                  _expandedModules[module.title] = !isExpanded;
-                                });
+                                if (widget.currentRoute != module.route) {
+                                  setState(() {
+                                    _expandedModules[module.title] = true;
+                                  });
+                                  Get.offNamed(module.route);
+                                } else {
+                                  setState(() {
+                                    _expandedModules[module.title] = !isExpanded;
+                                  });
+                                }
                               },
                             ),
                           ),
