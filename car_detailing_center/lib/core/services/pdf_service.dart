@@ -28,11 +28,11 @@ class PdfService {
   // -------------------------------------------------------------
   // INVOICE & RECEIPT PDF
   // -------------------------------------------------------------
-  static Future<void> printInvoice({
+  static pw.Document _buildInvoiceDoc({
     required BusinessModel business,
     required InvoiceModel invoice,
-  }) async {
-    final logoImage = await _getLogoImage();
+    pw.ImageProvider? logoImage,
+  }) {
     final doc = pw.Document();
 
     doc.addPage(
@@ -242,8 +242,50 @@ class PdfService {
       ),
     );
 
+    return doc;
+  }
+
+  /// Builds raw PDF bytes for an invoice (for preview, saving, or sharing)
+  static Future<Uint8List> buildInvoiceBytes({
+    required BusinessModel business,
+    required InvoiceModel invoice,
+  }) async {
+    final logoImage = await _getLogoImage();
+    final doc = _buildInvoiceDoc(
+      business: business,
+      invoice: invoice,
+      logoImage: logoImage,
+    );
+    return doc.save();
+  }
+
+  /// Converts the invoice PDF into high-res A4 PNG image bytes
+  static Future<Uint8List?> renderInvoiceToImage({
+    required BusinessModel business,
+    required InvoiceModel invoice,
+    double dpi = 180,
+  }) async {
+    final pdfBytes = await buildInvoiceBytes(
+      business: business,
+      invoice: invoice,
+    );
+    await for (final page in Printing.raster(pdfBytes, dpi: dpi)) {
+      return await page.toPng();
+    }
+    return null;
+  }
+
+  static Future<void> printInvoice({
+    required BusinessModel business,
+    required InvoiceModel invoice,
+  }) async {
+    final pdfBytes = await buildInvoiceBytes(
+      business: business,
+      invoice: invoice,
+    );
+
     await Printing.layoutPdf(
-      onLayout: (PdfPageFormat format) async => doc.save(),
+      onLayout: (PdfPageFormat format) async => pdfBytes,
       name: 'Invoice_${invoice.invoiceNumber}.pdf',
     );
   }

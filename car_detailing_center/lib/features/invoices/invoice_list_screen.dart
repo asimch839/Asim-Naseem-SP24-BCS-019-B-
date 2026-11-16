@@ -1,10 +1,15 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:printing/printing.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/responsive/responsive_layout.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/services/auth_service.dart';
+import '../../core/services/clipboard_service.dart';
 import '../../core/services/pdf_service.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/widgets/app_scaffold.dart';
@@ -12,6 +17,7 @@ import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/loading_indicator.dart';
 import '../../data/models/invoice_model.dart';
 import '../../data/repositories/invoice_payment_repository.dart';
+import '../../data/repositories/job_repository.dart';
 import 'invoice_create_dialog.dart';
 import '../payments/record_payment_dialog.dart';
 
@@ -37,6 +43,12 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
     _fetchInvoices();
   }
 
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   Future<void> _fetchInvoices() async {
     setState(() => _isLoading = true);
     try {
@@ -56,6 +68,214 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
       if (mounted) {
         setState(() => _isLoading = false);
       }
+    }
+  }
+
+  Future<InvoiceModel> _loadFullInvoice(InvoiceModel invoice) async {
+    try {
+      final details = await _invoiceRepo.getInvoiceDetails(invoice.id);
+      if (details != null) {
+        final rawItems = (details['items'] as List<dynamic>? ?? []);
+        List<InvoiceItem> items = rawItems
+            .map((i) => InvoiceItem.fromMap(Map<String, dynamic>.from(i as Map)))
+            .where((i) => i.name.trim().isNotEmpty)
+            .toList();
+
+        // If items are empty and this invoice was created from a job, load services from job_services!
+        if (items.isEmpty && invoice.jobId != null && invoice.jobId!.isNotEmpty) {
+          final jobRepo = Get.find<JobRepository>();
+          final jobDetails = await jobRepo.getJobById(invoice.jobId!);
+          if (jobDetails != null) {
+            final svcList = (jobDetails['services'] as List<dynamic>? ?? []);
+            for (final s in svcList) {
+              final desc = (s['description']?.toString() ?? '').trim();
+              final amt = (s['amount'] as num?)?.toDouble() ?? 0.0;
+              items.add(InvoiceItem(
+                name: desc.isNotEmpty ? desc : 'Detailing Service',
+                type: desc.toLowerCase().contains('stock') || desc.toLowerCase().contains('chemical') || desc.toLowerCase().contains('bottle') ? 'product' : 'service',
+                quantity: 1.0,
+                unitPrice: amt,
+                total: amt,
+              ));
+            }
+          }
+        }
+
+        // If items are still empty, create an itemized line item from vehicle and subtotal
+        if (items.isEmpty) {
+          final desc = (invoice.notes != null && invoice.notes!.isNotEmpty)
+              ? invoice.notes!
+              : (invoice.vehicleDisplayName != null && invoice.vehicleDisplayName!.isNotEmpty
+                  ? 'Detailing Service Package - ${invoice.vehicleDisplayName}'
+                  : 'Detailing Services & Labour');
+          final price = invoice.subtotal > 0 ? invoice.subtotal : invoice.grandTotal;
+          items.add(InvoiceItem(
+            name: desc,
+            type: 'service',
+            quantity: 1.0,
+            unitPrice: price,
+            total: price,
+          ));
+        }
+
+        return InvoiceModel.fromSqlite(details, items);
+      }
+    } catch (e) {
+      debugPrint('Error loading full invoice details: $e');
+    }
+
+    if (invoice.items.isEmpty) {
+      final desc = (invoice.vehicleDisplayName != null && invoice.vehicleDisplayName!.isNotEmpty)
+          ? 'Detailing Service Package - ${invoice.vehicleDisplayName}'
+          : 'Detailing Services & Labour';
+      final price = invoice.subtotal > 0 ? invoice.subtotal : invoice.grandTotal;
+      final fallbackItem = InvoiceItem(
+        name: desc,
+        type: 'service',
+        quantity: 1.0,
+        unitPrice: price,
+        total: price,
+      );
+      return invoice.copyWith(items: [fallbackItem]);
+    }
+    return invoice;
+  }
+
+  Future<void> _viewInvoice(InvoiceModel invoice) async {
+    final business = AuthService.to.currentBusiness.value;
+    if (business == null) return;
+
+    try {
+      final fullInvoice = await _loadFullInvoice(invoice);
+      final pdfBytes = await PdfService.buildInvoiceBytes(business: business, invoice: fullInvoice);
+
+      if (!mounted) return;
+
+      showDialog(
+        context: context,
+        builder: (ctx) => Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          backgroundColor: AppColors.surfaceDark,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+          clipBehavior: Clip.antiAlias,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 950, maxHeight: 850),
+            child: Column(
+              children: [
+                // Header
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: const BoxDecoration(
+                    color: AppColors.cardDark,
+                    border: Border(bottom: BorderSide(color: AppColors.borderDark)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.receipt_long_rounded, color: AppColors.primaryLight),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Tax Invoice: ${fullInvoice.invoiceNumber} • ${fullInvoice.customerName}',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.share_rounded, size: 16),
+                        label: const Text('Share WhatsApp'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF25D366),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        ),
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _shareInvoice(fullInvoice);
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded, color: AppColors.textDarkMuted),
+                        tooltip: 'Close',
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: PdfPreview(
+                    build: (format) async => pdfBytes,
+                    canChangeOrientation: false,
+                    canChangePageFormat: false,
+                    canDebug: false,
+                    allowPrinting: true,
+                    allowSharing: true,
+                    pdfFileName: 'Invoice_${fullInvoice.invoiceNumber}.pdf',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    } catch (e) {
+      Get.snackbar('Error', 'Failed to render invoice preview: $e', backgroundColor: AppColors.error.withValues(alpha: 0.2));
+    }
+  }
+
+  Future<void> _shareInvoice(InvoiceModel invoice) async {
+    final business = AuthService.to.currentBusiness.value;
+    if (business == null) return;
+
+    try {
+      final fullInvoice = await _loadFullInvoice(invoice);
+      final pdfBytes = await PdfService.buildInvoiceBytes(business: business, invoice: fullInvoice);
+
+      final tempDir = await getTemporaryDirectory();
+      final baseName = 'Invoice_${fullInvoice.invoiceNumber.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_')}_${DateTime.now().millisecondsSinceEpoch}';
+      final pdfFile = File('${tempDir.path}/$baseName.pdf');
+      await pdfFile.writeAsBytes(pdfBytes);
+
+      // Render high-res A4 picture (PNG)
+      String? imagePath;
+      final imageBytes = await PdfService.renderInvoiceToImage(business: business, invoice: fullInvoice);
+      if (imageBytes != null) {
+        final imgFile = File('${tempDir.path}/$baseName.png');
+        await imgFile.writeAsBytes(imageBytes);
+        imagePath = imgFile.path;
+      }
+
+      // Copy to Windows Clipboard as Image & File Drop
+      if (imagePath != null) {
+        await WindowsClipboardService.copyImageToClipboard(imagePath, pdfPath: pdfFile.path);
+      } else {
+        await WindowsClipboardService.copyFileToClipboard(pdfFile.path);
+      }
+
+      // Try opening WhatsApp with client's phone number
+      final phone = fullInvoice.customerPhone.replaceAll(RegExp(r'[^0-9+]'), '');
+      final whatsappUri = Uri.parse(phone.isNotEmpty ? 'whatsapp://send?phone=$phone' : 'whatsapp://send');
+      final webWhatsappUri = Uri.parse(phone.isNotEmpty ? 'https://web.whatsapp.com/send?phone=$phone' : 'https://web.whatsapp.com');
+
+      if (await canLaunchUrl(whatsappUri)) {
+        await launchUrl(whatsappUri);
+      } else if (await canLaunchUrl(webWhatsappUri)) {
+        await launchUrl(webWhatsappUri);
+      }
+
+      if (!mounted) return;
+
+      Get.snackbar(
+        'Copied to Clipboard!',
+        'A4 Tax Invoice copied. Open client chat & press Ctrl + V to paste!',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: const Color(0xFF25D366).withValues(alpha: 0.25),
+        colorText: Colors.white,
+        icon: const Icon(Icons.check_circle_rounded, color: Color(0xFF25D366)),
+        duration: const Duration(seconds: 4),
+      );
+    } catch (e) {
+      Get.snackbar('Error', 'Failed to share invoice: $e', backgroundColor: AppColors.error.withValues(alpha: 0.2));
     }
   }
 
@@ -285,20 +505,55 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                                     ? PopupMenuButton<String>(
                                         icon: const Icon(Icons.more_vert_rounded),
                                         onSelected: (action) async {
-                                          if (action == 'pay') {
+                                          if (action == 'view') {
+                                            _viewInvoice(invoice);
+                                          } else if (action == 'share') {
+                                            _shareInvoice(invoice);
+                                          } else if (action == 'print') {
+                                            final business = AuthService.to.currentBusiness.value;
+                                            if (business != null) {
+                                              final fullInvoice = await _loadFullInvoice(invoice);
+                                              await PdfService.printInvoice(business: business, invoice: fullInvoice);
+                                            }
+                                          } else if (action == 'pay') {
                                             final res = await showDialog(
                                               context: context,
                                               builder: (_) => RecordPaymentDialog(invoice: invoice),
                                             );
                                             if (res == true) _fetchInvoices();
-                                          } else if (action == 'print') {
-                                            final business = AuthService.to.currentBusiness.value;
-                                            if (business != null) {
-                                              await PdfService.printInvoice(business: business, invoice: invoice);
-                                            }
                                           }
                                         },
                                         itemBuilder: (context) => [
+                                          const PopupMenuItem(
+                                            value: 'view',
+                                            child: Row(
+                                              children: [
+                                                Icon(Icons.visibility_rounded, size: 18, color: AppColors.primaryLight),
+                                                SizedBox(width: 8),
+                                                Text('View Invoice'),
+                                              ],
+                                            ),
+                                          ),
+                                          const PopupMenuItem(
+                                            value: 'share',
+                                            child: Row(
+                                              children: [
+                                                Icon(Icons.share_rounded, size: 18, color: Color(0xFF25D366)),
+                                                SizedBox(width: 8),
+                                                Text('Share WhatsApp', style: TextStyle(color: Color(0xFF25D366), fontWeight: FontWeight.bold)),
+                                              ],
+                                            ),
+                                          ),
+                                          const PopupMenuItem(
+                                            value: 'print',
+                                            child: Row(
+                                              children: [
+                                                Icon(Icons.print_rounded, size: 18),
+                                                SizedBox(width: 8),
+                                                Text('Print / Save PDF'),
+                                              ],
+                                            ),
+                                          ),
                                           if (invoice.remainingAmount > 0)
                                             const PopupMenuItem(
                                               value: 'pay',
@@ -310,16 +565,6 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                                                 ],
                                               ),
                                             ),
-                                          const PopupMenuItem(
-                                            value: 'print',
-                                            child: Row(
-                                              children: [
-                                                Icon(Icons.print_rounded, size: 18),
-                                                SizedBox(width: 8),
-                                                Text('Print / Save PDF'),
-                                              ],
-                                            ),
-                                          ),
                                         ],
                                       )
                                     : Row(
@@ -331,11 +576,11 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                                             children: [
                                               Text(
                                                 Formatters.currency(invoice.grandTotal, symbol: currency),
-                                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                                               ),
                                               Text(
                                                 invoice.remainingAmount > 0
-                                                    ? 'Remaining: ${Formatters.currency(invoice.remainingAmount, symbol: currency)}'
+                                                    ? 'Due: ${Formatters.currency(invoice.remainingAmount, symbol: currency)}'
                                                     : 'Fully Settled',
                                                 style: TextStyle(
                                                   fontSize: 11,
@@ -345,8 +590,50 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                                               ),
                                             ],
                                           ),
-                                          const SizedBox(width: 12),
-                                          if (invoice.remainingAmount > 0)
+                                          const SizedBox(width: 14),
+                                          // 1. View Button
+                                          OutlinedButton.icon(
+                                            icon: const Icon(Icons.visibility_rounded, size: 15),
+                                            label: const Text('View'),
+                                            style: OutlinedButton.styleFrom(
+                                              foregroundColor: AppColors.primaryLight,
+                                              side: const BorderSide(color: AppColors.primaryLight),
+                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                            ),
+                                            onPressed: () => _viewInvoice(invoice),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          // 2. Share WhatsApp Button
+                                          ElevatedButton.icon(
+                                            icon: const Icon(Icons.share_rounded, size: 15),
+                                            label: const Text('Share'),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: const Color(0xFF25D366),
+                                              foregroundColor: Colors.white,
+                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                            ),
+                                            onPressed: () => _shareInvoice(invoice),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          // 3. Print PDF Button
+                                          ElevatedButton.icon(
+                                            icon: const Icon(Icons.print_rounded, size: 15),
+                                            label: const Text('Print PDF'),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: AppColors.primary,
+                                              foregroundColor: Colors.white,
+                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                            ),
+                                            onPressed: () async {
+                                              final business = AuthService.to.currentBusiness.value;
+                                              if (business != null) {
+                                                final fullInvoice = await _loadFullInvoice(invoice);
+                                                await PdfService.printInvoice(business: business, invoice: fullInvoice);
+                                              }
+                                            },
+                                          ),
+                                          if (invoice.remainingAmount > 0) ...[
+                                            const SizedBox(width: 8),
                                             ElevatedButton.icon(
                                               onPressed: () async {
                                                 final res = await showDialog(
@@ -355,20 +642,15 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                                                 );
                                                 if (res == true) _fetchInvoices();
                                               },
-                                              icon: const Icon(Icons.price_check_rounded, size: 16),
+                                              icon: const Icon(Icons.price_check_rounded, size: 15),
                                               label: const Text('Pay'),
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: AppColors.success,
+                                                foregroundColor: Colors.white,
+                                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                              ),
                                             ),
-                                          const SizedBox(width: 8),
-                                          IconButton(
-                                            icon: const Icon(Icons.print_rounded),
-                                            tooltip: 'Print / Save PDF',
-                                            onPressed: () async {
-                                              final business = AuthService.to.currentBusiness.value;
-                                              if (business != null) {
-                                                await PdfService.printInvoice(business: business, invoice: invoice);
-                                              }
-                                            },
-                                          ),
+                                          ],
                                         ],
                                       ),
                               );

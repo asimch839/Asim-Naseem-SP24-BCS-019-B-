@@ -30,12 +30,12 @@ class InvoiceItem {
 
   factory InvoiceItem.fromMap(Map<String, dynamic> map) {
     return InvoiceItem(
-      name: map['name'] ?? '',
+      name: map['name'] ?? map['description'] ?? '',
       type: map['type'] ?? 'service',
       quantity: (map['quantity'] as num?)?.toDouble() ?? 1.0,
-      unitPrice: (map['unitPrice'] as num?)?.toDouble() ?? 0.0,
-      total: (map['total'] as num?)?.toDouble() ?? 0.0,
-      inventoryItemId: map['inventoryItemId'] as String?,
+      unitPrice: (map['unitPrice'] as num?)?.toDouble() ?? (map['unit_price'] as num?)?.toDouble() ?? 0.0,
+      total: (map['total'] as num?)?.toDouble() ?? (map['total_price'] as num?)?.toDouble() ?? 0.0,
+      inventoryItemId: (map['inventoryItemId'] ?? map['inventory_item_id']) as String?,
     );
   }
 }
@@ -168,6 +168,14 @@ class InvoiceModel {
   factory InvoiceModel.fromSqlite(Map<String, dynamic> map, [List<InvoiceItem>? items]) {
     final dateStr = map['date'] as String? ?? map['created_at'] as String? ?? '';
     final dt = DateTime.tryParse(dateStr) ?? DateTime.now();
+
+    List<InvoiceItem> resolvedItems = items ?? [];
+    if (resolvedItems.isEmpty && map['items'] is List) {
+      resolvedItems = (map['items'] as List<dynamic>)
+          .map((i) => InvoiceItem.fromMap(Map<String, dynamic>.from(i as Map)))
+          .toList();
+    }
+
     return InvoiceModel(
       id: map['id'] as String,
       invoiceNumber: map['invoice_number'] as String? ?? '',
@@ -180,7 +188,7 @@ class InvoiceModel {
       vehicleRegNumber: map['registration_number'] as String?,
       vehicleDisplayName: map['vehicle_name'] as String?,
       jobId: map['job_id'] as String?,
-      items: items ?? [],
+      items: resolvedItems,
       subtotal: (map['subtotal'] as num?)?.toDouble() ?? 0.0,
       discount: (map['discount'] as num?)?.toDouble() ?? 0.0,
       tax: (map['tax_amount'] as num?)?.toDouble() ?? 0.0,
@@ -197,13 +205,13 @@ class InvoiceModel {
     );
   }
 
-
   InvoiceModel copyWith({
     double? paidAmount,
     double? remainingAmount,
     String? status,
     String? paymentMethod,
     bool? isDeleted,
+    List<InvoiceItem>? items,
   }) {
     return InvoiceModel(
       id: id,
@@ -217,7 +225,7 @@ class InvoiceModel {
       vehicleRegNumber: vehicleRegNumber,
       vehicleDisplayName: vehicleDisplayName,
       jobId: jobId,
-      items: items,
+      items: items ?? this.items,
       subtotal: subtotal,
       discount: discount,
       tax: tax,

@@ -67,15 +67,34 @@ class _InvoiceCreateDialogState extends State<InvoiceCreateDialog> {
           _onCustomerChanged(matchedCustomer, preselectedVehicleId: job.vehicleId);
         }
 
-        // Populate items from job services
-        for (final s in job.services) {
-          _items.add(InvoiceItem(
-            name: s.serviceName,
-            type: 'service',
-            quantity: 1.0,
-            unitPrice: s.price,
-            total: s.price,
-          ));
+        // Populate items from job services & recorded work
+        final jobRepo = Get.find<JobRepository>();
+        final jobDetails = await jobRepo.getJobById(job.id);
+        if (jobDetails != null) {
+          final svcList = (jobDetails['services'] as List<dynamic>? ?? []);
+          for (final s in svcList) {
+            final desc = (s['description']?.toString() ?? '').trim();
+            final amt = (s['amount'] as num?)?.toDouble() ?? 0.0;
+            _items.add(InvoiceItem(
+              name: desc.isNotEmpty ? desc : 'Detailing Service',
+              type: desc.toLowerCase().contains('stock') || desc.toLowerCase().contains('chemical') || desc.toLowerCase().contains('bottle') || desc.toLowerCase().contains('liter') ? 'product' : 'service',
+              quantity: 1.0,
+              unitPrice: amt,
+              total: amt,
+            ));
+          }
+        }
+
+        if (_items.isEmpty) {
+          for (final s in job.services) {
+            _items.add(InvoiceItem(
+              name: s.serviceName.isNotEmpty ? s.serviceName : 'Detailing Service',
+              type: 'service',
+              quantity: 1.0,
+              unitPrice: s.price,
+              total: s.price,
+            ));
+          }
         }
         _discountController.text = job.discount.toStringAsFixed(0);
         if (job.paidAmount > 0) {

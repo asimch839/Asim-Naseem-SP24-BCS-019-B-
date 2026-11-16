@@ -74,20 +74,8 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     final currency = AuthService.to.currentBusiness.value?.currency ?? AppConstants.defaultCurrency;
     final nameCtrl = TextEditingController();
     final priceCtrl = TextEditingController();
+    final descCtrl = TextEditingController();
     final jobRepo = Get.find<JobRepository>();
-
-    final presets = [
-      'Detailing Service',
-      'Compound Polish',
-      'Interior Deep Clean',
-      'Exterior Wash & Wax',
-      'Ceramic Coating',
-      'PPF Installation',
-      'Engine Bay Cleaning',
-      'Leather Treatment',
-      'Headlight Restoration',
-      'Labour Charges',
-    ];
 
     await showDialog(
       context: context,
@@ -121,30 +109,22 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                     const SizedBox(height: 12),
                     TextField(
                       controller: priceCtrl,
-                      keyboardType: TextInputType.number,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       decoration: InputDecoration(
                         labelText: 'Price / Labour Charge ($currency) *',
                         hintText: '0.00',
                         prefixIcon: const Icon(Icons.payments_rounded, size: 18),
                       ),
                     ),
-                    const SizedBox(height: 14),
-                    const Text('Quick Presets:', style: TextStyle(fontSize: 11, color: AppColors.textDarkSecondary, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: presets.map((p) {
-                        return ActionChip(
-                          visualDensity: VisualDensity.compact,
-                          label: Text(p, style: const TextStyle(fontSize: 11)),
-                          onPressed: () {
-                            setDialogState(() {
-                              nameCtrl.text = p;
-                            });
-                          },
-                        );
-                      }).toList(),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: descCtrl,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        labelText: 'Description / Notes',
+                        hintText: 'e.g. Details, warranty, panel info...',
+                        prefixIcon: Icon(Icons.description_rounded, size: 18),
+                      ),
                     ),
                   ],
                 ),
@@ -159,17 +139,19 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                       return;
                     }
                     final price = double.tryParse(priceCtrl.text.trim()) ?? 0.0;
+                    final desc = descCtrl.text.trim();
+                    final fullDescription = desc.isNotEmpty ? '$name - $desc' : name;
                     try {
                       await jobRepo.addServiceToJob(
                         jobId: _job.id,
-                        description: name,
+                        description: fullDescription,
                         amount: price,
                       );
                       if (ctx.mounted) Navigator.pop(ctx);
                       await _loadJobDetails();
                       Get.snackbar(
                         'Service Added',
-                        'Added "$name" ($currency $price) to Job #${_job.jobNumber}',
+                        'Added "$fullDescription" ($currency $price) to Job #${_job.jobNumber}',
                         backgroundColor: AppColors.success.withValues(alpha: 0.2),
                       );
                     } catch (e) {

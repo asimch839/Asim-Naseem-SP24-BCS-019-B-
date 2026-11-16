@@ -21,9 +21,9 @@ class JobServiceItem {
 
   factory JobServiceItem.fromMap(Map<String, dynamic> map) {
     return JobServiceItem(
-      serviceId: map['serviceId'] ?? '',
-      serviceName: map['serviceName'] ?? '',
-      price: (map['price'] as num?)?.toDouble() ?? 0.0,
+      serviceId: map['serviceId'] ?? map['id']?.toString() ?? '',
+      serviceName: map['serviceName'] ?? map['description']?.toString() ?? '',
+      price: (map['price'] as num?)?.toDouble() ?? (map['amount'] as num?)?.toDouble() ?? 0.0,
     );
   }
 }
