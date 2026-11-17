@@ -287,16 +287,75 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
     return AppScaffold(
       currentRoute: AppRoutes.invoices,
       title: 'Tax Invoices & Billing Center',
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          final res = await showDialog(
-            context: context,
-            builder: (_) => const InvoiceCreateDialog(),
-          );
-          if (res == true) _fetchInvoices();
-        },
-        icon: const Icon(Icons.receipt_long_rounded),
-        label: const Text('Create Invoice'),
+      actions: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+          child: ElevatedButton.icon(
+            onPressed: () async {
+              final res = await showDialog(
+                context: context,
+                builder: (_) => const InvoiceCreateDialog(isDirectSale: true),
+              );
+              if (res == true) _fetchInvoices();
+            },
+            icon: const Icon(Icons.point_of_sale_rounded, size: 18),
+            label: const Text('Sell Stock / Counter Bill'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.success,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+          child: ElevatedButton.icon(
+            onPressed: () async {
+              final res = await showDialog(
+                context: context,
+                builder: (_) => const InvoiceCreateDialog(),
+              );
+              if (res == true) _fetchInvoices();
+            },
+            icon: const Icon(Icons.receipt_long_rounded, size: 18),
+            label: const Text('Create Invoice'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ),
+      ],
+      floatingActionButton: Wrap(
+        direction: Axis.horizontal,
+        spacing: 8,
+        children: [
+          FloatingActionButton.extended(
+            heroTag: 'sellStockFabInv',
+            backgroundColor: AppColors.success,
+            foregroundColor: Colors.white,
+            onPressed: () async {
+              final res = await showDialog(
+                context: context,
+                builder: (_) => const InvoiceCreateDialog(isDirectSale: true),
+              );
+              if (res == true) _fetchInvoices();
+            },
+            icon: const Icon(Icons.point_of_sale_rounded),
+            label: const Text('Sell Stock / Bill'),
+          ),
+          FloatingActionButton.extended(
+            heroTag: 'createInvFab',
+            onPressed: () async {
+              final res = await showDialog(
+                context: context,
+                builder: (_) => const InvoiceCreateDialog(),
+              );
+              if (res == true) _fetchInvoices();
+            },
+            icon: const Icon(Icons.receipt_long_rounded),
+            label: const Text('Create Invoice'),
+          ),
+        ],
       ),
       body: Padding(
         padding: EdgeInsets.all(isMobile ? 12 : 24),

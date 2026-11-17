@@ -701,6 +701,76 @@ class AppDatabase {
 
     // Ensure invoices table allows NULL vehicle_id for counter sales
     await ensureInvoicesTableSchema(db);
+
+    // Ensure showroom_cars table exists for car trading, sales & brokerage deals
+    await _ensureShowroomCarsTable(db);
+  }
+
+  Future<void> _ensureShowroomCarsTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS showroom_cars (
+        id TEXT PRIMARY KEY,
+        deal_type TEXT NOT NULL DEFAULT 'inventory',
+        make TEXT NOT NULL,
+        model TEXT NOT NULL,
+        year INTEGER NOT NULL,
+        variant TEXT,
+        registration_number TEXT NOT NULL,
+        registration_city TEXT,
+        color TEXT,
+        mileage INTEGER DEFAULT 0,
+        transmission TEXT DEFAULT 'Automatic',
+        fuel_type TEXT DEFAULT 'Petrol',
+        engine_capacity TEXT,
+        condition_grade TEXT DEFAULT 'Good',
+        features TEXT,
+        image_path TEXT,
+        documents_status TEXT DEFAULT 'Complete',
+        purchase_price REAL DEFAULT 0,
+        purchase_date TEXT,
+        extra_expenses REAL DEFAULT 0,
+        demand_price REAL DEFAULT 0,
+        sold_price REAL DEFAULT 0,
+        sale_date TEXT,
+        commission_amount REAL DEFAULT 0,
+        buyer_commission REAL DEFAULT 0,
+        seller_commission REAL DEFAULT 0,
+        commission_payer TEXT DEFAULT 'Both',
+        profit_amount REAL DEFAULT 0,
+        seller_name TEXT,
+        seller_phone TEXT,
+        buyer_name TEXT,
+        buyer_phone TEXT,
+        buyer_cnic TEXT,
+        status TEXT NOT NULL DEFAULT 'Available',
+        token_amount REAL DEFAULT 0,
+        notes TEXT,
+        payment_method TEXT DEFAULT 'Cash',
+        is_deleted INTEGER DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_showroom_cars_status ON showroom_cars(status)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_showroom_cars_reg ON showroom_cars(registration_number)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_showroom_cars_deal ON showroom_cars(deal_type)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_showroom_cars_sale_date ON showroom_cars(sale_date)');
+
+    // Ensure dedicated customer & car columns exist
+    final showroomCols = [
+      'ALTER TABLE showroom_cars ADD COLUMN customer_name TEXT',
+      'ALTER TABLE showroom_cars ADD COLUMN customer_phone TEXT',
+      'ALTER TABLE showroom_cars ADD COLUMN customer_price REAL DEFAULT 0',
+      'ALTER TABLE showroom_cars ADD COLUMN car_name TEXT',
+      'ALTER TABLE showroom_cars ADD COLUMN buyer_commission REAL DEFAULT 0',
+      'ALTER TABLE showroom_cars ADD COLUMN seller_commission REAL DEFAULT 0',
+      'ALTER TABLE showroom_cars ADD COLUMN condition_grade TEXT',
+    ];
+    for (final col in showroomCols) {
+      try {
+        await db.execute(col);
+      } catch (_) {}
+    }
   }
 
   Future<void> ensureInvoicesTableSchema(Database db) async {

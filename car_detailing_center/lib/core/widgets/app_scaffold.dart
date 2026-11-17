@@ -129,6 +129,11 @@ class _AppScaffoldState extends State<AppScaffold> {
       route: AppRoutes.vehicles,
     ),
     MainModuleItem(
+      title: 'Car Showroom',
+      icon: Icons.directions_car_filled_rounded,
+      route: AppRoutes.showroom,
+    ),
+    MainModuleItem(
       title: 'Customers',
       icon: Icons.people_alt_rounded,
       route: AppRoutes.customers,

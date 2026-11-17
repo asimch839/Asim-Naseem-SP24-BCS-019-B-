@@ -45,6 +45,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     'invoices': 'Invoices & Billing Summary',
     'payments': 'Payments & Collections Received',
     'outstanding_balances': 'Customer Outstanding Balances & Aging',
+    'showroom_cars': 'Car Showroom & Brokerage Deals',
   };
 
   @override

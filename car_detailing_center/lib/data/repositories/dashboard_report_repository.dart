@@ -117,13 +117,25 @@ class DashboardReportRepository {
     final endStr = end.toIso8601String();
     final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
-    // 1. Total Income: valid payments received in period
+    // 1. Total Income: valid service & product payments + car sales net profit & deals commissions in period
     final incomeRes = await db.rawQuery('''
       SELECT COALESCE(SUM(amount), 0.0) as income
       FROM payments
       WHERE payment_date BETWEEN ? AND ? AND is_refund = 0
     ''', [startStr, endStr]);
-    final totalIncome = (incomeRes.first['income'] as num?)?.toDouble() ?? 0.0;
+    final serviceIncome = (incomeRes.first['income'] as num?)?.toDouble() ?? 0.0;
+
+    double carIncome = 0.0;
+    try {
+      final carRes = await db.rawQuery('''
+        SELECT COALESCE(SUM(profit_amount), 0.0) as car_income
+        FROM showroom_cars
+        WHERE is_deleted = 0 AND status = 'Sold' AND sale_date BETWEEN ? AND ?
+      ''', [startStr, endStr]);
+      carIncome = (carRes.first['car_income'] as num?)?.toDouble() ?? 0.0;
+    } catch (_) {}
+
+    final totalIncome = serviceIncome + carIncome;
 
     // 2. Expenses: All garage operating expenses + staff salary payouts & advances + staff expenses
     final totalExpenses = await _queryTotalExpensesInRange(db, startStr, endStr);
@@ -232,13 +244,17 @@ class DashboardReportRepository {
       final dayStr = DateFormat('yyyy-MM-dd').format(day);
       final dayLabel = DateFormat('EEE').format(day);
 
-      // Income for day
+      // Income for day (payments + car sales net profit)
       final incRes = await db.rawQuery('''
         SELECT COALESCE(SUM(amount), 0.0) as val
         FROM payments
         WHERE payment_date LIKE '$dayStr%' AND is_refund = 0
       ''');
-      final income = (incRes.first['val'] as num?)?.toDouble() ?? 0.0;
+      double income = (incRes.first['val'] as num?)?.toDouble() ?? 0.0;
+      try {
+        final cRes = await db.rawQuery("SELECT COALESCE(SUM(profit_amount), 0.0) as val FROM showroom_cars WHERE is_deleted = 0 AND status = 'Sold' AND sale_date LIKE '$dayStr%'");
+        income += (cRes.first['val'] as num?)?.toDouble() ?? 0.0;
+      } catch (_) {}
 
       // Expenses for day (inclusive of garage expenses, staff salaries, advances, and staff expenses)
       final exp = await _queryTotalExpensesLike(db, dayStr);
@@ -272,7 +288,11 @@ class DashboardReportRepository {
         FROM payments
         WHERE payment_date LIKE '$mStr%' AND is_refund = 0
       ''');
-      final income = (incRes.first['val'] as num?)?.toDouble() ?? 0.0;
+      double income = (incRes.first['val'] as num?)?.toDouble() ?? 0.0;
+      try {
+        final cRes = await db.rawQuery("SELECT COALESCE(SUM(profit_amount), 0.0) as val FROM showroom_cars WHERE is_deleted = 0 AND status = 'Sold' AND sale_date LIKE '$mStr%'");
+        income += (cRes.first['val'] as num?)?.toDouble() ?? 0.0;
+      } catch (_) {}
 
       final exp = await _queryTotalExpensesLike(db, mStr);
 
@@ -610,13 +630,48 @@ class DashboardReportRepository {
           GROUP BY c.id
           ORDER BY total_outstanding DESC
         ''');
+      case 'showroom_cars':
+        return await db.rawQuery('''
+          SELECT 
+            registration_number,
+            (year || ' ' || make || ' ' || model || CASE WHEN variant IS NOT NULL THEN ' ' || variant ELSE '' END) as car_name,
+            deal_type,
+            status,
+            demand_price,
+            purchase_price,
+            extra_expenses,
+            sold_price,
+            commission_amount,
+            profit_amount,
+            sale_date,
+            buyer_name,
+            buyer_phone,
+            seller_name,
+            payment_method
+          FROM showroom_cars
+          WHERE is_deleted = 0
+          ORDER BY created_at DESC
+        ''');
       case 'income_expense':
       default:
         final inc = await db.rawQuery("SELECT date(payment_date) as record_date, 'Payment Received' as category, amount, payment_method as method, 'Income' as type FROM payments WHERE payment_date BETWEEN ? AND ? AND is_refund = 0", [startStr, endStr]);
+        List<Map<String, dynamic>> carInc = [];
+        try {
+          carInc = await db.rawQuery('''
+            SELECT 
+              date(sale_date) as record_date, 
+              ('Car Deal: ' || year || ' ' || make || ' ' || model || ' (' || registration_number || ')') as category, 
+              profit_amount as amount, 
+              payment_method as method, 
+              'Income' as type 
+            FROM showroom_cars 
+            WHERE is_deleted = 0 AND status = 'Sold' AND sale_date BETWEEN ? AND ?
+          ''', [startStr, endStr]);
+        } catch (_) {}
         final expG = await db.rawQuery("SELECT date(date) as record_date, category, amount, payment_method as method, 'Expense' as type FROM garage_expenses WHERE date BETWEEN ? AND ?", [startStr, endStr]);
         final unsyncedSal = await db.rawQuery("SELECT date(payment_date) as record_date, 'Staff Salary' as category, amount, payment_method as method, 'Expense' as type FROM salary_payments WHERE payment_date BETWEEN ? AND ? AND ('gexp_' || id) NOT IN (SELECT id FROM garage_expenses)", [startStr, endStr]);
         final unsyncedStaff = await db.rawQuery("SELECT date(date) as record_date, category, amount, payment_method as method, 'Expense' as type FROM staff_expenses WHERE date BETWEEN ? AND ? AND ('gexp_' || id) NOT IN (SELECT id FROM garage_expenses)", [startStr, endStr]);
-        return [...inc, ...expG, ...unsyncedSal, ...unsyncedStaff];
+        return [...inc, ...carInc, ...expG, ...unsyncedSal, ...unsyncedStaff];
     }
   }
 }

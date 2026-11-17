@@ -19,6 +19,7 @@ import 'data/repositories/settings_repository.dart';
 import 'data/repositories/notification_repository.dart';
 import 'data/repositories/vendor_repository.dart';
 import 'data/repositories/detailing_package_repository.dart';
+import 'data/repositories/showroom_repository.dart';
 import 'features/notifications/notification_controller.dart';
 
 void main() async {
@@ -61,6 +62,7 @@ void main() async {
   Get.put(DashboardReportRepository(), permanent: true);
   Get.put(NotificationRepository(), permanent: true);
   Get.put(DetailingPackageRepository(), permanent: true);
+  Get.put(ShowroomRepository(), permanent: true);
 
   // Notification / Local Reminders Controller
   Get.put(NotificationController(), permanent: true);

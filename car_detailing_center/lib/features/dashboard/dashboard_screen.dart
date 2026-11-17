@@ -162,6 +162,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                     ),
                     CustomButton(
+                      text: 'Sell Stock / POS',
+                      icon: Icons.point_of_sale_rounded,
+                      type: ButtonType.secondary,
+                      height: 34,
+                      onPressed: () => showDialog(
+                        context: context,
+                        builder: (_) => const InvoiceCreateDialog(isDirectSale: true),
+                      ),
+                    ),
+                    CustomButton(
                       text: 'Create Invoice',
                       icon: Icons.receipt_long_rounded,
                       type: ButtonType.secondary,
@@ -194,6 +204,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       type: ButtonType.secondary,
                       height: 34,
                       onPressed: () => Get.toNamed(AppRoutes.inventory),
+                    ),
+                    CustomButton(
+                      text: 'Car Showroom',
+                      icon: Icons.directions_car_filled_rounded,
+                      type: ButtonType.secondary,
+                      height: 34,
+                      onPressed: () => Get.toNamed(AppRoutes.showroom),
                     ),
                     CustomButton(
                       text: 'Staff Attendance',

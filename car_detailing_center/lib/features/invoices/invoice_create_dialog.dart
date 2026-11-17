@@ -20,7 +20,13 @@ import '../inventory/inventory_form_dialog.dart';
 class InvoiceCreateDialog extends StatefulWidget {
   final JobModel? preselectedJob;
   final InventoryItemModel? preselectedStockItem;
-  const InvoiceCreateDialog({super.key, this.preselectedJob, this.preselectedStockItem});
+  final bool isDirectSale;
+  const InvoiceCreateDialog({
+    super.key,
+    this.preselectedJob,
+    this.preselectedStockItem,
+    this.isDirectSale = false,
+  });
 
   @override
   State<InvoiceCreateDialog> createState() => _InvoiceCreateDialogState();
@@ -55,6 +61,26 @@ class _InvoiceCreateDialogState extends State<InvoiceCreateDialog> {
     final customers = await customerRepo.getCustomers();
 
     if (mounted) {
+      CustomerModel? defaultWalkIn = customers.firstWhereOrNull(
+        (c) => c.fullName.toLowerCase().contains('walk-in') || c.phone.toLowerCase().contains('walk-in'),
+      );
+
+      if (defaultWalkIn == null) {
+        try {
+          final newCust = CustomerModel(
+            id: 'cust_walkin',
+            businessId: 'local',
+            fullName: 'Walk-in Retail Customer',
+            phone: 'Walk-in',
+            status: 'Active',
+            createdAt: DateTime.now(),
+          );
+          await customerRepo.saveCustomer(newCust);
+          customers.insert(0, newCust);
+          defaultWalkIn = newCust;
+        } catch (_) {}
+      }
+
       setState(() {
         _customers = customers;
         _isLoading = false;
@@ -103,6 +129,13 @@ class _InvoiceCreateDialogState extends State<InvoiceCreateDialog> {
         } else {
           _syncPaidAmount();
         }
+      } else {
+        // Direct retail/counter sale: default to Walk-in customer so zero friction
+        if (defaultWalkIn != null) {
+          _onCustomerChanged(defaultWalkIn);
+        } else if (customers.isNotEmpty) {
+          _onCustomerChanged(customers.first);
+        }
       }
 
       if (widget.preselectedStockItem != null) {
@@ -117,6 +150,13 @@ class _InvoiceCreateDialogState extends State<InvoiceCreateDialog> {
           inventoryItemId: p.id,
         ));
         _syncPaidAmount();
+      } else if (widget.isDirectSale) {
+        // Direct counter sale: auto-open the stock picker so user immediately picks item
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _items.isEmpty) {
+            _addStockItemDialog();
+          }
+        });
       }
     }
   }
@@ -602,10 +642,12 @@ class _InvoiceCreateDialogState extends State<InvoiceCreateDialog> {
         }
       }
 
-      // Update linked job status if present
+      // Update linked job status if present (only forward to Delivered if not already Completed)
       if (widget.preselectedJob != null) {
         final jobRepo = Get.find<JobRepository>();
-        await jobRepo.updateJobStatus(widget.preselectedJob!.id, 'Delivered', actualDeliveryDate: DateTime.now());
+        if (widget.preselectedJob!.status != 'Completed') {
+          await jobRepo.updateJobStatus(widget.preselectedJob!.id, 'Delivered', actualDeliveryDate: DateTime.now());
+        }
       }
 
       // Fetch saved invoice details to build printable model
@@ -666,10 +708,22 @@ class _InvoiceCreateDialogState extends State<InvoiceCreateDialog> {
                         children: [
                           Row(
                             children: [
-                              const Expanded(
+                              Icon(
+                                (widget.isDirectSale || widget.preselectedStockItem != null)
+                                    ? Icons.point_of_sale_rounded
+                                    : Icons.receipt_long_rounded,
+                                color: (widget.isDirectSale || widget.preselectedStockItem != null)
+                                    ? AppColors.success
+                                    : AppColors.primary,
+                                size: 22,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
                                 child: Text(
-                                  'Create Official Tax Invoice',
-                                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                                  (widget.isDirectSale || widget.preselectedStockItem != null)
+                                      ? 'Sell Stock / Counter Bill (Retail POS)'
+                                      : 'Create Official Tax Invoice',
+                                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),

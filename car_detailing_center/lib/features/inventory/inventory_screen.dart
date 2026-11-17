@@ -66,7 +66,25 @@ class _InventoryScreenState extends State<InventoryScreen> {
       title: 'Stock Details',
       actions: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+          child: ElevatedButton.icon(
+            onPressed: () async {
+              final res = await showDialog<bool>(
+                context: context,
+                builder: (_) => const InvoiceCreateDialog(isDirectSale: true),
+              );
+              if (res == true && mounted) setState(() {});
+            },
+            icon: const Icon(Icons.point_of_sale_rounded, size: 18),
+            label: const Text('Sell Stock (Counter Bill)'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.success,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
           child: ElevatedButton.icon(
             onPressed: _openAddStockDialog,
             icon: const Icon(Icons.add_rounded, size: 18),
@@ -78,10 +96,31 @@ class _InventoryScreenState extends State<InventoryScreen> {
           ),
         ),
       ],
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openAddStockDialog,
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Add Stock Item'),
+      floatingActionButton: Wrap(
+        direction: Axis.horizontal,
+        spacing: 8,
+        children: [
+          FloatingActionButton.extended(
+            heroTag: 'sellStockFab',
+            backgroundColor: AppColors.success,
+            foregroundColor: Colors.white,
+            onPressed: () async {
+              final res = await showDialog<bool>(
+                context: context,
+                builder: (_) => const InvoiceCreateDialog(isDirectSale: true),
+              );
+              if (res == true && mounted) setState(() {});
+            },
+            icon: const Icon(Icons.point_of_sale_rounded),
+            label: const Text('Sell Stock / Bill'),
+          ),
+          FloatingActionButton.extended(
+            heroTag: 'addStockFab',
+            onPressed: _openAddStockDialog,
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('Add Stock Item'),
+          ),
+        ],
       ),
       body: Padding(
         padding: EdgeInsets.all(isMobile ? 12 : 24),
@@ -365,6 +404,17 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     IconButton(
+                                      icon: const Icon(Icons.point_of_sale_rounded, color: AppColors.success, size: 22),
+                                      tooltip: 'Sell Stock / Generate Bill',
+                                      onPressed: () async {
+                                        final res = await showDialog<bool>(
+                                          context: context,
+                                          builder: (_) => InvoiceCreateDialog(preselectedStockItem: item, isDirectSale: true),
+                                        );
+                                        if (res == true && mounted) setState(() {});
+                                      },
+                                    ),
+                                    IconButton(
                                       icon: const Icon(Icons.add_circle_outline_rounded, color: AppColors.success, size: 22),
                                       tooltip: '+ Increase',
                                       onPressed: () async {
@@ -392,7 +442,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                         if (val == 'sell') {
                                           final res = await showDialog<bool>(
                                             context: context,
-                                            builder: (_) => InvoiceCreateDialog(preselectedStockItem: item),
+                                            builder: (_) => InvoiceCreateDialog(preselectedStockItem: item, isDirectSale: true),
                                           );
                                           if (res == true && mounted) setState(() {});
                                         } else if (val == 'history') {
@@ -433,7 +483,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                           value: 'sell',
                                           child: Row(
                                             children: [
-                                              Icon(Icons.receipt_long_rounded, size: 16, color: AppColors.success),
+                                              Icon(Icons.point_of_sale_rounded, size: 16, color: AppColors.success),
                                               SizedBox(width: 8),
                                               Text('Sell / Generate Bill', style: TextStyle(color: AppColors.success, fontWeight: FontWeight.bold)),
                                             ],
@@ -449,18 +499,19 @@ class _InventoryScreenState extends State<InventoryScreen> {
                               : Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    OutlinedButton.icon(
-                                      icon: const Icon(Icons.receipt_long_rounded, size: 15, color: AppColors.success),
-                                      label: const Text('Sell / Bill', style: TextStyle(color: AppColors.success, fontSize: 11.5, fontWeight: FontWeight.bold)),
-                                      style: OutlinedButton.styleFrom(
-                                        side: const BorderSide(color: AppColors.success),
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    ElevatedButton.icon(
+                                      icon: const Icon(Icons.point_of_sale_rounded, size: 14),
+                                      label: const Text('Sell / Bill', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppColors.success,
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                         visualDensity: VisualDensity.compact,
                                       ),
                                       onPressed: () async {
                                         final res = await showDialog<bool>(
                                           context: context,
-                                          builder: (_) => InvoiceCreateDialog(preselectedStockItem: item),
+                                          builder: (_) => InvoiceCreateDialog(preselectedStockItem: item, isDirectSale: true),
                                         );
                                         if (res == true && mounted) setState(() {});
                                       },

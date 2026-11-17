@@ -18,6 +18,8 @@ class AppRoutes {
   static const vehicles = '/vehicles';
   static const customers = '/customers';
   static const inspections = '/inspections';
+  static const showroom = '/showroom';
+  static const carSales = showroom;
 
   // Support / Detail Screens & Compatibility Aliases
   static const notifications = '/notifications';

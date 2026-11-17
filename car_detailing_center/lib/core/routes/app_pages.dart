@@ -17,6 +17,7 @@ import '../../features/notifications/notification_center_screen.dart';
 import '../../features/settings/settings_screen.dart';
 import '../../features/vendors/vendor_list_screen.dart';
 import '../../features/jobs/job_list_screen.dart';
+import '../../features/showroom/car_showroom_screen.dart';
 
 class AppPages {
   static const initial = AppRoutes.splash;
@@ -44,6 +45,7 @@ class AppPages {
     GetPage(name: AppRoutes.vehicles, page: () => const VehicleListScreen()),
     GetPage(name: AppRoutes.customers, page: () => const CustomerListScreen()),
     GetPage(name: AppRoutes.inspections, page: () => const InspectionListScreen()),
+    GetPage(name: AppRoutes.showroom, page: () => const CarShowroomScreen()),
 
     // Notification Center
     GetPage(name: AppRoutes.notifications, page: () => const NotificationCenterScreen()),

@@ -10,6 +10,7 @@ import '../../data/models/invoice_model.dart';
 import '../../data/models/job_model.dart';
 import '../../data/models/inspection_model.dart';
 import '../../data/models/salary_model.dart';
+import '../../data/models/showroom_car_model.dart';
 
 class PdfService {
   static pw.MemoryImage? _cachedLogoImage;
@@ -1845,6 +1846,263 @@ class PdfService {
     await Printing.layoutPdf(
       onLayout: (PdfPageFormat format) async => doc.save(),
       name: '${title.replaceAll(' ', '_')}.pdf',
+    );
+  }
+
+  /// Official Car Sale Agreement & Delivery Receipt PDF
+  static Future<void> printCarDealReceipt({
+    required BusinessModel business,
+    required ShowroomCarModel car,
+  }) async {
+    final doc = pw.Document();
+    final logoImage = await _getLogoImage();
+    final isCommission = car.isCommission;
+    final dealDateStr = car.saleDate != null ? Formatters.date(car.saleDate!) : Formatters.date(DateTime.now());
+
+    doc.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(32),
+        build: (pw.Context ctx) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              // Header
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Row(
+                    children: [
+                      if (logoImage != null)
+                        pw.Container(
+                          width: 55,
+                          height: 55,
+                          margin: const pw.EdgeInsets.only(right: 12),
+                          child: pw.Image(logoImage),
+                        ),
+                      pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text(business.name, style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900)),
+                          pw.Text(business.address, style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
+                          pw.Text('Phone: ${business.phone} | Email: ${business.email}', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
+                        ],
+                      ),
+                    ],
+                  ),
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.end,
+                    children: [
+                      pw.Text(
+                        isCommission ? 'VEHICLE BROKERAGE AGREEMENT' : 'CAR SALE & DELIVERY RECEIPT',
+                        style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900),
+                      ),
+                      pw.Text('Date: $dealDateStr', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey800)),
+                      pw.Text('Ref #: DEAL-${car.registrationNumber}', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey800)),
+                    ],
+                  ),
+                ],
+              ),
+              pw.Divider(thickness: 1.5, color: PdfColors.blue900),
+              pw.SizedBox(height: 10),
+
+              // Vehicle Details Card
+              pw.Container(
+                padding: const pw.EdgeInsets.all(10),
+                decoration: pw.BoxDecoration(
+                  color: PdfColors.grey100,
+                  borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+                  border: pw.Border.all(color: PdfColors.grey400, width: 0.8),
+                ),
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text('VEHICLE DETAILS', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10, color: PdfColors.blue900)),
+                    pw.SizedBox(height: 6),
+                    pw.Row(
+                      children: [
+                        pw.Expanded(child: pw.Text('Car Name: ${car.carName}', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
+                        pw.Expanded(child: pw.Text('Model: ${car.model}', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
+                        pw.Expanded(child: pw.Text('Registration #: ${car.registrationNumber}${car.color != null && car.color!.isNotEmpty ? " (${car.color})" : ""}', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
+                      ],
+                    ),
+                    pw.SizedBox(height: 4),
+                    pw.Row(
+                      children: [
+                        pw.Expanded(child: pw.Text('Customer / Client: ${car.customerName}', style: const pw.TextStyle(fontSize: 9))),
+                        pw.Expanded(child: pw.Text('Phone: ${car.customerPhone}', style: const pw.TextStyle(fontSize: 9))),
+                        pw.Expanded(child: pw.Text('Condition: ${car.condition ?? "Good"}', style: const pw.TextStyle(fontSize: 9))),
+                      ],
+                    ),
+                    if (car.notes != null && car.notes!.isNotEmpty) ...[
+                      pw.SizedBox(height: 4),
+                      pw.Text('Notes / Deal Terms: ${car.notes}', style: pw.TextStyle(fontSize: 8.5, fontStyle: pw.FontStyle.italic, color: PdfColors.grey800)),
+                    ],
+                  ],
+                ),
+              ),
+              pw.SizedBox(height: 12),
+
+              // Buyer & Seller Parties Info
+              pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Expanded(
+                    child: pw.Container(
+                      padding: const pw.EdgeInsets.all(8),
+                      decoration: pw.BoxDecoration(
+                        border: pw.Border.all(color: PdfColors.grey300),
+                        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+                      ),
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text('BUYER / PURCHASER DETAILS', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9.5, color: PdfColors.blue900)),
+                          pw.SizedBox(height: 4),
+                          pw.Text('Full Name: ${car.buyerName ?? "N/A"}', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
+                          pw.Text('Phone: ${car.buyerPhone ?? "N/A"}', style: const pw.TextStyle(fontSize: 8.5)),
+                          if (car.buyerCnic != null && car.buyerCnic!.isNotEmpty)
+                            pw.Text('CNIC #: ${car.buyerCnic}', style: const pw.TextStyle(fontSize: 8.5)),
+                        ],
+                      ),
+                    ),
+                  ),
+                  pw.SizedBox(width: 12),
+                  pw.Expanded(
+                    child: pw.Container(
+                      padding: const pw.EdgeInsets.all(8),
+                      decoration: pw.BoxDecoration(
+                        border: pw.Border.all(color: PdfColors.grey300),
+                        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+                      ),
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text(isCommission ? 'VEHICLE OWNER / SELLER' : 'SELLER / SHOWROOM DEALERSHIP', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9.5, color: PdfColors.blue900)),
+                          pw.SizedBox(height: 4),
+                          pw.Text(car.sellerName ?? business.name, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
+                          pw.Text('Phone: ${car.sellerPhone ?? business.phone}', style: const pw.TextStyle(fontSize: 8.5)),
+                          pw.Text('Deal Type: ${isCommission ? "Brokerage Deal (Commission)" : "Showroom Direct Sale"}', style: const pw.TextStyle(fontSize: 8.5)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 14),
+
+              // Financial Settlement Table
+              pw.Container(
+                decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey400), borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6))),
+                child: pw.Table(
+                  columnWidths: {
+                    0: const pw.FlexColumnWidth(3),
+                    1: const pw.FlexColumnWidth(2),
+                  },
+                  children: [
+                    pw.TableRow(
+                      decoration: const pw.BoxDecoration(color: PdfColors.blue800),
+                      children: [
+                        pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('DESCRIPTION', style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 9))),
+                        pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('AMOUNT (${business.currency})', textAlign: pw.TextAlign.right, style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 9))),
+                      ],
+                    ),
+                    pw.TableRow(
+                      children: [
+                        pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Total Vehicle Sale / Deal Value', style: const pw.TextStyle(fontSize: 9))),
+                        pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text(Formatters.currency(car.soldPrice > 0 ? car.soldPrice : car.demandPrice, symbol: business.currency), textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
+                      ],
+                    ),
+                    if (car.buyerCommission > 0)
+                      pw.TableRow(
+                        children: [
+                          pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Dealership Commission from Buyer', style: const pw.TextStyle(fontSize: 9))),
+                          pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text(Formatters.currency(car.buyerCommission, symbol: business.currency), textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
+                        ],
+                      ),
+                    if (car.sellerCommission > 0)
+                      pw.TableRow(
+                        children: [
+                          pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Dealership Commission from Seller', style: const pw.TextStyle(fontSize: 9))),
+                          pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text(Formatters.currency(car.sellerCommission, symbol: business.currency), textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
+                        ],
+                      ),
+                    if (car.totalCommission > 0 && car.buyerCommission == 0 && car.sellerCommission == 0)
+                      pw.TableRow(
+                        children: [
+                          pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Dealership Brokerage Commission', style: const pw.TextStyle(fontSize: 9))),
+                          pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text(Formatters.currency(car.totalCommission, symbol: business.currency), textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
+                        ],
+                      ),
+                    if (car.tokenAmount > 0)
+                      pw.TableRow(
+                        children: [
+                          pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Less Advance Token Money Received', style: const pw.TextStyle(fontSize: 9))),
+                          pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('-${Formatters.currency(car.tokenAmount, symbol: business.currency)}', textAlign: pw.TextAlign.right, style: const pw.TextStyle(fontSize: 9))),
+                        ],
+                      ),
+                    pw.TableRow(
+                      decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+                      children: [
+                        pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Payment Method / Status: ${car.paymentMethod} (Settled in Full)', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
+                        pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('PAID & FINALIZED', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.green800))),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              pw.SizedBox(height: 14),
+
+              // Legal Terms
+              pw.Container(
+                padding: const pw.EdgeInsets.all(8),
+                decoration: pw.BoxDecoration(
+                  border: pw.Border.all(color: PdfColors.grey300, width: 0.8),
+                  borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+                ),
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text('TERMS OF DELIVERY & OWNERSHIP TRANSFER:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8, color: PdfColors.grey800)),
+                    pw.SizedBox(height: 3),
+                    pw.Text('1. The buyer has thoroughly inspected and test-driven the vehicle and accepts physical, mechanical, and documentation condition.', style: const pw.TextStyle(fontSize: 7.5, color: PdfColors.grey700)),
+                    pw.Text('2. All available keys, smart cards/original file, and physical possession have been handed over to the buyer as of this date.', style: const pw.TextStyle(fontSize: 7.5, color: PdfColors.grey700)),
+                    pw.Text('3. From the exact moment of delivery, the buyer is solely responsible for vehicle usage, traffic violations, taxes, and mandatory ownership transfer.', style: const pw.TextStyle(fontSize: 7.5, color: PdfColors.grey700)),
+                  ],
+                ),
+              ),
+              pw.Spacer(),
+
+              // Signatures
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Column(
+                    children: [
+                      pw.Container(width: 170, height: 1, color: PdfColors.black),
+                      pw.SizedBox(height: 4),
+                      pw.Text('Seller / Dealership Stamp & Sign', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
+                    ],
+                  ),
+                  pw.Column(
+                    children: [
+                      pw.Container(width: 170, height: 1, color: PdfColors.black),
+                      pw.SizedBox(height: 4),
+                      pw.Text('Buyer / Purchaser Signature', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
+                    ],
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 10),
+            ],
+          );
+        },
+      ),
+    );
+
+    await Printing.layoutPdf(
+      onLayout: (PdfPageFormat format) async => doc.save(),
+      name: 'Car_Sale_Receipt_${car.registrationNumber}.pdf',
     );
   }
 }

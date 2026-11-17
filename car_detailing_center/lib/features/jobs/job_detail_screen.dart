@@ -50,7 +50,63 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     }
   }
 
+  int _getStatusRank(String status) {
+    switch (status) {
+      case 'New':
+        return 0;
+      case 'Inspection Pending':
+        return 1;
+      case 'Waiting':
+        return 2;
+      case 'In Progress':
+        return 3;
+      case 'Ready for Delivery':
+        return 4;
+      case 'Delivered':
+        return 5;
+      case 'Completed':
+        return 6;
+      case 'Cancelled':
+        return 999;
+      default:
+        return 0;
+    }
+  }
+
   void _updateStatus(String newStatus) async {
+    final currentRank = _getStatusRank(_job.status);
+    final targetRank = _getStatusRank(newStatus);
+
+    if (_job.status == 'Completed') {
+      Get.snackbar(
+        'Job Finalized',
+        'This job is already completed and cannot be modified.',
+        backgroundColor: AppColors.warning.withValues(alpha: 0.2),
+      );
+      return;
+    }
+
+    if (_job.status == 'Cancelled') {
+      Get.snackbar(
+        'Job Cancelled',
+        'This job is cancelled.',
+        backgroundColor: AppColors.warning.withValues(alpha: 0.2),
+      );
+      return;
+    }
+
+    // STRICT FORWARD CHECK: Service progression cannot move backward
+    if (newStatus != 'Cancelled' && targetRank < currentRank) {
+      Get.snackbar(
+        'Action Blocked',
+        'Vehicle progression cannot be moved backward to a previous stage ($newStatus).',
+        backgroundColor: AppColors.error.withValues(alpha: 0.2),
+      );
+      return;
+    }
+
+    if (newStatus == _job.status) return;
+
     setState(() => _isProcessing = true);
     final jobRepo = Get.find<JobRepository>();
 
@@ -62,7 +118,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
       );
 
       setState(() => _job = _job.copyWith(status: newStatus));
-      Get.snackbar('Status Updated', 'Job status moved to $newStatus', backgroundColor: AppColors.success.withValues(alpha: 0.2));
+      Get.snackbar('Status Updated', 'Job status moved forward to $newStatus', backgroundColor: AppColors.success.withValues(alpha: 0.2));
     } catch (e) {
       Get.snackbar('Error', 'Failed to update status: $e', backgroundColor: AppColors.error.withValues(alpha: 0.2));
     } finally {
@@ -991,8 +1047,21 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
 
   Widget _buildWorkflowStatusCard() {
     final nextStatus = _nextLogicalStatus;
-    const primaryStages = ['New', 'In Progress', 'Ready for Delivery', 'Completed'];
-    final currentStatusIdx = primaryStages.indexOf(_job.status);
+    const primaryStages = ['New', 'In Progress', 'Ready for Delivery', 'Delivered', 'Completed'];
+    final currentRank = _getStatusRank(_job.status);
+    final isFinished = _job.status == 'Completed';
+    final isCancelled = _job.status == 'Cancelled';
+
+    // Strictly forward statuses that are not current and not the primary nextStatus
+    final forwardStatuses = AppConstants.allJobStatuses.where((s) {
+      if (s == _job.status || s == nextStatus) return false;
+      if (isFinished || isCancelled) return false;
+      if (s == 'Cancelled') {
+        // Only allow cancel if not already Delivered or Completed
+        return currentRank < _getStatusRank('Delivered');
+      }
+      return _getStatusRank(s) > currentRank;
+    }).toList();
 
     return Card(
       elevation: 0,
@@ -1028,58 +1097,94 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Visual Pipeline Stepper
+            // Visual Pipeline Stepper (Forward-Only Progression)
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: List.generate(primaryStages.length, (i) {
                   final stage = primaryStages[i];
-                  final isDone = currentStatusIdx >= i || (_job.status == 'Delivered' && i <= 2);
-                  final isCurrent = _job.status == stage || (_job.status == 'Delivered' && stage == 'Ready for Delivery');
+                  final stageRank = _getStatusRank(stage);
+                  final isDone = currentRank > stageRank;
+                  final isCurrent = _job.status == stage;
+                  final isFuture = stageRank > currentRank;
+
                   final color = isCurrent
                       ? AppColors.getJobStatusColor(stage)
                       : isDone
                           ? AppColors.success
                           : AppColors.textDarkMuted;
 
+                  final canTap = isFuture && !_isProcessing && !isFinished && !isCancelled;
+
                   return Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      InkWell(
-                        onTap: _isProcessing ? null : () => _updateStatus(stage),
-                        borderRadius: BorderRadius.circular(8),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: isCurrent ? color.withValues(alpha: 0.2) : Colors.transparent,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: color, width: isCurrent ? 1.5 : 1),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                isDone ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
-                                size: 16,
-                                color: color,
+                      Tooltip(
+                        message: isDone
+                            ? '$stage (Completed - progression is forward only)'
+                            : isCurrent
+                                ? '$stage (Current Status)'
+                                : 'Advance to $stage',
+                        child: InkWell(
+                          onTap: canTap ? () => _updateStatus(stage) : null,
+                          borderRadius: BorderRadius.circular(8),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: isCurrent
+                                  ? color.withValues(alpha: 0.2)
+                                  : isDone
+                                      ? AppColors.success.withValues(alpha: 0.08)
+                                      : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: isCurrent
+                                    ? color
+                                    : (isDone ? AppColors.success.withValues(alpha: 0.4) : color.withValues(alpha: 0.25)),
+                                width: isCurrent ? 1.8 : 1,
                               ),
-                              const SizedBox(width: 6),
-                              Text(
-                                stage,
-                                style: TextStyle(
-                                  fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
-                                  fontSize: 12,
-                                  color: isCurrent ? Colors.white : AppColors.textDarkSecondary,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  isDone
+                                      ? Icons.check_circle_rounded
+                                      : isCurrent
+                                          ? Icons.play_circle_fill_rounded
+                                          : Icons.radio_button_unchecked_rounded,
+                                  size: 16,
+                                  color: color,
                                 ),
-                              ),
-                            ],
+                                const SizedBox(width: 6),
+                                Text(
+                                  stage,
+                                  style: TextStyle(
+                                    fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
+                                    fontSize: 12,
+                                    color: isCurrent
+                                        ? Colors.white
+                                        : isDone
+                                            ? AppColors.success
+                                            : AppColors.textDarkSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
                       if (i < primaryStages.length - 1)
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 6),
-                          child: Icon(Icons.arrow_forward_rounded, size: 14, color: isDone ? AppColors.success : AppColors.textDarkMuted),
+                          child: Icon(
+                            Icons.arrow_forward_rounded,
+                            size: 14,
+                            color: currentRank >= _getStatusRank(primaryStages[i + 1])
+                                ? AppColors.success
+                                : AppColors.textDarkMuted.withValues(alpha: 0.35),
+                          ),
                         ),
                     ],
                   );
@@ -1088,8 +1193,8 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             ),
             const SizedBox(height: 16),
 
-            // 1-Click Fast Advance Button
-            if (nextStatus != null) ...[
+            // 1-Click Fast Advance Button OR Finalized Banner
+            if (nextStatus != null && !isFinished && !isCancelled) ...[
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
@@ -1097,7 +1202,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                   icon: _isProcessing
                       ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                       : const Icon(Icons.fast_forward_rounded, size: 18),
-                  label: Text('Advance to Next Stage ➔ $nextStatus'),
+                  label: Text('Advance to Next Stage ➔ $nextStatus', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.getJobStatusColor(nextStatus),
                     foregroundColor: Colors.white,
@@ -1107,38 +1212,74 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                 ),
               ),
               const SizedBox(height: 12),
+            ] else if (isFinished) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: AppColors.success.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.success.withValues(alpha: 0.4)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: const [
+                    Icon(Icons.check_circle_rounded, color: AppColors.success, size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'Vehicle Detailing Completed & Delivered (Workflow Finalized)',
+                      style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.success, fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
             ],
 
-            // Other statuses (Dropdown / chips)
-            Row(
-              children: [
-                const Text('More Actions / Override: ', style: TextStyle(fontSize: 11, color: AppColors.textDarkSecondary)),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: AppConstants.allJobStatuses.where((s) => s != _job.status && s != nextStatus).map((st) {
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 6),
-                          child: OutlinedButton(
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              visualDensity: VisualDensity.compact,
+            // Strictly Forward Jump Options (No previous stages allowed!)
+            if (forwardStatuses.isNotEmpty)
+              Row(
+                children: [
+                  const Text('Jump to Stage: ', style: TextStyle(fontSize: 11, color: AppColors.textDarkSecondary)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: forwardStatuses.map((st) {
+                          final isCancel = st == 'Cancelled';
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: OutlinedButton(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: isCancel ? AppColors.error : AppColors.getJobStatusColor(st),
+                                side: BorderSide(
+                                  color: isCancel
+                                      ? AppColors.error.withValues(alpha: 0.5)
+                                      : AppColors.getJobStatusColor(st).withValues(alpha: 0.5),
+                                ),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                visualDensity: VisualDensity.compact,
+                              ),
+                              onPressed: _isProcessing ? null : () => _updateStatus(st),
+                              child: Text(st, style: const TextStyle(fontSize: 11)),
                             ),
-                            onPressed: _isProcessing ? null : () => _updateStatus(st),
-                            child: Text(st, style: const TextStyle(fontSize: 11)),
-                          ),
-                        );
-                      }).toList(),
+                          );
+                        }).toList(),
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              )
+            else if (!isFinished && !isCancelled && nextStatus == null)
+              const Text(
+                'Workflow reached final stage. Previous stages are locked.',
+                style: TextStyle(fontSize: 11, color: AppColors.textDarkMuted, fontStyle: FontStyle.italic),
+              ),
           ],
         ),
       ),
     );
   }
-}
+  }
+
