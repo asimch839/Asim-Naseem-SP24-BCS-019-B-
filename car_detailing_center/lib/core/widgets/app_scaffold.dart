@@ -6,7 +6,6 @@ import '../responsive/responsive_layout.dart';
 import '../routes/app_routes.dart';
 import '../services/auth_service.dart';
 import '../../features/notifications/notification_controller.dart';
-import 'sync_badge.dart';
 import '../../features/search/global_search_dialog.dart';
 import '../../features/staff/staff_screen.dart';
 
@@ -61,10 +60,65 @@ class AppScaffold extends StatefulWidget {
 }
 
 class _AppScaffoldState extends State<AppScaffold> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+
   static final Map<String, bool> _expandedModules = {
     'Staff': false,
     'Inventory': false,
   };
+
+  static double _sidebarScrollOffset = 0.0;
+  late final ScrollController _sidebarScrollController;
+  final GlobalKey _activeModuleKey = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    final isStaff = widget.currentRoute == AppRoutes.staff;
+    final isInventory = widget.currentRoute == AppRoutes.inventory || widget.currentRoute == AppRoutes.vendors;
+    if (isStaff) _expandedModules['Staff'] = true;
+    if (isInventory) _expandedModules['Inventory'] = true;
+
+    _sidebarScrollController = ScrollController(initialScrollOffset: _sidebarScrollOffset);
+    _sidebarScrollController.addListener(() {
+      if (_sidebarScrollController.hasClients) {
+        _sidebarScrollOffset = _sidebarScrollController.offset;
+      }
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_activeModuleKey.currentContext != null) {
+        Scrollable.ensureVisible(
+          _activeModuleKey.currentContext!,
+          alignment: 0.5,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeInOut,
+        );
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _sidebarScrollController.dispose();
+    super.dispose();
+  }
+
+  int _getBottomNavIndex() {
+    switch (widget.currentRoute) {
+      case AppRoutes.dashboard:
+        return 0;
+      case AppRoutes.jobs:
+        return 1;
+      case AppRoutes.invoices:
+        return 2;
+      case AppRoutes.staff:
+        return 3;
+      default:
+        return 4; // 'More'
+    }
+  }
 
   // The 11 Strict Main Navigation Modules per Section 6
   static const List<MainModuleItem> _modules = [
@@ -148,14 +202,68 @@ class _AppScaffoldState extends State<AppScaffold> {
   @override
   Widget build(BuildContext context) {
     final auth = AuthService.to;
-    final userRole = auth.currentUser.value?.role ?? AppConstants.roleAdmin;
+    final isMobile = ResponsiveLayout.isMobile(context);
 
     return Scaffold(
+      key: _scaffoldKey,
       drawer: ResponsiveLayout.isDesktop(context)
           ? null
           : Drawer(
               child: _buildSidebarContent(context),
             ),
+      bottomNavigationBar: isMobile
+          ? NavigationBar(
+              selectedIndex: _getBottomNavIndex(),
+              height: 60,
+              labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+              onDestinationSelected: (index) {
+                switch (index) {
+                  case 0:
+                    if (widget.currentRoute != AppRoutes.dashboard) Get.offNamed(AppRoutes.dashboard);
+                    break;
+                  case 1:
+                    if (widget.currentRoute != AppRoutes.jobs) Get.offNamed(AppRoutes.jobs);
+                    break;
+                  case 2:
+                    if (widget.currentRoute != AppRoutes.invoices) Get.offNamed(AppRoutes.invoices);
+                    break;
+                  case 3:
+                    if (widget.currentRoute != AppRoutes.staff) Get.offNamed(AppRoutes.staff);
+                    break;
+                  case 4:
+                    _scaffoldKey.currentState?.openDrawer();
+                    break;
+                }
+              },
+              destinations: const [
+                NavigationDestination(
+                  icon: Icon(Icons.dashboard_outlined, size: 20),
+                  selectedIcon: Icon(Icons.dashboard_rounded, size: 20),
+                  label: 'Dashboard',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.assignment_outlined, size: 20),
+                  selectedIcon: Icon(Icons.assignment_rounded, size: 20),
+                  label: 'Job Cards',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.receipt_long_outlined, size: 20),
+                  selectedIcon: Icon(Icons.receipt_long_rounded, size: 20),
+                  label: 'Invoices',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.badge_outlined, size: 20),
+                  selectedIcon: Icon(Icons.badge_rounded, size: 20),
+                  label: 'Staff',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.menu_rounded, size: 20),
+                  selectedIcon: Icon(Icons.menu_open_rounded, size: 20),
+                  label: 'More',
+                ),
+              ],
+            )
+          : null,
       appBar: AppBar(
         title: Text(
           widget.title,
@@ -174,13 +282,6 @@ class _AppScaffoldState extends State<AppScaffold> {
               );
             },
           ),
-
-          // Sync Badge (shown on tablet & desktop)
-          if (!ResponsiveLayout.isMobile(context)) ...[
-            const SizedBox(width: 8),
-            const SyncBadge(),
-            const SizedBox(width: 8),
-          ],
 
           // Notification Bell with Unread Badge
           Obx(() {
@@ -217,30 +318,15 @@ class _AppScaffoldState extends State<AppScaffold> {
             );
           }),
 
-          // Role Badge (shown on tablet & desktop)
-          if (!ResponsiveLayout.isMobile(context)) ...[
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
-              ),
-              child: Text(
-                userRole.toUpperCase(),
-                style: const TextStyle(color: AppColors.primaryLight, fontSize: 10, fontWeight: FontWeight.bold),
-              ),
+          // Logout Button (on mobile available in Drawer footer)
+          if (!isMobile) ...[
+            IconButton(
+              icon: const Icon(Icons.logout_rounded),
+              tooltip: 'Logout',
+              onPressed: () => _confirmLogout(context),
             ),
+            const SizedBox(width: 8),
           ],
-
-          // Logout Button
-          IconButton(
-            icon: const Icon(Icons.logout_rounded),
-            tooltip: 'Logout',
-            onPressed: () => _confirmLogout(context),
-          ),
-          const SizedBox(width: 8),
           ...?widget.actions,
         ],
       ),
@@ -323,6 +409,7 @@ class _AppScaffoldState extends State<AppScaffold> {
           // 11 Navigation Modules List
           Expanded(
             child: ListView.builder(
+              controller: _sidebarScrollController,
               padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
               itemCount: _modules.length,
               itemBuilder: (context, index) {
@@ -348,6 +435,7 @@ class _AppScaffoldState extends State<AppScaffold> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Container(
+                          key: isModuleActive ? _activeModuleKey : null,
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(8),
                             color: showHeaderIndicator ? activeBg : Colors.transparent,
@@ -528,6 +616,7 @@ class _AppScaffoldState extends State<AppScaffold> {
 
                 final isSelected = widget.currentRoute == module.route;
                 return Container(
+                  key: isSelected ? _activeModuleKey : null,
                   margin: const EdgeInsets.only(bottom: 2),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(8),
@@ -648,6 +737,102 @@ class _AppScaffoldState extends State<AppScaffold> {
               ],
             ),
           ),
+
+          // Devnix Limited Developer Footer
+          InkWell(
+            onTap: () => _showDeveloperInfo(context),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.black.withValues(alpha: 0.25) : Colors.grey.shade100,
+                border: Border(top: BorderSide(color: Theme.of(context).dividerColor.withValues(alpha: 0.4))),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.terminal_rounded, size: 14, color: isDark ? AppColors.primaryLight : AppColors.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          AppConstants.developerName,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? AppColors.primaryLight : AppColors.primaryDark,
+                          ),
+                        ),
+                        Text(
+                          'Support: ${AppConstants.developerPhone}',
+                          style: TextStyle(fontSize: 10, color: textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeveloperInfo(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.verified_rounded, color: AppColors.primaryLight),
+            const SizedBox(width: 8),
+            Text(AppConstants.developerName),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Software Engineering & IT Solutions',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'This enterprise management software is developed and supported by Devnix Limited.',
+              style: TextStyle(fontSize: 12),
+            ),
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).cardColor,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Theme.of(context).dividerColor),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.phone_in_talk_rounded, color: AppColors.success, size: 20),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Direct Support Helpline:', style: TextStyle(fontSize: 11, color: AppColors.textDarkSecondary)),
+                      SelectableText(
+                        AppConstants.developerPhone,
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.success),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Close')),
         ],
       ),
     );

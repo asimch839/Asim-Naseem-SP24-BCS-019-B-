@@ -6,7 +6,12 @@ import '../models/vehicle_model.dart';
 class VehicleRepository {
   Future<Database> get _db async => await AppDatabase.instance.database;
 
-  Future<List<Map<String, dynamic>>> getVehiclesWithCustomerInfo({String? searchQuery, String? customerId}) async {
+  Future<List<Map<String, dynamic>>> getVehiclesWithCustomerInfo({
+    String? searchQuery,
+    String? customerId,
+    String? startDate,
+    String? endDate,
+  }) async {
     final db = await _db;
     String sql = '''
       SELECT v.*, c.name as customer_name, c.phone as customer_phone
@@ -19,6 +24,10 @@ class VehicleRepository {
     if (customerId != null && customerId.isNotEmpty) {
       sql += ' AND v.customer_id = ?';
       args.add(customerId);
+    }
+    if (startDate != null && endDate != null) {
+      sql += ' AND date(v.created_at) BETWEEN date(?) AND date(?)';
+      args.addAll([startDate, endDate]);
     }
 
     if (searchQuery != null && searchQuery.trim().isNotEmpty) {
@@ -108,6 +117,48 @@ class VehicleRepository {
     String? notes,
   }) async {
     final db = await _db;
+
+    // If a service history record for this job card already exists, update it instead of inserting duplicates
+    if (jobId != null && jobId.isNotEmpty) {
+      final existing = await db.query(
+        'vehicle_service_history',
+        where: 'job_id = ?',
+        whereArgs: [jobId],
+      );
+      if (existing.isNotEmpty) {
+        await db.update(
+          'vehicle_service_history',
+          {
+            'date': date.toIso8601String(),
+            'service_description': serviceDescription,
+            'odometer': odometer,
+            'amount': amount,
+            'delivery_date': deliveryDate?.toIso8601String(),
+            'payment_status': paymentStatus,
+            'staff_names': staffNames ?? '',
+            'notes': notes ?? '',
+          },
+          where: 'job_id = ?',
+          whereArgs: [jobId],
+        );
+
+        // Update odometer if higher
+        final current = await db.query(
+          'vehicles',
+          columns: ['current_odometer'],
+          where: 'id = ?',
+          whereArgs: [vehicleId],
+        );
+        if (current.isNotEmpty) {
+          final curOdo = (current.first['current_odometer'] as num?)?.toDouble() ?? 0;
+          if (odometer > curOdo) {
+            await updateOdometer(vehicleId, odometer);
+          }
+        }
+        return;
+      }
+    }
+
     final historyId = 'vsh_${const Uuid().v4().substring(0, 8)}';
 
     await db.insert(

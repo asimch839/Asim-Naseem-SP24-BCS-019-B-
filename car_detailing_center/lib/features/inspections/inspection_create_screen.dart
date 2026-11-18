@@ -892,26 +892,11 @@ class _InspectionCreateScreenState extends State<InspectionCreateScreen> {
 
       // Render high-res A4 picture (PNG)
       String? imagePath;
-      final imageBytes = await PdfService.renderInspectionReportToImage(
-        business: business,
-        inspection: inspection,
-        vehicleReg: targetVehicle.registrationNumber,
-        vehicleName: '${targetVehicle.make} ${targetVehicle.model}',
-        customerName: customerName,
-        carDiagramBytes: carDiagramBytes,
-      );
-
-      if (imageBytes != null) {
-        final imgFile = File('${tempDir.path}/$baseName.png');
-        await imgFile.writeAsBytes(imageBytes);
-        imagePath = imgFile.path;
-      }
-
-      // Copy to Windows Clipboard as Image & File Drop
-      if (imagePath != null) {
-        await WindowsClipboardService.copyImageToClipboard(imagePath, pdfPath: pdfFile.path);
-      } else {
+      // Only 1 item sent: the official Inspection Sheet PDF
+      if (Platform.isWindows) {
         await WindowsClipboardService.copyFileToClipboard(pdfFile.path);
+      } else {
+        await Printing.sharePdf(bytes: pdfBytes, filename: '$baseName.pdf');
       }
 
       // Try to open WhatsApp (Windows desktop or Web)
@@ -928,8 +913,8 @@ class _InspectionCreateScreenState extends State<InspectionCreateScreen> {
       if (!mounted) return;
 
       Get.snackbar(
-        'Copied to Clipboard!',
-        'A4 Inspection Sheet copied. Press Ctrl + V in WhatsApp chat to paste!',
+        'Inspection PDF Copied!',
+        'Single Inspection Sheet PDF copied. Press Ctrl + V in WhatsApp chat to send!',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: const Color(0xFF25D366).withValues(alpha: 0.25),
         colorText: Colors.white,

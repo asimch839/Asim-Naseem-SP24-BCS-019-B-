@@ -3,6 +3,9 @@ class AppConstants {
   static const String appName = "Dawood's Garage";
   static const String appVersion = '1.0.0';
   static const String companyName = "Dawood's Garage Detail & Performance";
+  static const String developerName = "Devnix Limited";
+  static const String developerPhone = "03007720839";
+  static const String developerSupport = "Devnix Limited (03007720839)";
 
   // Local Storage Keys
   static const String keyActiveBusinessId = 'active_business_id';

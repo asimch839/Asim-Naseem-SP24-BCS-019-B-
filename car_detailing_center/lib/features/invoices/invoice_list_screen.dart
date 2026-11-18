@@ -15,6 +15,7 @@ import '../../core/utils/formatters.dart';
 import '../../core/widgets/app_scaffold.dart';
 import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/loading_indicator.dart';
+import '../../core/widgets/date_range_filter_bar.dart';
 import '../../data/models/invoice_model.dart';
 import '../../data/repositories/invoice_payment_repository.dart';
 import '../../data/repositories/job_repository.dart';
@@ -36,6 +37,8 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
   bool _isLoading = true;
   String _searchQuery = '';
   String _statusFilter = 'All';
+  String? _startDate;
+  String? _endDate;
 
   @override
   void initState() {
@@ -55,6 +58,8 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
       final list = await _invoiceRepo.getInvoices(
         searchQuery: _searchQuery,
         status: _statusFilter == 'All' ? null : _statusFilter,
+        startDate: _startDate,
+        endDate: _endDate,
       );
 
       final models = list.map((m) => InvoiceModel.fromSqlite(m)).toList();
@@ -236,20 +241,11 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
       final pdfFile = File('${tempDir.path}/$baseName.pdf');
       await pdfFile.writeAsBytes(pdfBytes);
 
-      // Render high-res A4 picture (PNG)
-      String? imagePath;
-      final imageBytes = await PdfService.renderInvoiceToImage(business: business, invoice: fullInvoice);
-      if (imageBytes != null) {
-        final imgFile = File('${tempDir.path}/$baseName.png');
-        await imgFile.writeAsBytes(imageBytes);
-        imagePath = imgFile.path;
-      }
-
-      // Copy to Windows Clipboard as Image & File Drop
-      if (imagePath != null) {
-        await WindowsClipboardService.copyImageToClipboard(imagePath, pdfPath: pdfFile.path);
-      } else {
+      // Only 1 item sent: the official Invoice PDF
+      if (Platform.isWindows) {
         await WindowsClipboardService.copyFileToClipboard(pdfFile.path);
+      } else {
+        await Printing.sharePdf(bytes: pdfBytes, filename: '$baseName.pdf');
       }
 
       // Try opening WhatsApp with client's phone number
@@ -266,8 +262,8 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
       if (!mounted) return;
 
       Get.snackbar(
-        'Copied to Clipboard!',
-        'A4 Tax Invoice copied. Open client chat & press Ctrl + V to paste!',
+        'Invoice PDF Copied!',
+        'Single Tax Invoice PDF copied. Open client chat & press Ctrl + V to send!',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: const Color(0xFF25D366).withValues(alpha: 0.25),
         colorText: Colors.white,
@@ -279,6 +275,70 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
     }
   }
 
+  void _showMobileBillingOptions(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.4), borderRadius: BorderRadius.circular(2)),
+                ),
+                const SizedBox(height: 16),
+                const Text('New Billing / Invoice', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                const SizedBox(height: 16),
+                ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: AppColors.success.withValues(alpha: 0.15),
+                    child: const Icon(Icons.point_of_sale_rounded, color: AppColors.success),
+                  ),
+                  title: const Text('Sell Stock / Counter Bill', style: TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: const Text('POS counter sale for chemicals, pads, or products'),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  tileColor: AppColors.cardDark,
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    final res = await showDialog(
+                      context: context,
+                      builder: (_) => const InvoiceCreateDialog(isDirectSale: true),
+                    );
+                    if (res == true) _fetchInvoices();
+                  },
+                ),
+                const SizedBox(height: 10),
+                ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: AppColors.primary.withValues(alpha: 0.15),
+                    child: const Icon(Icons.receipt_long_rounded, color: AppColors.primary),
+                  ),
+                  title: const Text('Create Service Invoice', style: TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: const Text('Standard tax invoice for vehicle detailing & coating jobs'),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  tileColor: AppColors.cardDark,
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    final res = await showDialog(
+                      context: context,
+                      builder: (_) => const InvoiceCreateDialog(),
+                    );
+                    if (res == true) _fetchInvoices();
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final currency = AuthService.to.currentBusiness.value?.currency ?? AppConstants.defaultCurrency;
@@ -287,76 +347,110 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
     return AppScaffold(
       currentRoute: AppRoutes.invoices,
       title: 'Tax Invoices & Billing Center',
-      actions: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-          child: ElevatedButton.icon(
-            onPressed: () async {
-              final res = await showDialog(
-                context: context,
-                builder: (_) => const InvoiceCreateDialog(isDirectSale: true),
-              );
-              if (res == true) _fetchInvoices();
-            },
-            icon: const Icon(Icons.point_of_sale_rounded, size: 18),
-            label: const Text('Sell Stock / Counter Bill'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.success,
-              foregroundColor: Colors.white,
-            ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-          child: ElevatedButton.icon(
-            onPressed: () async {
-              final res = await showDialog(
-                context: context,
-                builder: (_) => const InvoiceCreateDialog(),
-              );
-              if (res == true) _fetchInvoices();
-            },
-            icon: const Icon(Icons.receipt_long_rounded, size: 18),
-            label: const Text('Create Invoice'),
-            style: ElevatedButton.styleFrom(
+      actions: isMobile
+          ? [
+              IconButton(
+                icon: const Icon(Icons.point_of_sale_rounded, color: AppColors.success),
+                tooltip: 'Sell Stock / Counter Bill',
+                onPressed: () async {
+                  final res = await showDialog(
+                    context: context,
+                    builder: (_) => const InvoiceCreateDialog(isDirectSale: true),
+                  );
+                  if (res == true) _fetchInvoices();
+                },
+              ),
+              IconButton(
+                icon: const Icon(Icons.add_rounded, color: AppColors.primaryLight),
+                tooltip: 'Create Invoice',
+                onPressed: () async {
+                  final res = await showDialog(
+                    context: context,
+                    builder: (_) => const InvoiceCreateDialog(),
+                  );
+                  if (res == true) _fetchInvoices();
+                },
+              ),
+            ]
+          : [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    final res = await showDialog(
+                      context: context,
+                      builder: (_) => const InvoiceCreateDialog(isDirectSale: true),
+                    );
+                    if (res == true) _fetchInvoices();
+                  },
+                  icon: const Icon(Icons.point_of_sale_rounded, size: 18),
+                  label: const Text('Sell Stock / Counter Bill'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.success,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    final res = await showDialog(
+                      context: context,
+                      builder: (_) => const InvoiceCreateDialog(),
+                    );
+                    if (res == true) _fetchInvoices();
+                  },
+                  icon: const Icon(Icons.receipt_long_rounded, size: 18),
+                  label: const Text('Create Invoice'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+      floatingActionButton: isMobile
+          ? FloatingActionButton.extended(
+              heroTag: 'mobileInvoiceFab',
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
+              icon: const Icon(Icons.receipt_long_rounded),
+              label: const Text('New Invoice / Bill'),
+              onPressed: () => _showMobileBillingOptions(context),
+            )
+          : Wrap(
+              direction: Axis.horizontal,
+              spacing: 8,
+              children: [
+                FloatingActionButton.extended(
+                  heroTag: 'sellStockFabInv',
+                  backgroundColor: AppColors.success,
+                  foregroundColor: Colors.white,
+                  onPressed: () async {
+                    final res = await showDialog(
+                      context: context,
+                      builder: (_) => const InvoiceCreateDialog(isDirectSale: true),
+                    );
+                    if (res == true) _fetchInvoices();
+                  },
+                  icon: const Icon(Icons.point_of_sale_rounded),
+                  label: const Text('Sell Stock / Bill'),
+                ),
+                FloatingActionButton.extended(
+                  heroTag: 'createInvFab',
+                  onPressed: () async {
+                    final res = await showDialog(
+                      context: context,
+                      builder: (_) => const InvoiceCreateDialog(),
+                    );
+                    if (res == true) _fetchInvoices();
+                  },
+                  icon: const Icon(Icons.receipt_long_rounded),
+                  label: const Text('Create Invoice'),
+                ),
+              ],
             ),
-          ),
-        ),
-      ],
-      floatingActionButton: Wrap(
-        direction: Axis.horizontal,
-        spacing: 8,
-        children: [
-          FloatingActionButton.extended(
-            heroTag: 'sellStockFabInv',
-            backgroundColor: AppColors.success,
-            foregroundColor: Colors.white,
-            onPressed: () async {
-              final res = await showDialog(
-                context: context,
-                builder: (_) => const InvoiceCreateDialog(isDirectSale: true),
-              );
-              if (res == true) _fetchInvoices();
-            },
-            icon: const Icon(Icons.point_of_sale_rounded),
-            label: const Text('Sell Stock / Bill'),
-          ),
-          FloatingActionButton.extended(
-            heroTag: 'createInvFab',
-            onPressed: () async {
-              final res = await showDialog(
-                context: context,
-                builder: (_) => const InvoiceCreateDialog(),
-              );
-              if (res == true) _fetchInvoices();
-            },
-            icon: const Icon(Icons.receipt_long_rounded),
-            label: const Text('Create Invoice'),
-          ),
-        ],
-      ),
       body: Padding(
         padding: EdgeInsets.all(isMobile ? 12 : 24),
         child: Column(
@@ -365,8 +459,11 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    LayoutBuilder(
+                      builder: (context, constraints) {
                     final isNarrow = constraints.maxWidth < 600;
                     if (isNarrow) {
                       return Column(
@@ -459,8 +556,20 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                     );
                   },
                 ),
-              ),
+                const SizedBox(height: 12),
+                DateRangeFilterBar(
+                  onFilterChanged: (start, end, label) {
+                    setState(() {
+                      _startDate = start;
+                      _endDate = end;
+                    });
+                    _fetchInvoices();
+                  },
+                ),
+              ],
             ),
+          ),
+        ),
             const SizedBox(height: 16),
 
             // Invoices List

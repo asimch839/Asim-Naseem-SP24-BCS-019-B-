@@ -168,6 +168,7 @@ class ShowroomCarModel {
     );
   }
 
+
   ShowroomCarModel copyWith({
     String? id,
     String? dealType,

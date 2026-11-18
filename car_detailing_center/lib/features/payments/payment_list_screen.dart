@@ -9,6 +9,7 @@ import '../../core/utils/formatters.dart';
 import '../../core/widgets/app_scaffold.dart';
 import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/loading_indicator.dart';
+import '../../core/widgets/date_range_filter_bar.dart';
 import '../../data/repositories/invoice_payment_repository.dart';
 
 class PaymentListScreen extends StatefulWidget {
@@ -25,6 +26,8 @@ class _PaymentListScreenState extends State<PaymentListScreen> {
   List<Map<String, dynamic>> _payments = [];
   bool _isLoading = true;
   String _searchQuery = '';
+  String? _startDate;
+  String? _endDate;
 
   @override
   void initState() {
@@ -35,7 +38,11 @@ class _PaymentListScreenState extends State<PaymentListScreen> {
   Future<void> _fetchPayments() async {
     setState(() => _isLoading = true);
     try {
-      final list = await _paymentRepo.getPayments(searchQuery: _searchQuery);
+      final list = await _paymentRepo.getPayments(
+        searchQuery: _searchQuery,
+        startDate: _startDate,
+        endDate: _endDate,
+      );
       if (mounted) {
         setState(() {
           _payments = list;
@@ -68,30 +75,45 @@ class _PaymentListScreenState extends State<PaymentListScreen> {
             // Search Bar & Inflow Summary
             Card(
               child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 16, vertical: 10),
-                child: Row(
+                padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 16, vertical: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _searchController,
-                        decoration: InputDecoration(
-                          hintText: isMobile
-                              ? 'Search payments...'
-                              : 'Search payments by Invoice #, Customer Name, or Reference...',
-                          prefixIcon: const Icon(Icons.search_rounded),
-                          isDense: isMobile,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _searchController,
+                            decoration: InputDecoration(
+                              hintText: isMobile
+                                  ? 'Search payments...'
+                                  : 'Search payments by Invoice #, Customer Name, or Reference...',
+                              prefixIcon: const Icon(Icons.search_rounded),
+                              isDense: isMobile,
+                            ),
+                            onChanged: (val) {
+                              _searchQuery = val.trim();
+                              _fetchPayments();
+                            },
+                          ),
                         ),
-                        onChanged: (val) {
-                          _searchQuery = val.trim();
-                          _fetchPayments();
-                        },
-                      ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          icon: const Icon(Icons.refresh_rounded),
+                          tooltip: 'Refresh Ledger',
+                          onPressed: _fetchPayments,
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      icon: const Icon(Icons.refresh_rounded),
-                      tooltip: 'Refresh Ledger',
-                      onPressed: _fetchPayments,
+                    const SizedBox(height: 10),
+                    DateRangeFilterBar(
+                      onFilterChanged: (start, end, label) {
+                        setState(() {
+                          _startDate = start;
+                          _endDate = end;
+                        });
+                        _fetchPayments();
+                      },
                     ),
                   ],
                 ),

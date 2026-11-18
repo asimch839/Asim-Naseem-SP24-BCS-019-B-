@@ -175,15 +175,15 @@ class _ShowroomSaleDialogState extends State<ShowroomSaleDialog> {
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
                         ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Column(
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            final isNarrow = constraints.maxWidth < 420;
+                            final carInfoCol = Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
                                   '${widget.car.registrationNumber}${widget.car.color != null && widget.car.color!.isNotEmpty ? " • ${widget.car.color}" : ""}${widget.car.condition != null && widget.car.condition!.isNotEmpty ? " (${widget.car.condition})" : ""}',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, letterSpacing: 1),
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, letterSpacing: 0.8),
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
@@ -191,9 +191,10 @@ class _ShowroomSaleDialogState extends State<ShowroomSaleDialog> {
                                   style: const TextStyle(fontSize: 12, color: AppColors.textDarkSecondary),
                                 ),
                               ],
-                            ),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
+                            );
+
+                            final priceCol = Column(
+                              crossAxisAlignment: isNarrow ? CrossAxisAlignment.start : CrossAxisAlignment.end,
                               children: [
                                 Text(
                                   'Customer Price: ${Formatters.currency(widget.car.customerPrice, symbol: currency)}',
@@ -204,8 +205,30 @@ class _ShowroomSaleDialogState extends State<ShowroomSaleDialog> {
                                   style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.primaryLight),
                                 ),
                               ],
-                            ),
-                          ],
+                            );
+
+                            if (isNarrow) {
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  carInfoCol,
+                                  const SizedBox(height: 8),
+                                  const Divider(height: 1),
+                                  const SizedBox(height: 6),
+                                  priceCol,
+                                ],
+                              );
+                            }
+
+                            return Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(child: carInfoCol),
+                                const SizedBox(width: 10),
+                                priceCol,
+                              ],
+                            );
+                          },
                         ),
                       ),
                       const SizedBox(height: 16),

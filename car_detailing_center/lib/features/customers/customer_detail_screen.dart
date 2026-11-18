@@ -50,8 +50,17 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
 
     final updatedCust = await custRepo.getCustomerById(_currentCustomer.id);
     final vehicles = await custRepo.getCustomerVehicles(_currentCustomer.id);
-    final history = await custRepo.getCustomerServiceHistory(_currentCustomer.id);
     final jobs = await jobRepo.getJobs(customerId: _currentCustomer.id);
+
+    // Sync jobs to ensure all services and dates appear in service history
+    for (final j in jobs) {
+      final jobId = j['id'] as String?;
+      if (jobId != null) {
+        await jobRepo.syncJobToVehicleHistory(jobId);
+      }
+    }
+
+    final history = await custRepo.getCustomerServiceHistory(_currentCustomer.id);
     final invoices = await invRepo.getInvoices(customerId: _currentCustomer.id);
     final payments = await invRepo.getPayments(customerId: _currentCustomer.id);
     final inspections = await inspRepo.getInspections(customerId: _currentCustomer.id);

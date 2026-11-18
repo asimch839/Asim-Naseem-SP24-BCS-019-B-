@@ -263,15 +263,37 @@ class StaffRepository {
         break;
     }
 
-    // Check existing advance payments for this staff in this period
+    // Check existing advance payments and all staff expenses for this staff in this period
     final advanceRes = await db.rawQuery('''
       SELECT COALESCE(SUM(amount), 0.0) as adv_total
       FROM salary_payments
-      WHERE staff_id = ? AND is_advance = 1 AND payment_date BETWEEN ? AND ?
+      WHERE staff_id = ? AND is_advance = 1 AND date(payment_date) BETWEEN date(?) AND date(?)
     ''', [staffId, startDate, endDate]);
-    final advanceTotal = (advanceRes.first['adv_total'] as num?)?.toDouble() ?? 0.0;
+    final advanceSalaryPayments = (advanceRes.first['adv_total'] as num?)?.toDouble() ?? 0.0;
 
-    final netSalary = grossSalary - advanceTotal > 0 ? (grossSalary - advanceTotal) : 0.0;
+    // Staff Expenses (Advance, Food, Loan, Medical, etc. auto-deducted from salary)
+    final staffExpRes = await db.rawQuery('''
+      SELECT category, amount
+      FROM staff_expenses
+      WHERE staff_id = ? AND date(date) BETWEEN date(?) AND date(?)
+    ''', [staffId, startDate, endDate]);
+
+    double staffExpenseDeductions = 0.0;
+    double staffBonuses = 0.0;
+
+    for (final exp in staffExpRes) {
+      final amt = (exp['amount'] as num?)?.toDouble() ?? 0.0;
+      final cat = (exp['category'] as String? ?? '').toLowerCase();
+      if (cat.contains('bonus') || cat.contains('incentive') || cat.contains('reward')) {
+        staffBonuses += amt;
+      } else {
+        staffExpenseDeductions += amt;
+      }
+    }
+
+    final totalGross = grossSalary + staffBonuses;
+    final totalDeductions = advanceSalaryPayments + staffExpenseDeductions;
+    final netSalary = (totalGross - totalDeductions) > 0 ? (totalGross - totalDeductions) : 0.0;
 
     return {
       'staff_id': staffId,
@@ -285,8 +307,9 @@ class StaffRepository {
       'absent_days': absentDays,
       'half_days': halfDays,
       'leave_days': leaveDays,
-      'gross_salary': grossSalary,
-      'advance_deductions': advanceTotal,
+      'bonus': staffBonuses,
+      'gross_salary': totalGross,
+      'advance_deductions': totalDeductions,
       'net_salary': netSalary,
     };
   }
@@ -317,14 +340,32 @@ class StaffRepository {
   Future<void> saveSalaryRecord(Map<String, dynamic> data) async {
     final db = await _db;
     final now = DateTime.now().toIso8601String();
-    final salaryId = data['id'] ?? 'sal_${const Uuid().v4().substring(0, 8)}';
+
+    // Look up existing salary record to prevent duplicate entries and preserve payment progress
+    String salaryId = (data['id'] as String?) ?? '';
+    double paid = (data['paid_amount'] as num?)?.toDouble() ?? 0.0;
+    if (salaryId.isEmpty) {
+      final existing = await db.query(
+        'salaries',
+        columns: ['id', 'paid_amount'],
+        where: 'staff_id = ? AND pay_period = ?',
+        whereArgs: [data['staff_id'], data['pay_period']],
+      );
+      if (existing.isNotEmpty) {
+        salaryId = existing.first['id'] as String;
+        paid = (existing.first['paid_amount'] as num?)?.toDouble() ?? paid;
+      } else {
+        salaryId = 'sal_${const Uuid().v4().substring(0, 8)}';
+      }
+    }
 
     final gross = (data['gross_salary'] as num?)?.toDouble() ?? 0.0;
     final deductions = (data['advance_deductions'] as num?)?.toDouble() ?? 0.0;
-    final net = (data['net_salary'] as num?)?.toDouble() ?? (gross - deductions);
-    final paid = (data['paid_amount'] as num?)?.toDouble() ?? 0.0;
+    final otherDeductions = (data['other_deductions'] as num?)?.toDouble() ?? 0.0;
+    final totalDeductions = deductions + otherDeductions;
+    final net = (data['net_salary'] as num?)?.toDouble() ?? ((gross - totalDeductions) > 0 ? (gross - totalDeductions) : 0.0);
     final remaining = (net - paid) > 0 ? (net - paid) : 0.0;
-    final status = remaining <= 0 ? 'Paid' : (paid > 0 ? 'Partially Paid' : 'Pending');
+    final status = remaining <= 0 && net > 0 ? 'Paid' : (paid > 0 ? 'Partially Paid' : 'Pending');
 
     await db.insert(
       'salaries',
@@ -344,7 +385,7 @@ class StaffRepository {
         'bonus': (data['bonus'] as num?)?.toDouble() ?? 0.0,
         'commission': (data['commission'] as num?)?.toDouble() ?? 0.0,
         'advance_deductions': deductions,
-        'other_deductions': (data['other_deductions'] as num?)?.toDouble() ?? 0.0,
+        'other_deductions': otherDeductions,
         'gross_salary': gross,
         'net_salary': net,
         'paid_amount': paid,
@@ -358,12 +399,73 @@ class StaffRepository {
     );
   }
 
+  /// Recalculates and updates an existing salary record in real-time when an expense is added, edited, or deleted
+  Future<void> syncStaffSalaryForPeriod(String staffId, String payPeriod) async {
+    try {
+      final db = await _db;
+      final existing = await db.query(
+        'salaries',
+        where: 'staff_id = ? AND pay_period = ?',
+        whereArgs: [staffId, payPeriod],
+      );
+
+      if (existing.isNotEmpty) {
+        final sal = existing.first;
+        final salId = sal['id'] as String;
+        final paid = (sal['paid_amount'] as num?)?.toDouble() ?? 0.0;
+        final otherDeductions = (sal['other_deductions'] as num?)?.toDouble() ?? 0.0;
+
+        final calc = await calculateSalaryForStaff(staffId, payPeriod);
+        final calcGross = (calc['gross_salary'] as num?)?.toDouble() ?? 0.0;
+        final advDeductions = (calc['advance_deductions'] as num?)?.toDouble() ?? 0.0;
+        final calcBonus = (calc['bonus'] as num?)?.toDouble() ?? 0.0;
+
+        final existingComm = (sal['commission'] as num?)?.toDouble() ?? 0.0;
+        final existingOT = (sal['overtime_amount'] as num?)?.toDouble() ?? 0.0;
+        final existingBonus = (sal['bonus'] as num?)?.toDouble() ?? 0.0;
+        final effectiveBonus = calcBonus > existingBonus ? calcBonus : existingBonus;
+
+        final gross = calcGross + existingComm + existingOT;
+        final totalDeductions = advDeductions + otherDeductions;
+        final net = (gross - totalDeductions) > 0 ? (gross - totalDeductions) : 0.0;
+        final remaining = (net - paid) > 0 ? (net - paid) : 0.0;
+        final status = remaining <= 0 && net > 0 ? 'Paid' : (paid > 0 ? 'Partially Paid' : 'Pending');
+
+        await db.update(
+          'salaries',
+          {
+            'basic_salary': calc['basic_salary'],
+            'present_days': calc['present_days'],
+            'absent_days': calc['absent_days'],
+            'half_days': calc['half_days'],
+            'overtime_amount': existingOT,
+            'bonus': effectiveBonus,
+            'commission': existingComm,
+            'advance_deductions': advDeductions,
+            'gross_salary': gross,
+            'net_salary': net,
+            'remaining_amount': remaining,
+            'status': status,
+            'updated_at': DateTime.now().toIso8601String(),
+          },
+          where: 'id = ?',
+          whereArgs: [salId],
+        );
+      }
+    } catch (_) {
+      // Background sync fail-safe
+    }
+  }
+
   Future<void> recordSalaryPayment({
     required String salaryId,
     required String staffId,
     required double amount,
     required String paymentMethod,
     bool isAdvance = false,
+    double commission = 0.0,
+    double bonus = 0.0,
+    double overtimeAmount = 0.0,
     String? reference,
     String? notes,
   }) async {
@@ -386,19 +488,36 @@ class StaffRepository {
       });
 
       if (!isAdvance) {
-        // Update salary paid & remaining amounts
+        // Update salary paid & remaining amounts, including added commission, bonus, overtime
         final salRes = await txn.query('salaries', where: 'id = ?', whereArgs: [salaryId]);
         if (salRes.isNotEmpty) {
           final sal = salRes.first;
           final currentPaid = (sal['paid_amount'] as num?)?.toDouble() ?? 0.0;
-          final net = (sal['net_salary'] as num?)?.toDouble() ?? 0.0;
+          final currentNet = (sal['net_salary'] as num?)?.toDouble() ?? 0.0;
+          final currentGross = (sal['gross_salary'] as num?)?.toDouble() ?? 0.0;
+          final currentCommission = (sal['commission'] as num?)?.toDouble() ?? 0.0;
+          final currentBonus = (sal['bonus'] as num?)?.toDouble() ?? 0.0;
+          final currentOvertime = (sal['overtime_amount'] as num?)?.toDouble() ?? 0.0;
+
+          final newCommission = currentCommission + commission;
+          final newBonus = currentBonus + bonus;
+          final newOvertime = currentOvertime + overtimeAmount;
+          final extraEarnings = commission + bonus + overtimeAmount;
+
+          final newGross = currentGross + extraEarnings;
+          final newNet = currentNet + extraEarnings;
           final newPaid = currentPaid + amount;
-          final newRemaining = (net - newPaid) > 0 ? (net - newPaid) : 0.0;
+          final newRemaining = (newNet - newPaid) > 0 ? (newNet - newPaid) : 0.0;
           final newStatus = newRemaining <= 0 ? 'Paid' : 'Partially Paid';
 
           await txn.update(
             'salaries',
             {
+              'commission': newCommission,
+              'bonus': newBonus,
+              'overtime_amount': newOvertime,
+              'gross_salary': newGross,
+              'net_salary': newNet,
               'paid_amount': newPaid,
               'remaining_amount': newRemaining,
               'status': newStatus,
@@ -414,7 +533,16 @@ class StaffRepository {
       final staffRes = await txn.query('staff', columns: ['name'], where: 'id = ?', whereArgs: [staffId]);
       final staffName = staffRes.isNotEmpty ? (staffRes.first['name'] as String? ?? 'Staff') : 'Staff';
       final expenseCategory = isAdvance ? 'Staff Advance' : 'Staff Salary';
-      final expenseDesc = isAdvance ? 'Advance paid to $staffName' : 'Salary disbursement to $staffName';
+
+      final extraDetails = <String>[];
+      if (overtimeAmount > 0) extraDetails.add('OT: Rs. ${overtimeAmount.toStringAsFixed(0)}');
+      if (bonus > 0) extraDetails.add('Bonus: Rs. ${bonus.toStringAsFixed(0)}');
+      if (commission > 0) extraDetails.add('Comm: Rs. ${commission.toStringAsFixed(0)}');
+      final extraStr = extraDetails.isNotEmpty ? ' [${extraDetails.join(", ")}]' : '';
+
+      final expenseDesc = isAdvance
+          ? 'Advance paid to $staffName'
+          : 'Salary disbursement to $staffName$extraStr';
 
       await txn.insert(
         'garage_expenses',
@@ -453,7 +581,7 @@ class StaffRepository {
   Future<List<Map<String, dynamic>>> getStaffExpenses({String? staffId, String? startDate, String? endDate}) async {
     final db = await _db;
     String sql = '''
-      SELECT se.*, s.name as staff_name, s.designation
+      SELECT se.*, s.name as staff_name, s.designation, s.phone as staff_phone
       FROM staff_expenses se
       INNER JOIN staff s ON se.staff_id = s.id
       WHERE 1=1
@@ -465,7 +593,7 @@ class StaffRepository {
       args.add(staffId);
     }
     if (startDate != null && endDate != null) {
-      sql += ' AND se.date BETWEEN ? AND ?';
+      sql += ' AND date(se.date) BETWEEN date(?) AND date(?)';
       args.addAll([startDate, endDate]);
     }
 
@@ -489,6 +617,19 @@ class StaffRepository {
     final db = await _db;
     final expId = id ?? 'stf_exp_${const Uuid().v4().substring(0, 8)}';
     final now = DateTime.now().toIso8601String();
+
+    String? oldStaffId;
+    String? oldPayPeriod;
+    if (id != null) {
+      final prev = await db.query('staff_expenses', columns: ['staff_id', 'date'], where: 'id = ?', whereArgs: [id]);
+      if (prev.isNotEmpty) {
+        oldStaffId = prev.first['staff_id'] as String?;
+        final prevDateStr = prev.first['date'] as String?;
+        if (prevDateStr != null && prevDateStr.length >= 7) {
+          oldPayPeriod = prevDateStr.substring(0, 7);
+        }
+      }
+    }
 
     await db.transaction((txn) async {
       await txn.insert(
@@ -535,6 +676,13 @@ class StaffRepository {
       );
     });
 
+    // Real-time synchronization with staff salary for that month
+    final newPayPeriod = DateFormat('yyyy-MM').format(date);
+    await syncStaffSalaryForPeriod(staffId, newPayPeriod);
+    if (oldStaffId != null && oldPayPeriod != null && (oldStaffId != staffId || oldPayPeriod != newPayPeriod)) {
+      await syncStaffSalaryForPeriod(oldStaffId, oldPayPeriod);
+    }
+
     if (Get.isRegistered<DashboardController>()) {
       Get.find<DashboardController>().refreshData();
     }
@@ -542,8 +690,25 @@ class StaffRepository {
 
   Future<void> deleteStaffExpense(String id) async {
     final db = await _db;
+    String? staffId;
+    String? payPeriod;
+
+    final prev = await db.query('staff_expenses', columns: ['staff_id', 'date'], where: 'id = ?', whereArgs: [id]);
+    if (prev.isNotEmpty) {
+      staffId = prev.first['staff_id'] as String?;
+      final dateStr = prev.first['date'] as String?;
+      if (dateStr != null && dateStr.length >= 7) {
+        payPeriod = dateStr.substring(0, 7);
+      }
+    }
+
     await db.delete('staff_expenses', where: 'id = ?', whereArgs: [id]);
     await db.delete('garage_expenses', where: 'id = ?', whereArgs: ['gexp_$id']);
+
+    if (staffId != null && payPeriod != null) {
+      await syncStaffSalaryForPeriod(staffId, payPeriod);
+    }
+
     if (Get.isRegistered<DashboardController>()) {
       Get.find<DashboardController>().refreshData();
     }

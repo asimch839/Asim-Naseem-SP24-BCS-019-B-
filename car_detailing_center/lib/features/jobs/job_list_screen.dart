@@ -9,6 +9,7 @@ import '../../core/utils/formatters.dart';
 import '../../core/widgets/app_scaffold.dart';
 import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/loading_indicator.dart';
+import '../../core/widgets/date_range_filter_bar.dart';
 import '../../data/models/job_model.dart';
 import '../../data/repositories/job_repository.dart';
 import 'job_create_dialog.dart';
@@ -29,6 +30,8 @@ class _JobListScreenState extends State<JobListScreen> {
   bool _isLoading = true;
   String _searchQuery = '';
   String _selectedStatus = 'All';
+  String? _startDate;
+  String? _endDate;
 
   @override
   void initState() {
@@ -42,6 +45,8 @@ class _JobListScreenState extends State<JobListScreen> {
       final list = await _jobRepo.getJobs(
         searchQuery: _searchQuery,
         status: _selectedStatus == 'All' ? null : _selectedStatus,
+        startDate: _startDate,
+        endDate: _endDate,
       );
       if (mounted) {
         setState(() {
@@ -146,6 +151,16 @@ class _JobListScreenState extends State<JobListScreen> {
                           );
                         }).toList(),
                       ),
+                    ),
+                    const SizedBox(height: 10),
+                    DateRangeFilterBar(
+                      onFilterChanged: (start, end, label) {
+                        setState(() {
+                          _startDate = start;
+                          _endDate = end;
+                        });
+                        _fetchJobs();
+                      },
                     ),
                   ],
                 ),

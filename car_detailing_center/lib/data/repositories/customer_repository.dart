@@ -6,13 +6,23 @@ import '../models/vehicle_model.dart';
 class CustomerRepository {
   Future<Database> get _db async => await AppDatabase.instance.database;
 
-  Future<List<CustomerModel>> getCustomers({String? searchQuery, bool activeOnly = true}) async {
+  Future<List<CustomerModel>> getCustomers({
+    String? searchQuery,
+    bool activeOnly = true,
+    String? startDate,
+    String? endDate,
+  }) async {
     final db = await _db;
     String whereClause = 'is_deleted = 0';
     List<dynamic> whereArgs = [];
 
     if (activeOnly) {
       whereClause += ' AND is_active = 1';
+    }
+
+    if (startDate != null && endDate != null) {
+      whereClause += ' AND date(created_at) BETWEEN date(?) AND date(?)';
+      whereArgs.addAll([startDate, endDate]);
     }
 
     if (searchQuery != null && searchQuery.trim().isNotEmpty) {
@@ -103,6 +113,10 @@ class CustomerRepository {
       },
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
+  }
+
+  Future<void> updateCustomer(CustomerModel customer) async {
+    await saveCustomer(customer);
   }
 
   Future<void> deleteCustomer(String id, {bool softDelete = true}) async {

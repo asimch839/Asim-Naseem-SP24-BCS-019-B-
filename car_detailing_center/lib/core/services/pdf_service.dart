@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -929,6 +930,13 @@ class PdfService {
                   ),
                 ),
               ),
+              pw.SizedBox(height: 2),
+              pw.Center(
+                child: pw.Text(
+                  'Software by Devnix Limited (03007720839)',
+                  style: const pw.TextStyle(fontSize: 6, color: PdfColors.grey600),
+                ),
+              ),
             ],
           );
         },
@@ -1183,7 +1191,7 @@ class PdfService {
   // -------------------------------------------------------------
   // SALARY SLIP PDF
   // -------------------------------------------------------------
-  static Future<void> printSalarySlip({
+  static Future<pw.Document> _buildSalarySlipDoc({
     required BusinessModel business,
     required SalaryModel salary,
   }) async {
@@ -1258,7 +1266,7 @@ class PdfService {
                     children: [
                       pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Basic Salary')),
                       pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text(Formatters.currency(salary.basicSalary, symbol: business.currency), textAlign: pw.TextAlign.right)),
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Advances')),
+                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Advances / Deductions')),
                       pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text(Formatters.currency(salary.advanceDeduction, symbol: business.currency), textAlign: pw.TextAlign.right)),
                     ],
                   ),
@@ -1272,8 +1280,16 @@ class PdfService {
                   ),
                   pw.TableRow(
                     children: [
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Bonus / Commissions')),
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text(Formatters.currency(salary.bonusAmount + salary.commissionAmount, symbol: business.currency), textAlign: pw.TextAlign.right)),
+                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Bonus')),
+                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text(Formatters.currency(salary.bonusAmount, symbol: business.currency), textAlign: pw.TextAlign.right)),
+                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('')),
+                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('')),
+                    ],
+                  ),
+                  pw.TableRow(
+                    children: [
+                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Commission')),
+                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text(Formatters.currency(salary.commissionAmount, symbol: business.currency), textAlign: pw.TextAlign.right)),
                       pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('')),
                       pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('')),
                     ],
@@ -1307,15 +1323,358 @@ class PdfService {
                   pw.Text('Management Signature: _________________', style: const pw.TextStyle(fontSize: 10)),
                 ],
               ),
+              pw.SizedBox(height: 10),
+              pw.Center(
+                child: pw.Text(
+                  'Software by Devnix Limited (03007720839)',
+                  style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey600),
+                ),
+              ),
             ],
           );
         },
       ),
     );
 
+    return doc;
+  }
+
+  static Future<Uint8List> buildSalarySlipBytes({
+    required BusinessModel business,
+    required SalaryModel salary,
+  }) async {
+    final doc = await _buildSalarySlipDoc(business: business, salary: salary);
+    return await doc.save();
+  }
+
+  static Future<Uint8List?> renderSalarySlipToImage({
+    required BusinessModel business,
+    required SalaryModel salary,
+    double dpi = 180,
+  }) async {
+    final pdfBytes = await buildSalarySlipBytes(business: business, salary: salary);
+    await for (final page in Printing.raster(pdfBytes, dpi: dpi)) {
+      return await page.toPng();
+    }
+    return null;
+  }
+
+  static Future<void> printSalarySlip({
+    required BusinessModel business,
+    required SalaryModel salary,
+  }) async {
+    final pdfBytes = await buildSalarySlipBytes(business: business, salary: salary);
     await Printing.layoutPdf(
-      onLayout: (PdfPageFormat format) async => doc.save(),
+      onLayout: (PdfPageFormat format) async => pdfBytes,
       name: 'SalarySlip_${salary.staffName}_${salary.month}.pdf',
+    );
+  }
+
+  // -------------------------------------------------------------
+  // STAFF EXPENSE / ADVANCE VOUCHER PDF
+  // -------------------------------------------------------------
+  static Future<pw.Document> _buildStaffExpenseSlipDoc({
+    required BusinessModel business,
+    required Map<String, dynamic> expense,
+    required String staffName,
+    String? staffPhone,
+    String? staffDesignation,
+  }) async {
+    final logoImage = await _getLogoImage();
+    final doc = pw.Document();
+
+    final category = expense['category'] as String? ?? 'Staff Expense';
+    final amount = (expense['amount'] as num?)?.toDouble() ?? 0.0;
+    final dateStr = expense['date'] as String? ?? DateTime.now().toIso8601String();
+    final date = DateTime.tryParse(dateStr) ?? DateTime.now();
+    final paymentMethod = expense['payment_method'] as String? ?? 'Cash';
+    final reference = expense['reference'] as String? ?? 'N/A';
+    final description = expense['description'] as String? ?? '';
+    final notes = expense['notes'] as String? ?? '';
+    final voucherId = (expense['id'] as String? ?? 'EXP').toUpperCase();
+
+    final isAdvance = category.toLowerCase().contains('advance') ||
+        category.toLowerCase().contains('loan') ||
+        !category.toLowerCase().contains('bonus');
+
+    doc.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(36),
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              // Header
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: pw.CrossAxisAlignment.center,
+                children: [
+                  pw.Row(
+                    children: [
+                      if (logoImage != null)
+                        pw.Container(
+                          width: 48,
+                          height: 48,
+                          margin: const pw.EdgeInsets.only(right: 12),
+                          child: pw.Image(logoImage, fit: pw.BoxFit.contain),
+                        ),
+                      pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text(business.name, style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900)),
+                          pw.Text('Phone: ${business.phone} | Email: ${business.email}', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
+                          if (business.address != null && business.address!.isNotEmpty)
+                            pw.Text('Address: ${business.address}', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
+                        ],
+                      ),
+                    ],
+                  ),
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.end,
+                    children: [
+                      pw.Container(
+                        padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: pw.BoxDecoration(
+                          color: PdfColors.blue50,
+                          borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+                          border: pw.Border.all(color: PdfColors.blue200),
+                        ),
+                        child: pw.Text('STAFF PAYMENT VOUCHER', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900)),
+                      ),
+                      pw.SizedBox(height: 4),
+                      pw.Text('Voucher #: $voucherId', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey800)),
+                      pw.Text('Date: ${DateFormat('dd MMM yyyy, hh:mm a').format(date)}', style: const pw.TextStyle(fontSize: 8.5, color: PdfColors.grey700)),
+                    ],
+                  ),
+                ],
+              ),
+              pw.Divider(thickness: 1.2, color: PdfColors.grey400),
+              pw.SizedBox(height: 12),
+
+              // Staff Information Box
+              pw.Container(
+                padding: const pw.EdgeInsets.all(10),
+                decoration: pw.BoxDecoration(
+                  color: PdfColors.grey100,
+                  borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+                  border: pw.Border.all(color: PdfColors.grey300),
+                ),
+                child: pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text('Staff Member: $staffName', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+                        pw.SizedBox(height: 3),
+                        pw.Text('Designation: ${staffDesignation ?? "Staff Member"}', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey800)),
+                        if (staffPhone != null && staffPhone.isNotEmpty)
+                          pw.Text('Contact: $staffPhone', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey800)),
+                      ],
+                    ),
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.end,
+                      children: [
+                        pw.Text('Payment Method: $paymentMethod', style: const pw.TextStyle(fontSize: 9.5, color: PdfColors.grey800)),
+                        if (reference.isNotEmpty && reference != 'N/A')
+                          pw.Text('Reference / Slip: $reference', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              pw.SizedBox(height: 16),
+
+              // Voucher Line Items Table
+              pw.Table(
+                border: pw.TableBorder.all(color: PdfColors.grey300),
+                children: [
+                  pw.TableRow(
+                    decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+                    children: [
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Expense Classification / Category', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10))),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Description / Purpose', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10))),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Disbursed Amount', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10))),
+                    ],
+                  ),
+                  pw.TableRow(
+                    children: [
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(8),
+                        child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            pw.Text(category, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                            if (isAdvance)
+                              pw.Text('(Monthly Salary Deduction)', style: const pw.TextStyle(fontSize: 8, color: PdfColors.red800)),
+                          ],
+                        ),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(8),
+                        child: pw.Text(
+                          description.isNotEmpty ? description : (notes.isNotEmpty ? notes : category),
+                          style: const pw.TextStyle(fontSize: 9.5),
+                        ),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(8),
+                        child: pw.Text(
+                          Formatters.currency(amount, symbol: business.currency),
+                          textAlign: pw.TextAlign.right,
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11, color: PdfColors.blue900),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 14),
+
+              // Total Summary
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.end,
+                children: [
+                  pw.Container(
+                    width: 200,
+                    padding: const pw.EdgeInsets.all(8),
+                    decoration: pw.BoxDecoration(
+                      color: PdfColors.grey100,
+                      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+                      border: pw.Border.all(color: PdfColors.grey300),
+                    ),
+                    child: pw.Row(
+                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                      children: [
+                        pw.Text('Net Disbursed:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                        pw.Text(Formatters.currency(amount, symbol: business.currency), style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11, color: PdfColors.blue900)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 16),
+
+              // Salary Deduction Policy Notice
+              if (isAdvance)
+                pw.Container(
+                  padding: const pw.EdgeInsets.all(8),
+                  decoration: pw.BoxDecoration(
+                    color: PdfColors.amber50,
+                    borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+                    border: pw.Border.all(color: PdfColors.amber300),
+                  ),
+                  child: pw.Row(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text('NOTE: ', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8.5, color: PdfColors.amber900)),
+                      pw.Expanded(
+                        child: pw.Text(
+                          'This amount has been recorded in the staff ledger and will be automatically deducted as advance/expense from $staffName\'s upcoming monthly salary payroll.',
+                          style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey800),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+              pw.Spacer(),
+              // Signature Row
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.center,
+                    children: [
+                      pw.Container(width: 160, height: 1, color: PdfColors.grey600),
+                      pw.SizedBox(height: 4),
+                      pw.Text('Staff Receiver Signature', style: const pw.TextStyle(fontSize: 8.5)),
+                      pw.Text('($staffName)', style: const pw.TextStyle(fontSize: 7.5, color: PdfColors.grey700)),
+                    ],
+                  ),
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.center,
+                    children: [
+                      pw.Container(width: 160, height: 1, color: PdfColors.grey600),
+                      pw.SizedBox(height: 4),
+                      pw.Text('Authorized Dealership Signature', style: const pw.TextStyle(fontSize: 8.5)),
+                      pw.Text('(${business.name})', style: const pw.TextStyle(fontSize: 7.5, color: PdfColors.grey700)),
+                    ],
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 10),
+              pw.Center(
+                child: pw.Text(
+                  'Software by Devnix Limited (03007720839)',
+                  style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey600),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    return doc;
+  }
+
+  static Future<Uint8List> buildStaffExpenseSlipBytes({
+    required BusinessModel business,
+    required Map<String, dynamic> expense,
+    required String staffName,
+    String? staffPhone,
+    String? staffDesignation,
+  }) async {
+    final doc = await _buildStaffExpenseSlipDoc(
+      business: business,
+      expense: expense,
+      staffName: staffName,
+      staffPhone: staffPhone,
+      staffDesignation: staffDesignation,
+    );
+    return await doc.save();
+  }
+
+  static Future<Uint8List?> renderStaffExpenseSlipToImage({
+    required BusinessModel business,
+    required Map<String, dynamic> expense,
+    required String staffName,
+    String? staffPhone,
+    String? staffDesignation,
+    double dpi = 180,
+  }) async {
+    final pdfBytes = await buildStaffExpenseSlipBytes(
+      business: business,
+      expense: expense,
+      staffName: staffName,
+      staffPhone: staffPhone,
+      staffDesignation: staffDesignation,
+    );
+    await for (final page in Printing.raster(pdfBytes, dpi: dpi)) {
+      return await page.toPng();
+    }
+    return null;
+  }
+
+  static Future<void> printStaffExpenseSlip({
+    required BusinessModel business,
+    required Map<String, dynamic> expense,
+    required String staffName,
+    String? staffPhone,
+    String? staffDesignation,
+  }) async {
+    final pdfBytes = await buildStaffExpenseSlipBytes(
+      business: business,
+      expense: expense,
+      staffName: staffName,
+      staffPhone: staffPhone,
+      staffDesignation: staffDesignation,
+    );
+    await Printing.layoutPdf(
+      onLayout: (PdfPageFormat format) async => pdfBytes,
+      name: 'Staff_Voucher_${staffName}_${expense['id'] ?? 'voucher'}.pdf',
     );
   }
 
@@ -1622,6 +1981,13 @@ class PdfService {
                   ],
                 ),
               ],
+            ),
+            pw.SizedBox(height: 8),
+            pw.Center(
+              child: pw.Text(
+                'Software by Devnix Limited (03007720839)',
+                style: const pw.TextStyle(fontSize: 6.5, color: PdfColors.grey600),
+              ),
             ),
           ];
         },

@@ -307,7 +307,7 @@ class _InventoryFormDialogState extends State<InventoryFormDialog> {
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
                           decoration: const InputDecoration(
                             labelText: 'Purchase Price (Cost) *',
-                            helperText: 'Khareed qeemat',
+                            helperText: 'Unit cost price',
                             prefixIcon: Icon(Icons.shopping_bag_outlined, size: 20),
                           ),
                           onChanged: (_) => setState(() {}),
@@ -322,8 +322,8 @@ class _InventoryFormDialogState extends State<InventoryFormDialog> {
                           controller: _sellingPriceController,
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
                           decoration: const InputDecoration(
-                            labelText: 'Selling Price (Farokht) *',
-                            helperText: 'Jis py customer ko bechna hai',
+                            labelText: 'Selling Price *',
+                            helperText: 'Customer retail price',
                             prefixIcon: Icon(Icons.point_of_sale_rounded, size: 20),
                           ),
                           onChanged: (_) => setState(() {}),
@@ -342,7 +342,7 @@ class _InventoryFormDialogState extends State<InventoryFormDialog> {
                                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                 decoration: const InputDecoration(
                                   labelText: 'Purchase Price (Cost) *',
-                                  helperText: 'Khareed qeemat',
+                                  helperText: 'Unit cost price',
                                   prefixIcon: Icon(Icons.shopping_bag_outlined, size: 20),
                                 ),
                                 onChanged: (_) => setState(() {}),
@@ -359,8 +359,8 @@ class _InventoryFormDialogState extends State<InventoryFormDialog> {
                                 controller: _sellingPriceController,
                                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                 decoration: const InputDecoration(
-                                  labelText: 'Selling Price (Farokht) *',
-                                  helperText: 'Jis py bechna hai',
+                                  labelText: 'Selling Price *',
+                                  helperText: 'Customer retail price',
                                   prefixIcon: Icon(Icons.point_of_sale_rounded, size: 20),
                                 ),
                                 onChanged: (_) => setState(() {}),

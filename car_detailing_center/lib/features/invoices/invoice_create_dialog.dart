@@ -1,9 +1,14 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:printing/printing.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/services/auth_service.dart';
+import '../../core/services/clipboard_service.dart';
 import '../../core/services/pdf_service.dart';
 import '../../core/utils/formatters.dart';
 import '../../data/models/invoice_model.dart';
@@ -447,7 +452,7 @@ class _InvoiceCreateDialogState extends State<InvoiceCreateDialog> {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Purchase Price (Khareed Cost):', style: TextStyle(fontSize: 11, color: AppColors.textDarkSecondary)),
+                              const Text('Purchase Price (Cost):', style: TextStyle(fontSize: 11, color: AppColors.textDarkSecondary)),
                               Text(
                                 'Rs. ${buyPrice.toStringAsFixed(0)}',
                                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textDark),
@@ -458,7 +463,7 @@ class _InvoiceCreateDialogState extends State<InvoiceCreateDialog> {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
-                              const Text('Preset Selling Price (Farokht):', style: TextStyle(fontSize: 11, color: AppColors.textDarkSecondary)),
+                              const Text('Preset Selling Price (Retail):', style: TextStyle(fontSize: 11, color: AppColors.textDarkSecondary)),
                               Text(
                                 'Rs. ${sellPrice.toStringAsFixed(0)}',
                                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.success),
@@ -576,7 +581,7 @@ class _InvoiceCreateDialogState extends State<InvoiceCreateDialog> {
     );
   }
 
-  void _saveAndPrintInvoice() async {
+  void _saveInvoice() async {
     if (_selectedCustomer == null) {
       Get.snackbar('Required', 'Please select or add a customer for this invoice', backgroundColor: AppColors.error.withValues(alpha: 0.2));
       return;
@@ -650,29 +655,154 @@ class _InvoiceCreateDialogState extends State<InvoiceCreateDialog> {
         }
       }
 
-      // Fetch saved invoice details to build printable model
+      // Fetch saved invoice details to build printable/shareable model
       final details = await invoiceRepo.getInvoiceDetails(savedInvoiceId);
+      InvoiceModel? savedModel;
       if (details != null) {
-        final savedModel = InvoiceModel.fromSqlite(details, _items);
-        final business = AuthService.to.currentBusiness.value;
-        if (business != null) {
-          await PdfService.printInvoice(business: business, invoice: savedModel);
-        }
+        savedModel = InvoiceModel.fromSqlite(details, _items);
       }
 
       final currency = AuthService.to.currentBusiness.value?.currency ?? AppConstants.defaultCurrency;
+      final business = AuthService.to.currentBusiness.value;
+
       Get.back(result: true);
+
       Get.snackbar(
         _markAsFullyPaid ? 'Invoice Saved & Bill Paid' : 'Invoice Saved',
         _markAsFullyPaid
-            ? 'Bill fully settled (${Formatters.currency(paymentToRecord, symbol: currency)}) and PDF sent to printer.'
-            : 'Tax Invoice saved to SQLite and sent to printer.',
+            ? 'Bill fully settled (${Formatters.currency(paymentToRecord, symbol: currency)}).'
+            : 'Tax Invoice saved to SQLite.',
         backgroundColor: AppColors.success.withValues(alpha: 0.2),
       );
+
+      // Prompt to share bill with customer
+      if (savedModel != null) {
+        final currentModel = savedModel;
+        Get.dialog(
+          AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Row(
+              children: [
+                Icon(Icons.check_circle_rounded, color: AppColors.success),
+                SizedBox(width: 8),
+                Text('Invoice Saved', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Invoice #${currentModel.invoiceNumber} has been saved for ${currentModel.customerName}.',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Total: ${Formatters.currency(_grandTotal, symbol: currency)}'
+                  '${_markAsFullyPaid ? ' (Paid & Settled)' : ''}',
+                  style: const TextStyle(color: AppColors.textDarkSecondary),
+                ),
+                if (currentModel.customerPhone.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      const Icon(Icons.phone_rounded, size: 14, color: AppColors.textDarkSecondary),
+                      const SizedBox(width: 4),
+                      Text(
+                        currentModel.customerPhone,
+                        style: const TextStyle(color: AppColors.textDarkSecondary, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 14),
+                const Text(
+                  'Would you like to share the bill with the customer on WhatsApp?',
+                  style: TextStyle(fontSize: 13),
+                ),
+              ],
+            ),
+            actions: [
+              OutlinedButton(
+                onPressed: () => Get.back(),
+                child: const Text('Close'),
+              ),
+              if (business != null)
+                OutlinedButton.icon(
+                  onPressed: () {
+                    Get.back();
+                    PdfService.printInvoice(business: business, invoice: currentModel);
+                  },
+                  icon: const Icon(Icons.print_rounded, size: 16),
+                  label: const Text('Print'),
+                ),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF25D366),
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: () async {
+                  Get.back();
+                  await _shareInvoicePdf(currentModel);
+                },
+                icon: const Icon(Icons.share_rounded, size: 16),
+                label: const Text('Share WhatsApp'),
+              ),
+            ],
+          ),
+        );
+      }
     } catch (e) {
       Get.snackbar('Error', 'Failed to generate invoice: $e', backgroundColor: AppColors.error.withValues(alpha: 0.2));
     } finally {
       if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  static Future<void> _shareInvoicePdf(InvoiceModel fullInvoice) async {
+    final business = AuthService.to.currentBusiness.value;
+    if (business == null) return;
+
+    try {
+      final pdfBytes = await PdfService.buildInvoiceBytes(business: business, invoice: fullInvoice);
+
+      final tempDir = await getTemporaryDirectory();
+      final baseName = 'Invoice_${fullInvoice.invoiceNumber.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_')}_${DateTime.now().millisecondsSinceEpoch}';
+      final pdfFile = File('${tempDir.path}/$baseName.pdf');
+      await pdfFile.writeAsBytes(pdfBytes);
+
+      // Only 1 item sent: the official Invoice PDF
+      if (Platform.isWindows) {
+        await WindowsClipboardService.copyFileToClipboard(pdfFile.path);
+      } else {
+        await Printing.sharePdf(bytes: pdfBytes, filename: '$baseName.pdf');
+      }
+
+      // Try opening WhatsApp with client's phone number
+      var phone = fullInvoice.customerPhone.replaceAll(RegExp(r'[^0-9+]'), '');
+      if (phone.startsWith('03') && phone.length == 11) {
+        phone = '92${phone.substring(1)}';
+      }
+      final whatsappUri = Uri.parse(phone.isNotEmpty ? 'whatsapp://send?phone=$phone' : 'whatsapp://send');
+      final webWhatsappUri = Uri.parse(phone.isNotEmpty ? 'https://web.whatsapp.com/send?phone=$phone' : 'https://web.whatsapp.com');
+
+      if (await canLaunchUrl(whatsappUri)) {
+        await launchUrl(whatsappUri);
+      } else if (await canLaunchUrl(webWhatsappUri)) {
+        await launchUrl(webWhatsappUri);
+      }
+
+      Get.snackbar(
+        'Invoice PDF Copied!',
+        'Single Tax Invoice PDF copied. Open client chat & press Ctrl + V to send!',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: const Color(0xFF25D366).withValues(alpha: 0.25),
+        colorText: Colors.white,
+        icon: const Icon(Icons.check_circle_rounded, color: Color(0xFF25D366)),
+        duration: const Duration(seconds: 4),
+      );
+    } catch (e) {
+      Get.snackbar('Error', 'Failed to share invoice: $e', backgroundColor: AppColors.error.withValues(alpha: 0.2));
     }
   }
 
@@ -1077,11 +1207,11 @@ class _InvoiceCreateDialogState extends State<InvoiceCreateDialog> {
                             children: [
                               OutlinedButton(onPressed: () => Get.back(), child: const Text('Cancel')),
                               ElevatedButton.icon(
-                                onPressed: _isSaving ? null : _saveAndPrintInvoice,
-                                icon: const Icon(Icons.print_rounded),
+                                onPressed: _isSaving ? null : _saveInvoice,
+                                icon: const Icon(Icons.check_circle_outline_rounded),
                                 label: _isSaving
                                     ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                    : Text(_markAsFullyPaid ? 'Save & Print Invoice (Paid & Settled)' : 'Save & Print Invoice (PDF)'),
+                                    : const Text('Save'),
                               ),
                             ],
                           ),
@@ -1129,7 +1259,7 @@ class _InvoiceCreateDialogState extends State<InvoiceCreateDialog> {
                 Row(
                   children: [
                     Text(
-                      'Bill Paid in Full (Pura Bill Ada Kar Diya)',
+                      'Bill Paid in Full (Fully Settled)',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 13,
@@ -1158,8 +1288,8 @@ class _InvoiceCreateDialogState extends State<InvoiceCreateDialog> {
                 const SizedBox(height: 2),
                 Text(
                   _markAsFullyPaid
-                      ? 'Save & Print par click kartay hi bill Paid ho jayega aur print nikal aye ga (baad me Pay button nahi dabana paray ga).'
-                      : 'Partial payment / Udhar bill mode active.',
+                      ? 'Invoice will be marked Paid upon Save with receipt generated immediately.'
+                      : 'Partial payment / Credit invoice mode active.',
                   style: TextStyle(
                     fontSize: 11,
                     color: Theme.of(context).textTheme.bodySmall?.color,

@@ -44,7 +44,7 @@ class InvoicePaymentRepository {
       args.add(customerId);
     }
     if (startDate != null && endDate != null) {
-      sql += ' AND inv.date BETWEEN ? AND ?';
+      sql += ' AND date(inv.date) BETWEEN date(?) AND date(?)';
       args.addAll([startDate, endDate]);
     }
     if (searchQuery != null && searchQuery.trim().isNotEmpty) {
@@ -266,7 +266,7 @@ class InvoicePaymentRepository {
       args.add(customerId);
     }
     if (startDate != null && endDate != null) {
-      sql += ' AND p.payment_date BETWEEN ? AND ?';
+      sql += ' AND date(p.payment_date) BETWEEN date(?) AND date(?)';
       args.addAll([startDate, endDate]);
     }
     if (searchQuery != null && searchQuery.trim().isNotEmpty) {

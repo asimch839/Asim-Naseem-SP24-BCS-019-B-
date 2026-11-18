@@ -89,11 +89,11 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.example" "\0"
+            VALUE "CompanyName", "Devnix Limited" "\0"
             VALUE "FileDescription", "car_detailing_center" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "car_detailing_center" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 com.example. All rights reserved." "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 Devnix Limited (03007720839). All rights reserved." "\0"
             VALUE "OriginalFilename", "car_detailing_center.exe" "\0"
             VALUE "ProductName", "car_detailing_center" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"

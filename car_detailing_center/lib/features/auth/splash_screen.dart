@@ -34,10 +34,10 @@ class _SplashScreenState extends State<SplashScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.darkBackground,
-      body: Center(
+      body: SafeArea(
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            const Spacer(),
             Container(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(24),
@@ -86,6 +86,24 @@ class _SplashScreenState extends State<SplashScreen> {
                 valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
               ),
             ),
+            const Spacer(),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.terminal_rounded, size: 14, color: AppColors.primaryLight),
+                const SizedBox(width: 6),
+                Text(
+                  'Software by ${AppConstants.developerName} • ${AppConstants.developerPhone}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textDarkMuted,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
           ],
         ),
       ),

@@ -26,7 +26,7 @@ class GarageExpenseRepository {
       args.addAll([category, category]);
     }
     if (startDate != null && endDate != null) {
-      sql += ' AND date BETWEEN ? AND ?';
+      sql += ' AND date(date) BETWEEN date(?) AND date(?)';
       args.addAll([startDate, endDate]);
     }
     if (vendorQuery != null && vendorQuery.trim().isNotEmpty) {

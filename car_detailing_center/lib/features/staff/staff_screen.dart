@@ -2,18 +2,23 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:printing/printing.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/services/auth_service.dart';
+import '../../core/services/clipboard_service.dart';
 import '../../core/services/pdf_service.dart';
 import '../../core/services/storage_service.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/widgets/app_scaffold.dart';
 import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/loading_indicator.dart';
+import '../../core/widgets/date_range_filter_bar.dart';
 import '../../data/models/staff_model.dart';
 import '../../data/models/salary_model.dart';
 import '../../data/repositories/staff_repository.dart';
@@ -228,7 +233,7 @@ class _StaffListSubViewState extends State<StaffListSubView> {
                     separatorBuilder: (_, __) => const Divider(height: 1),
                     itemBuilder: (context, index) {
                       final staff = filtered[index];
-                      return ListTile(
+return ListTile(
                         leading: CircleAvatar(
                           backgroundColor: AppColors.primary.withValues(alpha: 0.15),
                           backgroundImage: staff.photoUrl != null && File(staff.photoUrl!).existsSync()
@@ -347,10 +352,10 @@ class _StaffAttendanceSubViewState extends State<StaffAttendanceSubView> {
   Widget build(BuildContext context) {
     final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
 
-    final isCompactScreen = MediaQuery.of(context).size.width < 600;
+    final isCompact = MediaQuery.of(context).size.width < 600;
 
     return Padding(
-      padding: EdgeInsets.all(isCompactScreen ? 12 : 20),
+      padding: EdgeInsets.all(isCompact ? 12 : 20),
       child: Column(
         children: [
           // Date Selector Header
@@ -484,7 +489,52 @@ class _StaffAttendanceSubViewState extends State<StaffAttendanceSubView> {
                       final salaryType = row['salary_type'] as String? ?? 'Monthly';
                       final currentStatus = row['attendance_status'] as String?;
 
-                      return ListTile(
+                      if (isCompact) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 18,
+                                    backgroundColor: AppColors.primary.withValues(alpha: 0.15),
+                                    child: Text(staffName.isNotEmpty ? staffName[0].toUpperCase() : 'S', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryLight)),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(staffName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                        Text('$designation • $salaryType', style: const TextStyle(fontSize: 12, color: AppColors.textDarkSecondary)),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  children: [
+                                    _statusBtn(staffId, AppConstants.attendancePresent, 'Present', AppColors.success, currentStatus),
+                                    const SizedBox(width: 6),
+                                    _statusBtn(staffId, AppConstants.attendanceAbsent, 'Absent', AppColors.error, currentStatus),
+                                    const SizedBox(width: 6),
+                                    _statusBtn(staffId, AppConstants.attendanceHalfDay, 'Half Day', AppColors.info, currentStatus),
+                                    const SizedBox(width: 6),
+                                    _statusBtn(staffId, AppConstants.attendanceLeave, 'Leave', AppColors.warning, currentStatus),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+
+return ListTile(
                         leading: CircleAvatar(
                           backgroundColor: AppColors.primary.withValues(alpha: 0.15),
                           child: Text(staffName[0].toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryLight)),
@@ -551,12 +601,18 @@ class _StaffSalariesSubViewState extends State<StaffSalariesSubView> {
   String get _monthKey => DateFormat('yyyy-MM').format(_selectedMonth);
 
   void _disburseSalary(Map<String, dynamic> salary) async {
-    final remainingAmount = (salary['remaining_amount'] as num?)?.toDouble() ?? 0.0;
+    final currency = AuthService.to.currentBusiness.value?.currency ?? AppConstants.defaultCurrency;
+    final initialRemaining = (salary['remaining_amount'] as num?)?.toDouble() ?? 0.0;
     final staffName = salary['staff_name'] ?? 'Staff';
     final salaryId = salary['id'] as String;
     final staffId = salary['staff_id'] as String;
 
-    final amountController = TextEditingController(text: remainingAmount.toStringAsFixed(0));
+    final commissionController = TextEditingController();
+    final bonusController = TextEditingController();
+    final overtimeController = TextEditingController();
+    final amountController = TextEditingController(text: initialRemaining.toStringAsFixed(0));
+    final refController = TextEditingController();
+    final notesController = TextEditingController();
     String paymentMethod = 'Cash';
 
     final confirmed = await showDialog<bool>(
@@ -564,25 +620,190 @@ class _StaffSalariesSubViewState extends State<StaffSalariesSubView> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
+            final isNarrow = MediaQuery.of(context).size.width < 500;
+            final commVal = double.tryParse(commissionController.text.trim()) ?? 0.0;
+            final bonusVal = double.tryParse(bonusController.text.trim()) ?? 0.0;
+            final otVal = double.tryParse(overtimeController.text.trim()) ?? 0.0;
+            final extraTotal = commVal + bonusVal + otVal;
+            final totalPayable = initialRemaining + extraTotal;
+
+            void onExtraChanged() {
+              final c = double.tryParse(commissionController.text.trim()) ?? 0.0;
+              final b = double.tryParse(bonusController.text.trim()) ?? 0.0;
+              final o = double.tryParse(overtimeController.text.trim()) ?? 0.0;
+              final tot = initialRemaining + c + b + o;
+              amountController.text = tot.toStringAsFixed(0);
+            }
+
             return AlertDialog(
-              title: Text('Disburse Salary: $staffName', maxLines: 1, overflow: TextOverflow.ellipsis),
-              content: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: 400,
-                  maxHeight: MediaQuery.of(context).size.height * 0.8,
-                ),
+              title: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 16,
+                    backgroundColor: AppColors.primary.withValues(alpha: 0.15),
+                    child: const Icon(Icons.payments_rounded, color: AppColors.primaryLight, size: 18),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text('Disburse Salary: $staffName', maxLines: 1, overflow: TextOverflow.ellipsis),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: isNarrow ? double.maxFinite : 460,
                 child: SingleChildScrollView(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Total Net Due: Rs. ${remainingAmount.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 16),
+                      // Calculation Summary Card
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.cardDark,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppColors.borderDark),
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text('Base Net Due:', style: TextStyle(color: AppColors.textDarkSecondary, fontSize: 13)),
+                                Text(Formatters.currency(initialRemaining, symbol: currency), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                              ],
+                            ),
+                            if (extraTotal > 0) ...[
+                              const SizedBox(height: 4),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text('Extra (Comm + Bonus + OT):', style: TextStyle(color: AppColors.success, fontSize: 12)),
+                                  Text('+ ${Formatters.currency(extraTotal, symbol: currency)}', style: const TextStyle(color: AppColors.success, fontWeight: FontWeight.bold, fontSize: 12)),
+                                ],
+                              ),
+                            ],
+                            const Divider(height: 14),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text('Total Net Due:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                Text(
+                                  Formatters.currency(totalPayable, symbol: currency),
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.primaryLight),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Allowances / Extra Earnings Heading
+                      const Text(
+                        'Add Allowances / Incentives (Optional)',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textDarkSecondary),
+                      ),
+                      const SizedBox(height: 8),
+
+                      // Commission, Bonus, Overtime fields
+                      if (isNarrow) ...[
+                        TextField(
+                          controller: commissionController,
+                          decoration: const InputDecoration(
+                            labelText: 'Commission',
+                            hintText: '0',
+                            prefixText: 'Rs. ',
+                          ),
+                          keyboardType: TextInputType.number,
+                          onChanged: (v) => setDialogState(onExtraChanged),
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: bonusController,
+                          decoration: const InputDecoration(
+                            labelText: 'Bonus',
+                            hintText: '0',
+                            prefixText: 'Rs. ',
+                          ),
+                          keyboardType: TextInputType.number,
+                          onChanged: (v) => setDialogState(onExtraChanged),
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: overtimeController,
+                          decoration: const InputDecoration(
+                            labelText: 'Overtime',
+                            hintText: '0',
+                            prefixText: 'Rs. ',
+                          ),
+                          keyboardType: TextInputType.number,
+                          onChanged: (v) => setDialogState(onExtraChanged),
+                        ),
+                      ] else ...[
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: commissionController,
+                                decoration: const InputDecoration(
+                                  labelText: 'Commission',
+                                  hintText: '0',
+                                  prefixText: 'Rs. ',
+                                ),
+                                keyboardType: TextInputType.number,
+                                onChanged: (v) => setDialogState(onExtraChanged),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextField(
+                                controller: bonusController,
+                                decoration: const InputDecoration(
+                                  labelText: 'Bonus',
+                                  hintText: '0',
+                                  prefixText: 'Rs. ',
+                                ),
+                                keyboardType: TextInputType.number,
+                                onChanged: (v) => setDialogState(onExtraChanged),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextField(
+                                controller: overtimeController,
+                                decoration: const InputDecoration(
+                                  labelText: 'Overtime',
+                                  hintText: '0',
+                                  prefixText: 'Rs. ',
+                                ),
+                                keyboardType: TextInputType.number,
+                                onChanged: (v) => setDialogState(onExtraChanged),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                      const SizedBox(height: 14),
+
+                      // Disbursement Amount (Rs.)
                       TextField(
                         controller: amountController,
-                        decoration: const InputDecoration(labelText: 'Disbursement Amount (Rs.) *'),
+                        decoration: InputDecoration(
+                          labelText: 'Disbursement Amount (Rs.) *',
+                          prefixText: 'Rs. ',
+                          suffixIcon: IconButton(
+                            icon: const Icon(Icons.refresh_rounded, size: 20),
+                            tooltip: 'Reset to total payable',
+                            onPressed: () => setDialogState(() {
+                              amountController.text = totalPayable.toStringAsFixed(0);
+                            }),
+                          ),
+                        ),
                         keyboardType: TextInputType.number,
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 14),
+
                       DropdownButtonFormField<String>(
                         value: paymentMethod,
                         decoration: const InputDecoration(labelText: 'Payment Method'),
@@ -591,15 +812,34 @@ class _StaffSalariesSubViewState extends State<StaffSalariesSubView> {
                           if (val != null) setDialogState(() => paymentMethod = val);
                         },
                       ),
+                      const SizedBox(height: 12),
+
+                      TextField(
+                        controller: refController,
+                        decoration: const InputDecoration(
+                          labelText: 'Payment Reference (Optional)',
+                          hintText: 'e.g. TRX-12345 or Cheque #',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      TextField(
+                        controller: notesController,
+                        decoration: const InputDecoration(
+                          labelText: 'Notes (Optional)',
+                          hintText: 'e.g. November final salary settlement',
+                        ),
+                      ),
                     ],
                   ),
                 ),
               ),
               actions: [
                 TextButton(onPressed: () => Get.back(result: false), child: const Text('Cancel')),
-                ElevatedButton(
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.check_circle_rounded, size: 18),
                   onPressed: () => Get.back(result: true),
-                  child: const Text('Confirm Disbursement'),
+                  label: const Text('Confirm Disbursement'),
                 ),
               ],
             );
@@ -610,7 +850,14 @@ class _StaffSalariesSubViewState extends State<StaffSalariesSubView> {
 
     if (confirmed == true) {
       final payAmount = double.tryParse(amountController.text.trim()) ?? 0.0;
-      if (payAmount <= 0) return;
+      if (payAmount <= 0) {
+        Get.snackbar('Invalid Amount', 'Please enter a valid disbursement amount');
+        return;
+      }
+
+      final commVal = double.tryParse(commissionController.text.trim()) ?? 0.0;
+      final bonusVal = double.tryParse(bonusController.text.trim()) ?? 0.0;
+      final otVal = double.tryParse(overtimeController.text.trim()) ?? 0.0;
 
       try {
         await _staffRepo.recordSalaryPayment(
@@ -619,7 +866,11 @@ class _StaffSalariesSubViewState extends State<StaffSalariesSubView> {
           amount: payAmount,
           paymentMethod: paymentMethod,
           isAdvance: false,
-          notes: 'Disbursement for $_monthKey',
+          commission: commVal,
+          bonus: bonusVal,
+          overtimeAmount: otVal,
+          reference: refController.text.trim(),
+          notes: notesController.text.trim().isNotEmpty ? notesController.text.trim() : null,
         );
 
         Get.snackbar('Success', 'Salary payment recorded', backgroundColor: AppColors.success.withValues(alpha: 0.2));
@@ -646,14 +897,86 @@ class _StaffSalariesSubViewState extends State<StaffSalariesSubView> {
     }
   }
 
+  Future<void> _shareSalarySlipOnWhatsApp(
+    Map<String, dynamic> sal,
+    String staffName,
+    double basicSalary,
+    double netSalary,
+    double paidAmount,
+    double remainingAmount,
+    String status,
+    double advDeduction,
+  ) async {
+    final b = AuthService.to.currentBusiness.value;
+    if (b == null) return;
+
+    try {
+      final salModel = SalaryModel(
+        id: sal['id'],
+        businessId: 'local',
+        staffId: sal['staff_id'],
+        staffName: staffName,
+        month: sal['pay_period'],
+        basicSalary: basicSalary,
+        presentDays: sal['present_days'] ?? 0,
+        absentDays: sal['absent_days'] ?? 0,
+        halfDays: sal['half_days'] ?? 0,
+        overtimeAmount: (sal['overtime_amount'] as num?)?.toDouble() ?? 0.0,
+        bonusAmount: (sal['bonus'] as num?)?.toDouble() ?? 0.0,
+        commissionAmount: (sal['commission'] as num?)?.toDouble() ?? 0.0,
+        advanceDeduction: advDeduction,
+        grossSalary: (sal['gross_salary'] as num?)?.toDouble(),
+        netSalary: netSalary,
+        paidAmount: paidAmount,
+        remainingAmount: remainingAmount,
+        status: status,
+      );
+
+      final pdfBytes = await PdfService.buildSalarySlipBytes(business: b, salary: salModel);
+      final tempDir = await getTemporaryDirectory();
+      final baseName = 'SalarySlip_${staffName.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_')}_${sal['pay_period']}_${DateTime.now().millisecondsSinceEpoch}';
+      final pdfFile = File('${tempDir.path}/$baseName.pdf');
+      await pdfFile.writeAsBytes(pdfBytes);
+
+      // Only 1 item sent: the official PDF slip
+      if (Platform.isWindows) {
+        await WindowsClipboardService.copyFileToClipboard(pdfFile.path);
+      } else {
+        await Printing.sharePdf(bytes: pdfBytes, filename: '$baseName.pdf');
+      }
+
+      final rawPhone = (sal['staff_phone'] as String? ?? '').replaceAll(RegExp(r'[^0-9+]'), '');
+      final whatsappUri = Uri.parse(rawPhone.isNotEmpty ? 'whatsapp://send?phone=$rawPhone' : 'whatsapp://send');
+      final webWhatsappUri = Uri.parse(rawPhone.isNotEmpty ? 'https://web.whatsapp.com/send?phone=$rawPhone' : 'https://web.whatsapp.com');
+
+      if (await canLaunchUrl(whatsappUri)) {
+        await launchUrl(whatsappUri);
+      } else if (await canLaunchUrl(webWhatsappUri)) {
+        await launchUrl(webWhatsappUri);
+      }
+
+      Get.snackbar(
+        'Salary Slip PDF Copied!',
+        'Single PDF slip copied to clipboard. Open WhatsApp & press Ctrl + V to send!',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: const Color(0xFF25D366).withValues(alpha: 0.25),
+        colorText: Colors.white,
+        icon: const Icon(Icons.check_circle_rounded, color: Color(0xFF25D366)),
+        duration: const Duration(seconds: 4),
+      );
+    } catch (e) {
+      Get.snackbar('Error', 'Could not share salary slip: $e', backgroundColor: AppColors.error.withValues(alpha: 0.2));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final currency = AuthService.to.currentBusiness.value?.currency ?? AppConstants.defaultCurrency;
 
-    final isCompactScreen = MediaQuery.of(context).size.width < 600;
+    final isCompact = MediaQuery.of(context).size.width < 600;
 
     return Padding(
-      padding: EdgeInsets.all(isCompactScreen ? 12 : 20),
+      padding: EdgeInsets.all(isCompact ? 12 : 20),
       child: Column(
         children: [
           Card(
@@ -744,6 +1067,126 @@ class _StaffSalariesSubViewState extends State<StaffSalariesSubView> {
                       final netSalary = (sal['net_salary'] as num?)?.toDouble() ?? 0.0;
                       final paidAmount = (sal['paid_amount'] as num?)?.toDouble() ?? 0.0;
                       final remainingAmount = (sal['remaining_amount'] as num?)?.toDouble() ?? 0.0;
+                      final advDeduction = (sal['advance_deductions'] as num?)?.toDouble() ?? 0.0;
+                      final commission = (sal['commission'] as num?)?.toDouble() ?? 0.0;
+                      final bonus = (sal['bonus'] as num?)?.toDouble() ?? 0.0;
+                      final overtime = (sal['overtime_amount'] as num?)?.toDouble() ?? 0.0;
+
+                      if (isCompact) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 16,
+                                    backgroundColor: AppColors.primary.withValues(alpha: 0.15),
+                                    child: const Icon(Icons.receipt_rounded, color: AppColors.primaryLight, size: 18),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(staffName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: status == 'Paid' ? AppColors.success.withValues(alpha: 0.15) : AppColors.error.withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(status, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: status == 'Paid' ? AppColors.success : AppColors.error)),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Net: ${Formatters.currency(netSalary, symbol: currency)} • Paid: ${Formatters.currency(paidAmount, symbol: currency)} • Due: ${Formatters.currency(remainingAmount, symbol: currency)}',
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textDarkPrimary),
+                              ),
+                              if (commission > 0 || bonus > 0 || overtime > 0)
+                                Text(
+                                  'Incentives: ${overtime > 0 ? "OT: +${Formatters.currency(overtime, symbol: currency)} " : ""}${bonus > 0 ? "Bonus: +${Formatters.currency(bonus, symbol: currency)} " : ""}${commission > 0 ? "Comm: +${Formatters.currency(commission, symbol: currency)}" : ""}',
+                                  style: const TextStyle(fontSize: 11, color: AppColors.success, fontWeight: FontWeight.w600),
+                                ),
+                              if (advDeduction > 0)
+                                Text(
+                                  'Basic: ${Formatters.currency(basicSalary, symbol: currency)} • Advance/Expense Deducted: -${Formatters.currency(advDeduction, symbol: currency)}',
+                                  style: const TextStyle(fontSize: 11, color: AppColors.textDarkSecondary),
+                                ),
+                              const SizedBox(height: 8),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  OutlinedButton.icon(
+                                    icon: const Icon(Icons.print_rounded, size: 16),
+                                    label: const Text('Slip PDF', style: TextStyle(fontSize: 11)),
+                                    style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact, padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4)),
+                                    onPressed: () {
+                                      final b = AuthService.to.currentBusiness.value;
+                                      if (b != null) {
+                                        final salModel = SalaryModel(
+                                          id: sal['id'],
+                                          businessId: 'local',
+                                          staffId: sal['staff_id'],
+                                          staffName: staffName,
+                                          month: sal['pay_period'],
+                                          basicSalary: basicSalary,
+                                          presentDays: sal['present_days'] ?? 0,
+                                          absentDays: sal['absent_days'] ?? 0,
+                                          halfDays: sal['half_days'] ?? 0,
+                                          overtimeAmount: overtime,
+                                          bonusAmount: bonus,
+                                          commissionAmount: commission,
+                                          advanceDeduction: advDeduction,
+                                          grossSalary: (sal['gross_salary'] as num?)?.toDouble(),
+                                          netSalary: netSalary,
+                                          paidAmount: paidAmount,
+                                          remainingAmount: remainingAmount,
+                                          status: status,
+                                        );
+                                        PdfService.printSalarySlip(business: b, salary: salModel);
+                                      }
+                                    },
+                                  ),
+                                  const SizedBox(width: 8),
+                                  OutlinedButton.icon(
+                                    icon: const Icon(Icons.share, size: 16, color: Color(0xFF25D366)),
+                                    label: const Text('WhatsApp', style: TextStyle(fontSize: 11, color: Color(0xFF25D366))),
+                                    style: OutlinedButton.styleFrom(
+                                      visualDensity: VisualDensity.compact,
+                                      side: const BorderSide(color: Color(0xFF25D366)),
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    ),
+                                    onPressed: () => _shareSalarySlipOnWhatsApp(
+                                      sal,
+                                      staffName,
+                                      basicSalary,
+                                      netSalary,
+                                      paidAmount,
+                                      remainingAmount,
+                                      status,
+                                      advDeduction,
+                                    ),
+                                  ),
+                                  if (remainingAmount > 0) ...[
+                                    const SizedBox(width: 8),
+                                    ElevatedButton(
+                                      onPressed: () => _disburseSalary(sal),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppColors.success,
+                                        visualDensity: VisualDensity.compact,
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                      ),
+                                      child: const Text('Pay', style: TextStyle(fontSize: 11)),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ],
+                          ),
+                        );
+                      }
 
                       return ListTile(
                         leading: CircleAvatar(
@@ -765,7 +1208,10 @@ class _StaffSalariesSubViewState extends State<StaffSalariesSubView> {
                           ],
                         ),
                         subtitle: Text(
-                          'Basic: ${Formatters.currency(basicSalary, symbol: currency)} • Net: ${Formatters.currency(netSalary, symbol: currency)} • Paid: ${Formatters.currency(paidAmount, symbol: currency)} • Due: ${Formatters.currency(remainingAmount, symbol: currency)}',
+                          'Basic: ${Formatters.currency(basicSalary, symbol: currency)}'
+                          '${(overtime > 0 || bonus > 0 || commission > 0) ? " • Extra: +${Formatters.currency(overtime + bonus + commission, symbol: currency)}" : ""}'
+                          '${advDeduction > 0 ? " • Adv/Exp: -${Formatters.currency(advDeduction, symbol: currency)}" : ""}'
+                          ' • Net: ${Formatters.currency(netSalary, symbol: currency)} • Paid: ${Formatters.currency(paidAmount, symbol: currency)} • Due: ${Formatters.currency(remainingAmount, symbol: currency)}',
                           style: const TextStyle(fontSize: 12, color: AppColors.textDarkSecondary),
                         ),
                         trailing: Row(
@@ -786,6 +1232,12 @@ class _StaffSalariesSubViewState extends State<StaffSalariesSubView> {
                                     basicSalary: basicSalary,
                                     presentDays: sal['present_days'] ?? 0,
                                     absentDays: sal['absent_days'] ?? 0,
+                                    halfDays: sal['half_days'] ?? 0,
+                                    overtimeAmount: overtime,
+                                    bonusAmount: bonus,
+                                    commissionAmount: commission,
+                                    advanceDeduction: advDeduction,
+                                    grossSalary: (sal['gross_salary'] as num?)?.toDouble(),
                                     netSalary: netSalary,
                                     paidAmount: paidAmount,
                                     remainingAmount: remainingAmount,
@@ -794,6 +1246,20 @@ class _StaffSalariesSubViewState extends State<StaffSalariesSubView> {
                                   PdfService.printSalarySlip(business: b, salary: salModel);
                                 }
                               },
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.share, size: 18, color: Color(0xFF25D366)),
+                              tooltip: 'Share Pay Slip on WhatsApp',
+                              onPressed: () => _shareSalarySlipOnWhatsApp(
+                                sal,
+                                staffName,
+                                basicSalary,
+                                netSalary,
+                                paidAmount,
+                                remainingAmount,
+                                status,
+                                advDeduction,
+                              ),
                             ),
                             if (remainingAmount > 0)
                               ElevatedButton(
@@ -830,6 +1296,8 @@ class _StaffExpensesSubViewState extends State<StaffExpensesSubView> {
   final _staffRepo = StaffRepository();
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  String? _startDate;
+  String? _endDate;
 
   void _openStaffExpenseDialog([Map<String, dynamic>? existing]) async {
     final res = await showDialog<bool>(
@@ -837,6 +1305,58 @@ class _StaffExpensesSubViewState extends State<StaffExpensesSubView> {
       builder: (_) => StaffExpenseFormDialog(existing: existing),
     );
     if (res == true && mounted) setState(() {});
+  }
+
+  Future<void> _shareStaffExpenseOnWhatsApp(Map<String, dynamic> exp) async {
+    final b = AuthService.to.currentBusiness.value;
+    if (b == null) return;
+
+    try {
+      final staffName = exp['staff_name'] as String? ?? 'Staff';
+      final staffPhone = (exp['staff_phone'] as String? ?? '').replaceAll(RegExp(r'[^0-9+]'), '');
+      final staffDesignation = exp['designation'] as String? ?? 'Staff';
+
+      final pdfBytes = await PdfService.buildStaffExpenseSlipBytes(
+        business: b,
+        expense: exp,
+        staffName: staffName,
+        staffPhone: exp['staff_phone'] as String?,
+        staffDesignation: staffDesignation,
+      );
+
+      final tempDir = await getTemporaryDirectory();
+      final baseName = 'ExpenseVoucher_${staffName.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_')}_${DateTime.now().millisecondsSinceEpoch}';
+      final pdfFile = File('${tempDir.path}/$baseName.pdf');
+      await pdfFile.writeAsBytes(pdfBytes);
+
+      // Only 1 item sent: the official PDF voucher
+      if (Platform.isWindows) {
+        await WindowsClipboardService.copyFileToClipboard(pdfFile.path);
+      } else {
+        await Printing.sharePdf(bytes: pdfBytes, filename: '$baseName.pdf');
+      }
+
+      final whatsappUri = Uri.parse(staffPhone.isNotEmpty ? 'whatsapp://send?phone=$staffPhone' : 'whatsapp://send');
+      final webWhatsappUri = Uri.parse(staffPhone.isNotEmpty ? 'https://web.whatsapp.com/send?phone=$staffPhone' : 'https://web.whatsapp.com');
+
+      if (await canLaunchUrl(whatsappUri)) {
+        await launchUrl(whatsappUri);
+      } else if (await canLaunchUrl(webWhatsappUri)) {
+        await launchUrl(webWhatsappUri);
+      }
+
+      Get.snackbar(
+        'Voucher PDF Copied!',
+        'Single PDF voucher copied to clipboard. Open WhatsApp & press Ctrl + V to send!',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: const Color(0xFF25D366).withValues(alpha: 0.25),
+        colorText: Colors.white,
+        icon: const Icon(Icons.check_circle_rounded, color: Color(0xFF25D366)),
+        duration: const Duration(seconds: 4),
+      );
+    } catch (e) {
+      Get.snackbar('Error', 'Could not share voucher: $e', backgroundColor: AppColors.error.withValues(alpha: 0.2));
+    }
   }
 
   @override
@@ -885,10 +1405,19 @@ class _StaffExpensesSubViewState extends State<StaffExpensesSubView> {
               );
             },
           ),
+          const SizedBox(height: 12),
+          DateRangeFilterBar(
+            onFilterChanged: (start, end, label) {
+              setState(() {
+                _startDate = start;
+                _endDate = end;
+              });
+            },
+          ),
           const SizedBox(height: 14),
           Expanded(
             child: FutureBuilder<List<Map<String, dynamic>>>(
-              future: _staffRepo.getStaffExpenses(),
+              future: _staffRepo.getStaffExpenses(startDate: _startDate, endDate: _endDate),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const AppLoadingIndicator(message: 'Loading staff expenses...');
@@ -928,6 +1457,121 @@ class _StaffExpensesSubViewState extends State<StaffExpensesSubView> {
                       final notes = exp['notes'] as String?;
                       final id = exp['id'] as String;
 
+                      if (isCompact) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 16,
+                                    backgroundColor: AppColors.primary.withValues(alpha: 0.15),
+                                    child: const Icon(Icons.badge_rounded, color: AppColors.primaryLight, size: 18),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(staffName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                  ),
+                                  Text(
+                                    Formatters.currency(amount, symbol: currency),
+                                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.error),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.cardDark,
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: AppColors.borderDark),
+                                    ),
+                                    child: Text(category, style: const TextStyle(fontSize: 10)),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      '${Formatters.date(date)} • $method ${ref != null && ref.isNotEmpty ? "• $ref" : ""}',
+                                      style: const TextStyle(fontSize: 11, color: AppColors.textDarkSecondary),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              if (notes != null && notes.isNotEmpty) ...[
+                                const SizedBox(height: 2),
+                                Text('Notes: $notes', style: const TextStyle(fontSize: 11, color: AppColors.textDarkMuted)),
+                              ],
+                              const SizedBox(height: 6),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  OutlinedButton.icon(
+                                    icon: const Icon(Icons.print_rounded, size: 15),
+                                    label: const Text('Slip PDF', style: TextStyle(fontSize: 11)),
+                                    style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact, padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4)),
+                                    onPressed: () {
+                                      final b = AuthService.to.currentBusiness.value;
+                                      if (b != null) {
+                                        PdfService.printStaffExpenseSlip(
+                                          business: b,
+                                          expense: exp,
+                                          staffName: staffName,
+                                          staffPhone: exp['staff_phone'] as String?,
+                                          staffDesignation: exp['designation'] as String? ?? 'Staff',
+                                        );
+                                      }
+                                    },
+                                  ),
+                                  const SizedBox(width: 6),
+                                  OutlinedButton.icon(
+                                    icon: const Icon(Icons.share, size: 15, color: Color(0xFF25D366)),
+                                    label: const Text('WhatsApp', style: TextStyle(fontSize: 11, color: Color(0xFF25D366))),
+                                    style: OutlinedButton.styleFrom(
+                                      visualDensity: VisualDensity.compact,
+                                      side: const BorderSide(color: Color(0xFF25D366)),
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    ),
+                                    onPressed: () => _shareStaffExpenseOnWhatsApp(exp),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  IconButton(
+                                    icon: const Icon(Icons.delete_outline_rounded, size: 18, color: AppColors.error),
+                                    visualDensity: VisualDensity.compact,
+                                    tooltip: 'Delete',
+                                    onPressed: () async {
+                                      final confirm = await Get.dialog<bool>(
+                                        AlertDialog(
+                                          title: const Text('Delete Staff Expense'),
+                                          content: Text('Delete this expense of ${Formatters.currency(amount, symbol: currency)}?'),
+                                          actions: [
+                                            TextButton(onPressed: () => Get.back(result: false), child: const Text('Cancel')),
+                                            ElevatedButton(
+                                              style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+                                              onPressed: () => Get.back(result: true),
+                                              child: const Text('Delete'),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                      if (confirm == true) {
+                                        await _staffRepo.deleteStaffExpense(id);
+                                        Get.snackbar('Deleted', 'Staff expense deleted');
+                                        if (mounted) setState(() {});
+                                      }
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+
                       return ListTile(
                         leading: CircleAvatar(
                           backgroundColor: AppColors.primary.withValues(alpha: 0.15),
@@ -960,6 +1604,27 @@ class _StaffExpensesSubViewState extends State<StaffExpensesSubView> {
                               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.error),
                             ),
                             const SizedBox(width: 8),
+                            IconButton(
+                              icon: const Icon(Icons.print_rounded, size: 20, color: AppColors.primaryLight),
+                              tooltip: 'Print Voucher Slip',
+                              onPressed: () {
+                                final b = AuthService.to.currentBusiness.value;
+                                if (b != null) {
+                                  PdfService.printStaffExpenseSlip(
+                                    business: b,
+                                    expense: exp,
+                                    staffName: staffName,
+                                    staffPhone: exp['staff_phone'] as String?,
+                                    staffDesignation: exp['designation'] as String? ?? 'Staff',
+                                  );
+                                }
+                              },
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.share, size: 20, color: Color(0xFF25D366)),
+                              tooltip: 'Share Voucher on WhatsApp',
+                              onPressed: () => _shareStaffExpenseOnWhatsApp(exp),
+                            ),
                             IconButton(
                               icon: const Icon(Icons.delete_outline_rounded, size: 18, color: AppColors.error),
                               tooltip: 'Delete',
@@ -1148,15 +1813,41 @@ class _StaffExpenseFormDialogState extends State<StaffExpenseFormDialog> {
                 ),
                 const SizedBox(height: 14),
 
-                // Category (User types freely)
+                // Category (Admin enters custom category directly)
                 TextFormField(
                   controller: _categoryController,
                   decoration: const InputDecoration(
-                    labelText: 'Expense Category * (e.g., Advance, Bonus, Medical, Travel, Food)',
-                    hintText: 'Enter expense category',
+                    labelText: 'Expense Category *',
+                    hintText: 'Enter category name (e.g. Advance, Food, Travel, Medical)',
                     prefixIcon: Icon(Icons.category_rounded, size: 20),
                   ),
-                  validator: (v) => v == null || v.trim().isEmpty ? 'Enter category' : null,
+                  onChanged: (val) => setState(() {}),
+                  validator: (v) => v == null || v.trim().isEmpty ? 'Please enter a category' : null,
+                ),
+                const SizedBox(height: 12),
+
+                // Auto-deduction info banner
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.info.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.info.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline_rounded, size: 16, color: AppColors.info),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _categoryController.text.trim().toLowerCase().contains('bonus')
+                              ? '💡 Bonus category will be added to the staff member\'s gross salary.'
+                              : '💡 This expense will be automatically deducted from the staff member\'s monthly salary.',
+                          style: const TextStyle(fontSize: 11, color: AppColors.info),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 14),
 

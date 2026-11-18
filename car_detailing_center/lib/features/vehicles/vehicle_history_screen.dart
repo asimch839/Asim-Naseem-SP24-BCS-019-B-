@@ -6,12 +6,14 @@ import '../../core/services/auth_service.dart';
 import '../../core/utils/formatters.dart';
 import '../../data/models/vehicle_model.dart';
 import '../../data/models/customer_model.dart';
+import '../../data/models/job_model.dart';
 import '../../data/repositories/customer_repository.dart';
 import '../../data/repositories/vehicle_repository.dart';
 import '../../data/repositories/job_repository.dart';
 import '../../data/repositories/inspection_repository.dart';
 import '../customers/add_service_record_dialog.dart';
 import '../inspections/inspection_create_screen.dart';
+import '../jobs/job_detail_screen.dart';
 
 class VehicleHistoryScreen extends StatefulWidget {
   final VehicleModel vehicle;
@@ -42,8 +44,17 @@ class _VehicleHistoryScreenState extends State<VehicleHistoryScreen> {
     final inspRepo = Get.find<InspectionRepository>();
 
     final cust = await custRepo.getCustomerById(widget.vehicle.customerId);
-    final history = await vehRepo.getVehicleServiceHistory(widget.vehicle.id);
     final jobs = await jobRepo.getJobs(vehicleId: widget.vehicle.id);
+
+    // Sync all jobs of this vehicle to ensure all services and dates appear in permanent service records
+    for (final j in jobs) {
+      final jobId = j['id'] as String?;
+      if (jobId != null) {
+        await jobRepo.syncJobToVehicleHistory(jobId);
+      }
+    }
+
+    final history = await vehRepo.getVehicleServiceHistory(widget.vehicle.id);
     final inspections = await inspRepo.getInspections(vehicleId: widget.vehicle.id);
 
     if (mounted) {
@@ -226,40 +237,150 @@ class _VehicleHistoryScreenState extends State<VehicleHistoryScreen> {
                         final paid = (job['paid_amount'] as num?)?.toDouble() ?? 0.0;
                         final st = job['status'] as String? ?? 'New';
                         final recDate = DateTime.tryParse(job['receiving_date'] ?? '') ?? DateTime.now();
+                        final odoIn = (job['odometer_in'] as num?)?.toDouble() ?? 0.0;
+                        final servicesSummary = job['services_summary'] as String? ?? '';
+
+                        final jobModel = JobModel(
+                          id: job['id'] ?? '',
+                          jobNumber: job['job_number'] ?? '',
+                          businessId: 'local',
+                          customerId: job['customer_id'] ?? '',
+                          customerName: _customer?.fullName ?? job['customer_name'] ?? '',
+                          customerPhone: _customer?.phone ?? job['customer_phone'] ?? '',
+                          vehicleId: widget.vehicle.id,
+                          vehicleRegNumber: widget.vehicle.registrationNumber,
+                          vehicleDisplayName: widget.vehicle.displayName,
+                          services: [],
+                          status: st,
+                          grandTotal: grandTotal,
+                          paidAmount: paid,
+                          remainingAmount: (grandTotal - paid) > 0 ? (grandTotal - paid) : 0.0,
+                          createdAt: recDate,
+                        );
 
                         return Card(
                           margin: const EdgeInsets.only(bottom: 12),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Text(job['job_number'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                                        const SizedBox(width: 8),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: AppColors.getJobStatusColor(st).withValues(alpha: 0.15),
-                                            borderRadius: BorderRadius.circular(6),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(12),
+                            onTap: () async {
+                              await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => JobDetailScreen(job: jobModel),
+                                ),
+                              );
+                              _loadHistory();
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Text(
+                                            job['job_number'] ?? '',
+                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                                           ),
-                                          child: Text(st, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.getJobStatusColor(st))),
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.getJobStatusColor(st).withValues(alpha: 0.15),
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: Text(
+                                              st,
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 12,
+                                                color: AppColors.getJobStatusColor(st),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      Text(
+                                        'Total: ${Formatters.currency(grandTotal, symbol: currency)} (Paid: ${Formatters.currency(paid, symbol: currency)})',
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.success),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Wrap(
+                                    spacing: 12,
+                                    runSpacing: 4,
+                                    children: [
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.calendar_today_rounded, size: 14, color: AppColors.textDarkSecondary),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            'Service Date: ${Formatters.date(recDate)}',
+                                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textDarkSecondary),
+                                          ),
+                                        ],
+                                      ),
+                                      if (odoIn > 0)
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(Icons.speed_rounded, size: 14, color: AppColors.textDarkSecondary),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              '${odoIn.toInt()} KM',
+                                              style: const TextStyle(fontSize: 12, color: AppColors.textDarkSecondary),
+                                            ),
+                                          ],
+                                        ),
+                                      if (job['technician_name'] != null && job['technician_name'].toString().isNotEmpty)
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(Icons.person_outline_rounded, size: 14, color: AppColors.textDarkSecondary),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              'Tech: ${job['technician_name']}',
+                                              style: const TextStyle(fontSize: 12, color: AppColors.textDarkSecondary),
+                                            ),
+                                          ],
+                                        ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary.withValues(alpha: 0.08),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+                                    ),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Padding(
+                                          padding: EdgeInsets.only(top: 2),
+                                          child: Icon(Icons.handyman_rounded, size: 15, color: AppColors.primaryLight),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            servicesSummary.isNotEmpty
+                                                ? 'Work Done: $servicesSummary'
+                                                : 'General Detailing / Inspection',
+                                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primaryLight),
+                                          ),
                                         ),
                                       ],
                                     ),
-                                    const SizedBox(height: 4),
-                                    Text('Received: ${Formatters.date(recDate)} • Technician: ${job['technician_name'] ?? "Unassigned"}', style: const TextStyle(fontSize: 12, color: AppColors.textDarkSecondary)),
-                                  ],
-                                ),
-                                Text(
-                                  'Total: ${Formatters.currency(grandTotal, symbol: currency)} (Paid: ${Formatters.currency(paid, symbol: currency)})',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                                ),
-                              ],
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         );

@@ -6,6 +6,7 @@ import '../../core/routes/app_routes.dart';
 import '../../core/widgets/app_scaffold.dart';
 import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/loading_indicator.dart';
+import '../../core/widgets/date_range_filter_bar.dart';
 import '../../data/models/vehicle_model.dart';
 import '../../data/repositories/vehicle_repository.dart';
 import 'vehicle_form_dialog.dart';
@@ -26,6 +27,8 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
   List<Map<String, dynamic>> _vehicles = [];
   bool _isLoading = true;
   String _searchQuery = '';
+  String? _startDate;
+  String? _endDate;
 
   @override
   void initState() {
@@ -36,7 +39,11 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
   Future<void> _fetchVehicles() async {
     setState(() => _isLoading = true);
     try {
-      final list = await _vehicleRepo.getVehiclesWithCustomerInfo(searchQuery: _searchQuery);
+      final list = await _vehicleRepo.getVehiclesWithCustomerInfo(
+        searchQuery: _searchQuery,
+        startDate: _startDate,
+        endDate: _endDate,
+      );
       if (mounted) {
         setState(() {
           _vehicles = list;
@@ -75,30 +82,45 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
             // Search Bar
             Card(
               child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 16, vertical: 10),
-                child: Row(
+                padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 16, vertical: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _searchController,
-                        decoration: InputDecoration(
-                          hintText: isMobile
-                              ? 'Search vehicles...'
-                              : 'Search by Vehicle Name, Number Plate, Customer Name, or Phone...',
-                          prefixIcon: const Icon(Icons.search_rounded),
-                          isDense: isMobile,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _searchController,
+                            decoration: InputDecoration(
+                              hintText: isMobile
+                                  ? 'Search vehicles...'
+                                  : 'Search by Vehicle Name, Number Plate, Customer Name, or Phone...',
+                              prefixIcon: const Icon(Icons.search_rounded),
+                              isDense: isMobile,
+                            ),
+                            onChanged: (val) {
+                              _searchQuery = val.trim();
+                              _fetchVehicles();
+                            },
+                          ),
                         ),
-                        onChanged: (val) {
-                          _searchQuery = val.trim();
-                          _fetchVehicles();
-                        },
-                      ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          icon: const Icon(Icons.refresh_rounded),
+                          tooltip: 'Refresh',
+                          onPressed: _fetchVehicles,
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      icon: const Icon(Icons.refresh_rounded),
-                      tooltip: 'Refresh',
-                      onPressed: _fetchVehicles,
+                    const SizedBox(height: 10),
+                    DateRangeFilterBar(
+                      onFilterChanged: (start, end, label) {
+                        setState(() {
+                          _startDate = start;
+                          _endDate = end;
+                        });
+                        _fetchVehicles();
+                      },
                     ),
                   ],
                 ),

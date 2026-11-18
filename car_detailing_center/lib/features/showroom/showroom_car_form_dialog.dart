@@ -184,7 +184,7 @@ class _ShowroomCarFormDialogState extends State<ShowroomCarFormDialog> {
                         Text(
                           isEdit
                               ? (isCommissionMode ? 'Edit Commission Deal' : 'Edit Car Details')
-                              : (isCommissionMode ? 'Add Commission Deal (La k di)' : 'Add Showroom Car for Sale'),
+                              : (isCommissionMode ? 'Add Commission Deal (Brokerage)' : 'Add Showroom Car for Sale'),
                           style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
                         ),
                         Text(
@@ -231,7 +231,7 @@ class _ShowroomCarFormDialogState extends State<ShowroomCarFormDialog> {
                           const SizedBox(width: 10),
                           Expanded(
                             child: ChoiceChip(
-                              label: const Center(child: Text('Commission Deal (La k di)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
+                              label: const Center(child: Text('Commission Deal (Brokerage)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
                               selected: _dealType == 'commission',
                               selectedColor: AppColors.success.withValues(alpha: 0.25),
                               side: BorderSide(
@@ -244,180 +244,191 @@ class _ShowroomCarFormDialogState extends State<ShowroomCarFormDialog> {
                       ),
                       const SizedBox(height: 16),
 
-                      // 1. Customer Name & Customer Number
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: _customerNameCtrl,
-                              decoration: InputDecoration(
-                                labelText: isCommissionMode ? 'Customer Name *' : 'Customer Name *',
-                                hintText: isCommissionMode ? 'Customer jisko car la k di' : 'e.g. Asim, Ali Khan',
-                                prefixIcon: const Icon(Icons.person_rounded),
-                              ),
-                              validator: (v) => v == null || v.trim().isEmpty ? 'Customer name required' : null,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: TextFormField(
-                              controller: _customerPhoneCtrl,
-                              keyboardType: TextInputType.phone,
-                              decoration: const InputDecoration(
-                                labelText: 'Customer Number *',
-                                hintText: '0300-1234567',
-                                prefixIcon: Icon(Icons.phone_rounded),
-                              ),
-                              validator: (v) => v == null || v.trim().isEmpty ? 'Customer phone required' : null,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final isNarrow = constraints.maxWidth < 450;
 
-                      // 2. Car Name & Model
-                      Row(
-                        children: [
-                          Expanded(
-                            flex: 3,
-                            child: TextFormField(
-                              controller: _carNameCtrl,
-                              decoration: const InputDecoration(
-                                labelText: 'Car Name *',
-                                hintText: 'e.g. Corolla, Civic, Alto',
-                                prefixIcon: Icon(Icons.directions_car_outlined),
-                              ),
-                              validator: (v) => v == null || v.trim().isEmpty ? 'Car name required' : null,
+                          // 1. Customer Name & Customer Number
+                          final customerNameField = TextFormField(
+                            controller: _customerNameCtrl,
+                            decoration: InputDecoration(
+                              labelText: isCommissionMode ? 'Customer Name *' : 'Customer Name *',
+                              hintText: isCommissionMode ? 'Customer who purchased vehicle' : 'e.g. Asim, Ali Khan',
+                              prefixIcon: const Icon(Icons.person_rounded),
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            flex: 2,
-                            child: TextFormField(
-                              controller: _modelCtrl,
-                              decoration: const InputDecoration(
-                                labelText: 'Model *',
-                                hintText: 'e.g. 2024, 2022',
-                                prefixIcon: Icon(Icons.calendar_today_outlined),
-                              ),
-                              validator: (v) => v == null || v.trim().isEmpty ? 'Model required' : null,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
+                            validator: (v) => v == null || v.trim().isEmpty ? 'Customer name required' : null,
+                          );
 
-                      // 3. Registration Number & Color
-                      Row(
-                        children: [
-                          Expanded(
-                            flex: 3,
-                            child: TextFormField(
-                              controller: _regNoCtrl,
-                              decoration: const InputDecoration(
-                                labelText: 'Reg Number (Plate #) *',
-                                hintText: 'e.g. LEA-786, ICT-2022',
-                                prefixIcon: Icon(Icons.pin_outlined),
-                              ),
-                              validator: (v) => v == null || v.trim().isEmpty ? 'Reg number required' : null,
+                          final customerPhoneField = TextFormField(
+                            controller: _customerPhoneCtrl,
+                            keyboardType: TextInputType.phone,
+                            decoration: const InputDecoration(
+                              labelText: 'Customer Number *',
+                              hintText: '0300-1234567',
+                              prefixIcon: Icon(Icons.phone_rounded),
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            flex: 2,
-                            child: TextFormField(
-                              controller: _colorCtrl,
-                              decoration: const InputDecoration(
-                                labelText: 'Color *',
-                                hintText: 'e.g. White, Black',
-                                prefixIcon: Icon(Icons.palette_outlined),
-                              ),
-                              validator: (v) => v == null || v.trim().isEmpty ? 'Color required' : null,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
+                            validator: (v) => v == null || v.trim().isEmpty ? 'Customer phone required' : null,
+                          );
 
-                      // 4. Car Condition
-                      TextFormField(
-                        controller: _conditionCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Condition (Optional)',
-                          hintText: 'e.g. Total Genuine, 2 Pieces Touchup, Shower',
-                          prefixIcon: Icon(Icons.verified_outlined),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
+                          // 2. Car Name & Model
+                          final carNameField = TextFormField(
+                            controller: _carNameCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Car Name *',
+                              hintText: 'e.g. Corolla, Civic, Alto',
+                              prefixIcon: Icon(Icons.directions_car_outlined),
+                            ),
+                            validator: (v) => v == null || v.trim().isEmpty ? 'Car name required' : null,
+                          );
 
-                      // 5. Pricing & Commission
-                      if (isCommissionMode) ...[
-                        // Commission Mode: Car Price & Commission
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextFormField(
-                                controller: _demandCtrl,
-                                keyboardType: TextInputType.number,
-                                decoration: InputDecoration(
-                                  labelText: 'Car / Deal Price ($currency) *',
-                                  hintText: 'e.g. 4200000',
-                                  prefixIcon: const Icon(Icons.payments_outlined),
-                                ),
-                                onChanged: (_) => setState(() {}),
-                                validator: (v) => v == null || v.trim().isEmpty ? 'Car price required' : null,
-                              ),
+                          final modelField = TextFormField(
+                            controller: _modelCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Model *',
+                              hintText: 'e.g. 2024, 2022',
+                              prefixIcon: Icon(Icons.calendar_today_outlined),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: TextFormField(
-                                controller: _commissionCtrl,
-                                keyboardType: TextInputType.number,
-                                decoration: InputDecoration(
-                                  labelText: 'Commission ($currency) *',
-                                  hintText: 'e.g. 30000',
-                                  prefixIcon: const Icon(Icons.monetization_on_outlined, color: AppColors.success),
-                                ),
-                                onChanged: (_) => setState(() {}),
-                                validator: (v) => v == null || v.trim().isEmpty ? 'Commission required' : null,
-                              ),
+                            validator: (v) => v == null || v.trim().isEmpty ? 'Model required' : null,
+                          );
+
+                          // 3. Registration Number & Color
+                          final regNoField = TextFormField(
+                            controller: _regNoCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Reg Number (Plate #) *',
+                              hintText: 'e.g. LEA-786, ICT-2022',
+                              prefixIcon: Icon(Icons.pin_outlined),
                             ),
-                          ],
-                        ),
-                      ] else ...[
-                        // Showroom Inventory Mode: Demand & Customer Price
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextFormField(
-                                controller: _demandCtrl,
-                                keyboardType: TextInputType.number,
-                                decoration: InputDecoration(
-                                  labelText: 'Demand ($currency) *',
-                                  hintText: 'e.g. 4500000',
-                                  prefixIcon: const Icon(Icons.sell_outlined),
-                                ),
-                                onChanged: (_) => setState(() {}),
-                                validator: (v) => v == null || v.trim().isEmpty ? 'Demand price required' : null,
-                              ),
+                            validator: (v) => v == null || v.trim().isEmpty ? 'Reg number required' : null,
+                          );
+
+                          final colorField = TextFormField(
+                            controller: _colorCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Color *',
+                              hintText: 'e.g. White, Black',
+                              prefixIcon: Icon(Icons.palette_outlined),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: TextFormField(
-                                controller: _customerPriceCtrl,
-                                keyboardType: TextInputType.number,
-                                decoration: InputDecoration(
-                                  labelText: 'Customer Price ($currency) *',
-                                  hintText: 'e.g. 4200000',
-                                  prefixIcon: const Icon(Icons.payments_outlined),
-                                ),
-                                onChanged: (_) => setState(() {}),
-                                validator: (v) => v == null || v.trim().isEmpty ? 'Customer price required' : null,
-                              ),
+                            validator: (v) => v == null || v.trim().isEmpty ? 'Color required' : null,
+                          );
+
+                          // 5. Pricing & Commission fields
+                          final priceField = TextFormField(
+                            controller: _demandCtrl,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              labelText: isCommissionMode ? 'Car / Deal Price ($currency) *' : 'Demand ($currency) *',
+                              hintText: isCommissionMode ? 'e.g. 4200000' : 'e.g. 4500000',
+                              prefixIcon: Icon(isCommissionMode ? Icons.payments_outlined : Icons.sell_outlined),
                             ),
-                          ],
-                        ),
-                      ],
+                            onChanged: (_) => setState(() {}),
+                            validator: (v) => v == null || v.trim().isEmpty ? (isCommissionMode ? 'Car price required' : 'Demand price required') : null,
+                          );
+
+                          final secondaryPriceField = isCommissionMode
+                              ? TextFormField(
+                                  controller: _commissionCtrl,
+                                  keyboardType: TextInputType.number,
+                                  decoration: InputDecoration(
+                                    labelText: 'Commission ($currency) *',
+                                    hintText: 'e.g. 30000',
+                                    prefixIcon: const Icon(Icons.monetization_on_outlined, color: AppColors.success),
+                                  ),
+                                  onChanged: (_) => setState(() {}),
+                                  validator: (v) => v == null || v.trim().isEmpty ? 'Commission required' : null,
+                                )
+                              : TextFormField(
+                                  controller: _customerPriceCtrl,
+                                  keyboardType: TextInputType.number,
+                                  decoration: InputDecoration(
+                                    labelText: 'Customer Price ($currency) *',
+                                    hintText: 'e.g. 4200000',
+                                    prefixIcon: const Icon(Icons.payments_outlined),
+                                  ),
+                                  onChanged: (_) => setState(() {}),
+                                  validator: (v) => v == null || v.trim().isEmpty ? 'Customer price required' : null,
+                                );
+
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Customer row / col
+                              if (isNarrow) ...[
+                                customerNameField,
+                                const SizedBox(height: 12),
+                                customerPhoneField,
+                              ] else ...[
+                                Row(
+                                  children: [
+                                    Expanded(child: customerNameField),
+                                    const SizedBox(width: 12),
+                                    Expanded(child: customerPhoneField),
+                                  ],
+                                ),
+                              ],
+                              const SizedBox(height: 14),
+
+                              // Car Name & Model
+                              if (isNarrow) ...[
+                                carNameField,
+                                const SizedBox(height: 12),
+                                modelField,
+                              ] else ...[
+                                Row(
+                                  children: [
+                                    Expanded(flex: 3, child: carNameField),
+                                    const SizedBox(width: 12),
+                                    Expanded(flex: 2, child: modelField),
+                                  ],
+                                ),
+                              ],
+                              const SizedBox(height: 14),
+
+                              // Reg Number & Color
+                              if (isNarrow) ...[
+                                regNoField,
+                                const SizedBox(height: 12),
+                                colorField,
+                              ] else ...[
+                                Row(
+                                  children: [
+                                    Expanded(flex: 3, child: regNoField),
+                                    const SizedBox(width: 12),
+                                    Expanded(flex: 2, child: colorField),
+                                  ],
+                                ),
+                              ],
+                              const SizedBox(height: 14),
+
+                              // Condition (always full width)
+                              TextFormField(
+                                controller: _conditionCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Condition (Optional)',
+                                  hintText: 'e.g. Total Genuine, 2 Pieces Touchup, Shower',
+                                  prefixIcon: Icon(Icons.verified_outlined),
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+
+                              // Pricing row / col
+                              if (isNarrow) ...[
+                                priceField,
+                                const SizedBox(height: 12),
+                                secondaryPriceField,
+                              ] else ...[
+                                Row(
+                                  children: [
+                                    Expanded(child: priceField),
+                                    const SizedBox(width: 12),
+                                    Expanded(child: secondaryPriceField),
+                                  ],
+                                ),
+                              ],
+                            ],
+                          );
+                        },
+                      ),
                       const SizedBox(height: 14),
 
                       // 6. Notes / Remarks

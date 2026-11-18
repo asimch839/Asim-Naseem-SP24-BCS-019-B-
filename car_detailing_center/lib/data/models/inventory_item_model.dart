@@ -5,8 +5,8 @@ class InventoryItemModel {
   final double currentQuantity; // Current Quantity
   final String? brand; // Brand
   final String unit; // Unit (e.g., Litre, Bottle, Pieces, Box, etc.)
-  final double purchasePrice; // Purchase Price (Khareed Qeemat)
-  final double sellingPrice; // Selling Price (Sale / Retail Qeemat)
+  final double purchasePrice; // Purchase Price (Cost)
+  final double sellingPrice; // Selling Price (Retail Price)
   final DateTime purchaseDate; // Purchase Date
   final String? description; // Description
   final String? notes; // Notes

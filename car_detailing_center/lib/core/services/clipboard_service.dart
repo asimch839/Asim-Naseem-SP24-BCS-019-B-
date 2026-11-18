@@ -30,13 +30,14 @@ try {
         \$do.SetImage(\$img)
 
         \$files = New-Object System.Collections.Specialized.StringCollection
-        \$files.Add(\$imgPath)
         if (\$pdfPath -ne '' -and (Test-Path \$pdfPath)) {
             \$files.Add(\$pdfPath)
+        } else if (Test-Path \$imgPath) {
+            \$files.Add(\$imgPath)
         }
         \$do.SetFileDropList(\$files)
         [System.Windows.Forms.Clipboard]::SetDataObject(\$do, \$true)
-        Write-Output "COPIED_IMAGE_AND_FILE"
+        Write-Output "COPIED_SINGLE_FILE"
     } else {
         Write-Output "IMAGE_NOT_FOUND"
     }

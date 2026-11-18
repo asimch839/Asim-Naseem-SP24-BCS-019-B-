@@ -652,6 +652,58 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                 label: const Text('Save Business Settings'),
                 style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24)),
               ),
+              const SizedBox(height: 28),
+
+              // Software & Developer Support Card
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.verified_user_rounded, color: AppColors.primaryLight, size: 24),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Software Developed & Supported by Devnix Limited',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primaryLight),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'For software customization, licenses & technical assistance:',
+                            style: TextStyle(fontSize: 11, color: AppColors.textDarkSecondary),
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              const Icon(Icons.phone_in_talk_rounded, size: 14, color: AppColors.success),
+                              const SizedBox(width: 6),
+                              SelectableText(
+                                'Helpline: ${AppConstants.developerPhone}',
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.success),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),

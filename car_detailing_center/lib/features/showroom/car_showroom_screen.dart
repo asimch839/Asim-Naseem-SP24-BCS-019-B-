@@ -104,8 +104,8 @@ class _CarShowroomScreenState extends State<CarShowroomScreen> with SingleTicker
             Text('Book Car / Record Token Money', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           ],
         ),
-        content: SizedBox(
-          width: 440,
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 440),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -201,6 +201,62 @@ class _CarShowroomScreenState extends State<CarShowroomScreen> with SingleTicker
     }
   }
 
+  void _showMobileAddOptions(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.4), borderRadius: BorderRadius.circular(2)),
+                ),
+                const SizedBox(height: 16),
+                const Text('Choose Deal Category', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                const SizedBox(height: 16),
+                ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: AppColors.primary.withValues(alpha: 0.15),
+                    child: const Icon(Icons.directions_car_filled_rounded, color: AppColors.primary),
+                  ),
+                  title: const Text('Add Showroom Car', style: TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: const Text('Showroom Stock: Car purchased for floor sale'),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  tileColor: AppColors.cardDark,
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _openAddCarDialog(isCommission: false);
+                  },
+                ),
+                const SizedBox(height: 10),
+                ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: AppColors.success.withValues(alpha: 0.15),
+                    child: const Icon(Icons.handshake_rounded, color: AppColors.success),
+                  ),
+                  title: const Text('Add Commission Deal', style: TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: const Text('Brokerage Deal: Car procured for customer'),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  tileColor: AppColors.cardDark,
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _openAddCarDialog(isCommission: true);
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final currency = AuthService.to.currentBusiness.value?.currency ?? AppConstants.defaultCurrency;
@@ -209,54 +265,76 @@ class _CarShowroomScreenState extends State<CarShowroomScreen> with SingleTicker
     return AppScaffold(
       currentRoute: AppRoutes.showroom,
       title: 'Car Showroom & Brokerage Deals',
-      actions: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-          child: ElevatedButton.icon(
-            onPressed: () => _openAddCarDialog(isCommission: false),
-            icon: const Icon(Icons.add_rounded, size: 18),
-            label: const Text('Add Showroom Car'),
-            style: ElevatedButton.styleFrom(
+      actions: isMobile
+          ? [
+              IconButton(
+                icon: const Icon(Icons.add_circle_outline_rounded, color: AppColors.primaryLight),
+                tooltip: 'Add Showroom Car',
+                onPressed: () => _openAddCarDialog(isCommission: false),
+              ),
+              IconButton(
+                icon: const Icon(Icons.handshake_rounded, color: AppColors.success),
+                tooltip: 'Add Commission Deal',
+                onPressed: () => _openAddCarDialog(isCommission: true),
+              ),
+            ]
+          : [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                child: ElevatedButton.icon(
+                  onPressed: () => _openAddCarDialog(isCommission: false),
+                  icon: const Icon(Icons.add_rounded, size: 18),
+                  label: const Text('Add Showroom Car'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                child: ElevatedButton.icon(
+                  onPressed: () => _openAddCarDialog(isCommission: true),
+                  icon: const Icon(Icons.handshake_rounded, size: 18),
+                  label: const Text('Add Commission Deal'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.success,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+      floatingActionButton: isMobile
+          ? FloatingActionButton.extended(
+              heroTag: 'mobileShowroomFab',
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('New Deal / Car'),
+              onPressed: () => _showMobileAddOptions(context),
+            )
+          : Wrap(
+              direction: Axis.horizontal,
+              spacing: 8,
+              children: [
+                FloatingActionButton.extended(
+                  heroTag: 'addCommissionFab',
+                  backgroundColor: AppColors.success,
+                  foregroundColor: Colors.white,
+                  onPressed: () => _openAddCarDialog(isCommission: true),
+                  icon: const Icon(Icons.handshake_rounded),
+                  label: const Text('Commission Deal'),
+                ),
+                FloatingActionButton.extended(
+                  heroTag: 'addShowroomCarFab',
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  onPressed: () => _openAddCarDialog(isCommission: false),
+                  icon: const Icon(Icons.directions_car_filled_rounded),
+                  label: const Text('Add Showroom Car'),
+                ),
+              ],
             ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-          child: ElevatedButton.icon(
-            onPressed: () => _openAddCarDialog(isCommission: true),
-            icon: const Icon(Icons.handshake_rounded, size: 18),
-            label: const Text('Add Commission Deal'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.success,
-              foregroundColor: Colors.white,
-            ),
-          ),
-        ),
-      ],
-      floatingActionButton: Wrap(
-        direction: Axis.horizontal,
-        spacing: 8,
-        children: [
-          FloatingActionButton.extended(
-            heroTag: 'addCommissionFab',
-            backgroundColor: AppColors.success,
-            foregroundColor: Colors.white,
-            onPressed: () => _openAddCarDialog(isCommission: true),
-            icon: const Icon(Icons.handshake_rounded),
-            label: const Text('Commission Deal'),
-          ),
-          FloatingActionButton.extended(
-            heroTag: 'addShowroomCarFab',
-            backgroundColor: AppColors.primary,
-            foregroundColor: Colors.white,
-            onPressed: () => _openAddCarDialog(isCommission: false),
-            icon: const Icon(Icons.directions_car_filled_rounded),
-            label: const Text('Add Showroom Car'),
-          ),
-        ],
-      ),
       body: Padding(
         padding: EdgeInsets.all(isMobile ? 12 : 24),
         child: Column(

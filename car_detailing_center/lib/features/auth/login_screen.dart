@@ -276,13 +276,34 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 28),
 
                   // Footer
-                  const Text(
-                    'Apex Pro Detailing ERP • Windows & Android Multi-Device',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textDarkMuted,
-                    ),
+                  Column(
+                    children: [
+                      const Text(
+                        'Apex Pro Detailing ERP • Windows & Android Multi-Device',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textDarkMuted,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.terminal_rounded, size: 13, color: AppColors.primaryLight),
+                          const SizedBox(width: 5),
+                          Text(
+                            '${AppConstants.developerName} • ${AppConstants.developerPhone}',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.primaryLight,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ],
               ),

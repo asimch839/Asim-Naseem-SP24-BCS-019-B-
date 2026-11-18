@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import '../database/app_database.dart';
@@ -22,12 +23,15 @@ class JobRepository {
     String? vehicleId,
     String? searchQuery,
     String? dateFilter,
+    String? startDate,
+    String? endDate,
   }) async {
     final db = await _db;
     String sql = '''
       SELECT j.*, c.name as customer_name, c.phone as customer_phone, c.address as customer_address,
              v.vehicle_name, v.registration_number, v.color, v.model_year,
-             (SELECT COUNT(*) FROM job_services WHERE job_id = j.id) as services_count
+             (SELECT COUNT(*) FROM job_services WHERE job_id = j.id) as services_count,
+             (SELECT GROUP_CONCAT(description, ', ') FROM job_services WHERE job_id = j.id) as services_summary
       FROM jobs j
       INNER JOIN customers c ON j.customer_id = c.id
       INNER JOIN vehicles v ON j.vehicle_id = v.id
@@ -46,6 +50,10 @@ class JobRepository {
     if (vehicleId != null && vehicleId.isNotEmpty) {
       sql += ' AND j.vehicle_id = ?';
       args.add(vehicleId);
+    }
+    if (startDate != null && endDate != null) {
+      sql += ' AND date(j.receiving_date) BETWEEN date(?) AND date(?)';
+      args.addAll([startDate, endDate]);
     }
     if (searchQuery != null && searchQuery.trim().isNotEmpty) {
       final q = '%${searchQuery.trim().toLowerCase()}%';
@@ -177,21 +185,8 @@ class JobRepository {
       }
     });
 
-    // Update vehicle service history and odometer if completed or delivered
-    if (status == 'Completed' || status == 'Ready for Delivery' || status == 'Delivered') {
-      final descList = services.map((s) => s['description']?.toString() ?? '').where((s) => s.isNotEmpty).join(', ');
-      await VehicleRepository().addServiceHistory(
-        vehicleId: vehicleId,
-        customerId: customerId,
-        jobId: jobId,
-        date: receivingDate,
-        serviceDescription: descList.isNotEmpty ? descList : 'Detailing Package',
-        odometer: odometerOut > 0 ? odometerOut : odometerIn,
-        amount: grandTotal,
-        deliveryDate: actualDeliveryDate ?? expectedDeliveryDate,
-        paymentStatus: remainingAmount <= 0 ? 'Paid' : (paidAmount > 0 ? 'Partial' : 'Unpaid'),
-      );
-    }
+    // Always sync job and services directly to vehicle service history
+    await syncJobToVehicleHistory(jobId);
 
     return jobId;
   }
@@ -210,29 +205,7 @@ class JobRepository {
     }
 
     await db.update('jobs', updateData, where: 'id = ?', whereArgs: [jobId]);
-
-    if (status == 'Delivered' && actualDeliveryDate != null) {
-      final job = await getJobById(jobId);
-      if (job != null) {
-        final vehicleId = job['vehicle_id'] as String;
-        final customerId = job['customer_id'] as String;
-        final odo = (job['odometer_out'] as num?)?.toDouble() ?? 0.0;
-        final grandTotal = (job['grand_total'] as num?)?.toDouble() ?? 0.0;
-        final paid = (job['paid_amount'] as num?)?.toDouble() ?? 0.0;
-
-        await VehicleRepository().addServiceHistory(
-          vehicleId: vehicleId,
-          customerId: customerId,
-          jobId: jobId,
-          date: DateTime.tryParse(job['receiving_date']) ?? DateTime.now(),
-          serviceDescription: 'Completed Job Card #${job['job_number']}',
-          odometer: odo,
-          amount: grandTotal,
-          deliveryDate: actualDeliveryDate,
-          paymentStatus: paid >= grandTotal ? 'Paid' : 'Partial',
-        );
-      }
-    }
+    await syncJobToVehicleHistory(jobId);
   }
 
   /// Update services, labour subtotal, discount, and grand total for an existing job card
@@ -281,6 +254,7 @@ class JobRepository {
         });
       }
     });
+    await syncJobToVehicleHistory(jobId);
   }
 
   /// Add a single service or material line item to an existing job card
@@ -330,6 +304,7 @@ class JobRepository {
         'created_at': now,
       });
     });
+    await syncJobToVehicleHistory(jobId);
   }
 
   /// Remove a single service item by id
@@ -371,6 +346,47 @@ class JobRepository {
         whereArgs: [jobId],
       );
     });
+    await syncJobToVehicleHistory(jobId);
+  }
+
+  /// Automatically synchronizes all services and work performed on a job card into the permanent vehicle service history
+  Future<void> syncJobToVehicleHistory(String jobId) async {
+    try {
+      final db = await _db;
+      final job = await getJobById(jobId);
+      if (job == null) return;
+
+      final vehicleId = job['vehicle_id'] as String?;
+      final customerId = job['customer_id'] as String?;
+      if (vehicleId == null || vehicleId.isEmpty) return;
+
+      final services = await db.query('job_services', where: 'job_id = ?', whereArgs: [jobId], orderBy: 'sr_no ASC');
+      final descList = services.map((s) => s['description']?.toString() ?? '').where((s) => s.isNotEmpty).join(', ');
+
+      final recDate = DateTime.tryParse(job['receiving_date'] as String? ?? '') ?? DateTime.now();
+      final actualDelDate = job['actual_delivery_date'] != null ? DateTime.tryParse(job['actual_delivery_date'] as String) : null;
+      final expDelDate = job['expected_delivery_date'] != null ? DateTime.tryParse(job['expected_delivery_date'] as String) : null;
+      final odoIn = (job['odometer_in'] as num?)?.toDouble() ?? 0.0;
+      final odoOut = (job['odometer_out'] as num?)?.toDouble() ?? 0.0;
+      final grandTotal = (job['grand_total'] as num?)?.toDouble() ?? 0.0;
+      final paidAmount = (job['paid_amount'] as num?)?.toDouble() ?? 0.0;
+      final remainingAmount = (job['remaining_amount'] as num?)?.toDouble() ?? 0.0;
+
+      await VehicleRepository().addServiceHistory(
+        vehicleId: vehicleId,
+        customerId: customerId ?? '',
+        jobId: jobId,
+        date: recDate,
+        serviceDescription: descList.isNotEmpty ? descList : 'Detailing Services',
+        odometer: odoOut > 0 ? odoOut : odoIn,
+        amount: grandTotal,
+        deliveryDate: actualDelDate ?? expDelDate,
+        paymentStatus: remainingAmount <= 0 ? 'Paid' : (paidAmount > 0 ? 'Partial' : 'Unpaid'),
+        staffNames: job['technician_name'] as String?,
+      );
+    } catch (e) {
+      debugPrint('Error syncing job to vehicle history: $e');
+    }
   }
 
   Future<void> deleteJob(String id) async {

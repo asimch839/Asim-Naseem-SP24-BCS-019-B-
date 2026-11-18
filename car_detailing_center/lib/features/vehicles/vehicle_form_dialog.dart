@@ -26,6 +26,8 @@ class VehicleFormDialog extends StatefulWidget {
 
 class _VehicleFormDialogState extends State<VehicleFormDialog> {
   final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _customerController;
+  final FocusNode _customerFocusNode = FocusNode();
   late final TextEditingController _regNumberController;
   late final TextEditingController _makeController;
   late final TextEditingController _modelController;
@@ -35,6 +37,7 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
   late final TextEditingController _notesController;
 
   String? _selectedCustomerId;
+  CustomerModel? _selectedCustomer;
   bool _isSaving = false;
   List<CustomerModel> _customers = [];
 
@@ -42,6 +45,7 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
   void initState() {
     super.initState();
     final v = widget.vehicle;
+    _customerController = TextEditingController(text: widget.preselectedCustomerName ?? '');
     _regNumberController = TextEditingController(text: v?.registrationNumber ?? '');
     _makeController = TextEditingController(text: v?.make ?? '');
     _modelController = TextEditingController(text: v?.model ?? '');
@@ -54,17 +58,53 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
     _loadCustomers();
   }
 
+  @override
+  void dispose() {
+    _customerController.dispose();
+    _customerFocusNode.dispose();
+    _regNumberController.dispose();
+    _makeController.dispose();
+    _modelController.dispose();
+    _yearController.dispose();
+    _colorController.dispose();
+    _mileageController.dispose();
+    _notesController.dispose();
+    super.dispose();
+  }
+
   void _loadCustomers() async {
     final customerRepo = Get.find<CustomerRepository>();
     final list = await customerRepo.getCustomers();
     if (mounted) {
       setState(() {
         _customers = list;
-        if (_selectedCustomerId == null && list.isNotEmpty) {
+        if (_selectedCustomerId != null) {
+          _selectedCustomer = list.firstWhereOrNull((c) => c.id == _selectedCustomerId);
+        } else if (list.isNotEmpty) {
+          _selectedCustomer = list.first;
           _selectedCustomerId = list.first.id;
+        }
+        if (_selectedCustomer != null) {
+          _customerController.text = '${_selectedCustomer!.fullName} (${_selectedCustomer!.phone})';
         }
       });
     }
+  }
+
+  void _onCustomerSelected(CustomerModel customer) {
+    setState(() {
+      _selectedCustomer = customer;
+      _selectedCustomerId = customer.id;
+      _customerController.text = '${customer.fullName} (${customer.phone})';
+    });
+  }
+
+  void _clearCustomer() {
+    setState(() {
+      _selectedCustomer = null;
+      _selectedCustomerId = null;
+      _customerController.clear();
+    });
   }
 
   void _saveVehicle() async {
@@ -105,6 +145,123 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
     }
   }
 
+  Widget _buildCustomerField() {
+    return RawAutocomplete<CustomerModel>(
+      textEditingController: _customerController,
+      focusNode: _customerFocusNode,
+      optionsBuilder: (TextEditingValue textEditingValue) {
+        if (textEditingValue.text.trim().isEmpty) {
+          return _customers;
+        }
+        final q = textEditingValue.text.toLowerCase().trim();
+        return _customers.where((c) {
+          return c.fullName.toLowerCase().contains(q) || c.phone.contains(q);
+        });
+      },
+      displayStringForOption: (CustomerModel option) => '${option.fullName} (${option.phone})',
+      onSelected: (CustomerModel customer) {
+        _onCustomerSelected(customer);
+      },
+      fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+        return TextFormField(
+          controller: controller,
+          focusNode: focusNode,
+          enabled: widget.preselectedCustomerId == null,
+          decoration: InputDecoration(
+            labelText: 'Vehicle Owner (Customer) *',
+            hintText: 'Type customer name or phone to search...',
+            prefixIcon: const Icon(Icons.person_rounded),
+            suffixIcon: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (controller.text.isNotEmpty && widget.preselectedCustomerId == null)
+                  IconButton(
+                    icon: const Icon(Icons.clear_rounded, size: 18),
+                    tooltip: 'Clear Customer',
+                    onPressed: _clearCustomer,
+                  ),
+                if (widget.preselectedCustomerId == null)
+                  PopupMenuButton<CustomerModel>(
+                    icon: const Icon(Icons.arrow_drop_down, color: AppColors.textDarkSecondary),
+                    tooltip: 'Browse All Customers',
+                    onSelected: (c) => _onCustomerSelected(c),
+                    itemBuilder: (ctx) {
+                      if (_customers.isEmpty) {
+                        return [
+                          const PopupMenuItem(
+                            enabled: false,
+                            child: Text('No customers recorded yet'),
+                          ),
+                        ];
+                      }
+                      return _customers.map((c) {
+                        return PopupMenuItem<CustomerModel>(
+                          value: c,
+                          child: Text('${c.fullName} (${c.phone})', overflow: TextOverflow.ellipsis),
+                        );
+                      }).toList();
+                    },
+                  ),
+              ],
+            ),
+          ),
+          validator: (val) {
+            if (_selectedCustomerId == null || val == null || val.trim().isEmpty) {
+              return 'Please select a registered customer';
+            }
+            return null;
+          },
+          onChanged: (val) {
+            if (_selectedCustomer != null && !val.contains(_selectedCustomer!.fullName)) {
+              setState(() {
+                _selectedCustomer = null;
+                _selectedCustomerId = null;
+              });
+            }
+          },
+        );
+      },
+      optionsViewBuilder: (context, onSelected, options) {
+        return Align(
+          alignment: Alignment.topLeft,
+          child: Material(
+            elevation: 8,
+            borderRadius: BorderRadius.circular(10),
+            color: Theme.of(context).cardColor,
+            child: Container(
+              width: MediaQuery.of(context).size.width < 540 ? MediaQuery.of(context).size.width * 0.8 : 460,
+              constraints: const BoxConstraints(maxHeight: 250),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Theme.of(context).dividerColor),
+              ),
+              child: ListView.separated(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                shrinkWrap: true,
+                itemCount: options.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final c = options.elementAt(index);
+                  return ListTile(
+                    dense: true,
+                    leading: CircleAvatar(
+                      radius: 14,
+                      backgroundColor: AppColors.primary.withValues(alpha: 0.15),
+                      child: const Icon(Icons.person, size: 16, color: AppColors.primaryLight),
+                    ),
+                    title: Text(c.fullName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    subtitle: Text(c.phone, style: const TextStyle(fontSize: 11, color: AppColors.textDarkSecondary)),
+                    onTap: () => onSelected(c),
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Dialog(
@@ -138,22 +295,13 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
                 const Divider(),
                 const SizedBox(height: 12),
 
-                // Customer Selection
-                DropdownButtonFormField<String>(
-                  value: _selectedCustomerId,
-                  isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'Vehicle Owner (Customer) *', prefixIcon: Icon(Icons.person_rounded)),
-                  items: _customers.map((c) => DropdownMenuItem(value: c.id, child: Text('${c.fullName} (${c.phone})', overflow: TextOverflow.ellipsis))).toList(),
-                  onChanged: widget.preselectedCustomerId != null
-                      ? null
-                      : (val) => setState(() => _selectedCustomerId = val),
-                  validator: (val) => val == null ? 'Please select owner' : null,
-                ),
+                // Customer Search & Selection
+                _buildCustomerField(),
                 const SizedBox(height: 12),
 
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final isWide = constraints.maxWidth >= 460;
+                Builder(
+                  builder: (context) {
+                    final isWide = MediaQuery.of(context).size.width >= 500;
 
                     final regField = TextFormField(
                       controller: _regNumberController,

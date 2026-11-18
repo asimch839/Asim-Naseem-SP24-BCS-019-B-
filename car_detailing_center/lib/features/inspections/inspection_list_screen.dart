@@ -323,28 +323,11 @@ class _InspectionListScreenState extends State<InspectionListScreen> {
       final pdfFile = File('${tempDir.path}/$baseName.pdf');
       await pdfFile.writeAsBytes(pdfBytes);
 
-      // Render high-res A4 picture (PNG)
-      String? imagePath;
-      final imageBytes = await PdfService.renderInspectionReportToImage(
-        business: data.business,
-        inspection: data.inspection,
-        vehicleReg: data.vehicleReg,
-        vehicleName: data.vehicleName,
-        customerName: data.customerName,
-        carDiagramBytes: data.carDiagramBytes,
-      );
-
-      if (imageBytes != null) {
-        final imgFile = File('${tempDir.path}/$baseName.png');
-        await imgFile.writeAsBytes(imageBytes);
-        imagePath = imgFile.path;
-      }
-
-      // Copy to Windows Clipboard as Image & File Drop
-      if (imagePath != null) {
-        await WindowsClipboardService.copyImageToClipboard(imagePath, pdfPath: pdfFile.path);
-      } else {
+      // Only 1 item sent: the official Inspection Sheet PDF
+      if (Platform.isWindows) {
         await WindowsClipboardService.copyFileToClipboard(pdfFile.path);
+      } else {
+        await Printing.sharePdf(bytes: pdfBytes, filename: '$baseName.pdf');
       }
 
       // Try opening WhatsApp
@@ -361,8 +344,8 @@ class _InspectionListScreenState extends State<InspectionListScreen> {
       if (!mounted) return;
 
       Get.snackbar(
-        'Copied to Clipboard!',
-        'A4 Inspection Sheet copied. Press Ctrl + V in WhatsApp chat to paste!',
+        'Inspection PDF Copied!',
+        'Single Inspection Sheet PDF copied. Press Ctrl + V in WhatsApp chat to send!',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: const Color(0xFF25D366).withValues(alpha: 0.25),
         colorText: Colors.white,

@@ -8,6 +8,7 @@ import '../../core/utils/formatters.dart';
 import '../../core/widgets/app_scaffold.dart';
 import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/loading_indicator.dart';
+import '../../core/widgets/date_range_filter_bar.dart';
 import '../../data/models/customer_model.dart';
 import '../../data/repositories/customer_repository.dart';
 import 'customer_form_dialog.dart';
@@ -28,6 +29,8 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
   bool _isLoading = true;
   String _searchQuery = '';
   String _statusFilter = 'All';
+  String? _startDate;
+  String? _endDate;
 
   @override
   void initState() {
@@ -41,6 +44,8 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
       final list = await _customerRepo.getCustomers(
         searchQuery: _searchQuery,
         activeOnly: _statusFilter == 'Active',
+        startDate: _startDate,
+        endDate: _endDate,
       );
       if (mounted) {
         setState(() {
@@ -133,6 +138,16 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                           },
                         );
                       }).toList(),
+                    ),
+                    const SizedBox(height: 10),
+                    DateRangeFilterBar(
+                      onFilterChanged: (start, end, label) {
+                        setState(() {
+                          _startDate = start;
+                          _endDate = end;
+                        });
+                        _fetchCustomers();
+                      },
                     ),
                   ],
                 ),
