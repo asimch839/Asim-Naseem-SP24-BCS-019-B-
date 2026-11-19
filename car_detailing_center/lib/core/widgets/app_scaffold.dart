@@ -138,9 +138,10 @@ class _AppScaffoldState extends State<AppScaffold> {
       route: AppRoutes.staff,
       subItems: [
         NavSubItem(title: 'Staff List', icon: Icons.people_alt_rounded, tabIndex: 0),
-        NavSubItem(title: 'Attendance', icon: Icons.event_available_rounded, tabIndex: 1),
-        NavSubItem(title: 'Salaries', icon: Icons.payments_rounded, tabIndex: 2),
-        NavSubItem(title: 'Staff Expenses', icon: Icons.account_balance_wallet_rounded, tabIndex: 3),
+        NavSubItem(title: 'Commission Staff', icon: Icons.handshake_rounded, tabIndex: 1),
+        NavSubItem(title: 'Attendance', icon: Icons.event_available_rounded, tabIndex: 2),
+        NavSubItem(title: 'Salaries', icon: Icons.payments_rounded, tabIndex: 3),
+        NavSubItem(title: 'Staff Expenses', icon: Icons.account_balance_wallet_rounded, tabIndex: 4),
       ],
     ),
     MainModuleItem(
@@ -318,15 +319,13 @@ class _AppScaffoldState extends State<AppScaffold> {
             );
           }),
 
-          // Logout Button (on mobile available in Drawer footer)
-          if (!isMobile) ...[
-            IconButton(
-              icon: const Icon(Icons.logout_rounded),
-              tooltip: 'Logout',
-              onPressed: () => _confirmLogout(context),
-            ),
-            const SizedBox(width: 8),
-          ],
+          // Logout Button
+          IconButton(
+            icon: const Icon(Icons.logout_rounded),
+            tooltip: 'Logout',
+            onPressed: () => _confirmLogout(context),
+          ),
+          const SizedBox(width: 8),
           ...?widget.actions,
         ],
       ),
@@ -693,48 +692,6 @@ class _AppScaffoldState extends State<AppScaffold> {
                   ),
                 );
               },
-            ),
-          ),
-
-          // User Profile Card & Sign Out at Footer
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              border: Border(top: BorderSide(color: Theme.of(context).dividerColor)),
-            ),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 16,
-                  backgroundColor: AppColors.primary.withValues(alpha: 0.2),
-                  child: Text(
-                    AuthService.to.currentUser.value?.fullName.isNotEmpty == true
-                        ? AuthService.to.currentUser.value!.fullName[0].toUpperCase()
-                        : 'A',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: activeIcon),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        AuthService.to.currentUser.value?.fullName ?? 'Administrator',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textPrimary),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Text(
-                        AuthService.to.currentUser.value?.email ?? 'admin@autodetail.com',
-                        style: TextStyle(fontSize: 10, color: textMuted),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
             ),
           ),
 

@@ -320,7 +320,7 @@ class StaffRepository {
       SELECT s.*, st.name as staff_name, st.designation, st.phone as staff_phone
       FROM salaries s
       INNER JOIN staff st ON s.staff_id = st.id
-      WHERE 1=1
+      WHERE st.salary_type != 'Commission'
     ''';
     final List<dynamic> args = [];
 

@@ -10,7 +10,8 @@ import '../../data/models/staff_model.dart';
 
 class StaffFormDialog extends StatefulWidget {
   final StaffModel? staff;
-  const StaffFormDialog({super.key, this.staff});
+  final bool isCommissionBased;
+  const StaffFormDialog({super.key, this.staff, this.isCommissionBased = false});
 
   @override
   State<StaffFormDialog> createState() => _StaffFormDialogState();
@@ -28,6 +29,7 @@ class _StaffFormDialogState extends State<StaffFormDialog> {
   late final TextEditingController _commissionRateController;
   late final TextEditingController _notesController;
 
+  bool _isCommissionWorker = false;
   String _salaryType = AppConstants.salaryTypeMonthly;
   String _status = 'Active';
   bool _isSaving = false;
@@ -36,16 +38,18 @@ class _StaffFormDialogState extends State<StaffFormDialog> {
   void initState() {
     super.initState();
     final s = widget.staff;
+    final isComm = s?.salaryType == AppConstants.salaryTypeCommission || widget.isCommissionBased;
+    _isCommissionWorker = isComm;
     _nameController = TextEditingController(text: s?.name ?? '');
     _fatherNameController = TextEditingController(text: s?.fatherName ?? '');
     _cnicController = TextEditingController(text: s?.cnic ?? '');
     _phoneController = TextEditingController(text: s?.phone ?? '');
     _addressController = TextEditingController(text: s?.address ?? '');
-    _designationController = TextEditingController(text: s?.designation ?? 'Senior Detailer');
-    _baseSalaryController = TextEditingController(text: s?.baseSalary.toStringAsFixed(0) ?? '35000');
-    _commissionRateController = TextEditingController(text: s?.commissionRate.toString() ?? '0');
+    _designationController = TextEditingController(text: s?.designation ?? '');
+    _baseSalaryController = TextEditingController(text: isComm ? '0' : (s != null && s.baseSalary > 0 ? s.baseSalary.toStringAsFixed(0) : ''));
+    _commissionRateController = TextEditingController(text: s != null && s.commissionRate > 0 ? s.commissionRate.toStringAsFixed(0) : '');
     _notesController = TextEditingController(text: s?.notes ?? '');
-    _salaryType = s?.salaryType ?? AppConstants.salaryTypeMonthly;
+    _salaryType = s?.salaryType ?? (isComm ? AppConstants.salaryTypeCommission : AppConstants.salaryTypeMonthly);
     _status = s?.status ?? 'Active';
   }
 
@@ -56,6 +60,9 @@ class _StaffFormDialogState extends State<StaffFormDialog> {
     final businessId = AuthService.to.businessId;
     final id = widget.staff?.id ?? const Uuid().v4();
 
+    final commRate = _isCommissionWorker ? (double.tryParse(_commissionRateController.text.trim()) ?? 70.0) : 0.0;
+    final baseSal = _isCommissionWorker ? 0.0 : (double.tryParse(_baseSalaryController.text.trim()) ?? 0.0);
+
     final staff = StaffModel(
       id: id,
       businessId: businessId,
@@ -65,9 +72,9 @@ class _StaffFormDialogState extends State<StaffFormDialog> {
       phone: _phoneController.text.trim(),
       address: _addressController.text.trim().isNotEmpty ? _addressController.text.trim() : null,
       designation: _designationController.text.trim(),
-      baseSalary: double.tryParse(_baseSalaryController.text.trim()) ?? 0.0,
-      salaryType: _salaryType,
-      commissionRate: double.tryParse(_commissionRateController.text.trim()) ?? 0.0,
+      baseSalary: baseSal,
+      salaryType: _isCommissionWorker ? AppConstants.salaryTypeCommission : _salaryType,
+      commissionRate: commRate,
       status: _status,
       notes: _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : null,
       joiningDate: widget.staff?.joiningDate ?? DateTime.now(),
@@ -78,7 +85,11 @@ class _StaffFormDialogState extends State<StaffFormDialog> {
     try {
       await StaffRepository().saveStaff(staff);
       Get.back(result: true);
-      Get.snackbar('Success', 'Staff member profile saved', backgroundColor: AppColors.success.withValues(alpha: 0.2));
+      Get.snackbar(
+        'Success',
+        _isCommissionWorker ? 'Commission worker profile saved' : 'Staff member profile saved',
+        backgroundColor: AppColors.success.withValues(alpha: 0.2),
+      );
     } catch (e) {
       Get.snackbar('Error', 'Failed to save staff member: $e', backgroundColor: AppColors.error.withValues(alpha: 0.2));
     } finally {
@@ -108,7 +119,9 @@ class _StaffFormDialogState extends State<StaffFormDialog> {
                   children: [
                     Expanded(
                       child: Text(
-                        widget.staff == null ? 'Register New Staff Member' : 'Edit Staff Profile',
+                        widget.staff == null
+                            ? (_isCommissionWorker ? 'Register New Commission Worker' : 'Register New Staff Member')
+                            : (_isCommissionWorker ? 'Edit Commission Worker' : 'Edit Staff Profile'),
                         style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -117,7 +130,95 @@ class _StaffFormDialogState extends State<StaffFormDialog> {
                   ],
                 ),
                 const Divider(),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
+
+                // Employment Type Switcher (Salaried Staff vs Commission Worker)
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardColor,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.borderDark),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(8),
+                          onTap: () {
+                            setState(() {
+                              _isCommissionWorker = false;
+                              _salaryType = AppConstants.salaryTypeMonthly;
+                              if (_baseSalaryController.text == '0') {
+                                _baseSalaryController.text = '';
+                              }
+                            });
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 9),
+                            decoration: BoxDecoration(
+                              color: !_isCommissionWorker ? AppColors.primary.withValues(alpha: 0.2) : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                              border: !_isCommissionWorker ? Border.all(color: AppColors.primaryLight) : null,
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.badge_rounded, size: 16, color: !_isCommissionWorker ? AppColors.primaryLight : AppColors.textDarkSecondary),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Salaried Staff',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: !_isCommissionWorker ? FontWeight.bold : FontWeight.normal,
+                                    color: !_isCommissionWorker ? Colors.white : AppColors.textDarkSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(8),
+                          onTap: () {
+                            setState(() {
+                              _isCommissionWorker = true;
+                              _salaryType = AppConstants.salaryTypeCommission;
+                              _baseSalaryController.text = '0';
+                            });
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 9),
+                            decoration: BoxDecoration(
+                              color: _isCommissionWorker ? AppColors.success.withValues(alpha: 0.2) : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                              border: _isCommissionWorker ? Border.all(color: AppColors.success) : null,
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.handshake_rounded, size: 16, color: _isCommissionWorker ? AppColors.success : AppColors.textDarkSecondary),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Commission Worker (Denter/Painter)',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: _isCommissionWorker ? FontWeight.bold : FontWeight.normal,
+                                    color: _isCommissionWorker ? Colors.white : AppColors.textDarkSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
 
                 LayoutBuilder(
                   builder: (context, constraints) {
@@ -125,7 +226,10 @@ class _StaffFormDialogState extends State<StaffFormDialog> {
 
                     final nameField = TextFormField(
                       controller: _nameController,
-                      decoration: const InputDecoration(labelText: 'Full Name *', prefixIcon: Icon(Icons.badge_outlined)),
+                      decoration: InputDecoration(
+                        labelText: _isCommissionWorker ? 'Worker Name *' : 'Full Name *',
+                        prefixIcon: const Icon(Icons.badge_outlined),
+                      ),
                       validator: Validators.required,
                     );
 
@@ -147,15 +251,22 @@ class _StaffFormDialogState extends State<StaffFormDialog> {
 
                     final designationField = TextFormField(
                       controller: _designationController,
-                      decoration: const InputDecoration(labelText: 'Designation / Role *', hintText: 'Detailer, Polisher, PPF Expert'),
+                      decoration: InputDecoration(
+                        labelText: 'Designation / Skill *',
+                        hintText: _isCommissionWorker ? 'e.g. Denter, Painter, Electrician' : 'e.g. Detailer, Polisher, PPF Expert',
+                      ),
                       validator: Validators.required,
                     );
 
                     final salaryTypeField = DropdownButtonFormField<String>(
-                      value: _salaryType,
+                      value: _salaryType == AppConstants.salaryTypeCommission ? AppConstants.salaryTypeMonthly : _salaryType,
                       isExpanded: true,
-                      decoration: const InputDecoration(labelText: 'Salary Structure'),
-                      items: AppConstants.salaryTypes.map((t) => DropdownMenuItem(value: t, child: Text(t, overflow: TextOverflow.ellipsis))).toList(),
+                      decoration: const InputDecoration(labelText: 'Salary Frequency'),
+                      items: [
+                        AppConstants.salaryTypeMonthly,
+                        AppConstants.salaryTypeDaily,
+                        AppConstants.salaryTypeWeekly,
+                      ].map((t) => DropdownMenuItem(value: t, child: Text(t, overflow: TextOverflow.ellipsis))).toList(),
                       onChanged: (val) {
                         if (val != null) setState(() => _salaryType = val);
                       },
@@ -163,15 +274,93 @@ class _StaffFormDialogState extends State<StaffFormDialog> {
 
                     final baseSalaryField = TextFormField(
                       controller: _baseSalaryController,
-                      decoration: const InputDecoration(labelText: 'Base Salary *', prefixIcon: Icon(Icons.payments_outlined)),
+                      decoration: const InputDecoration(
+                        labelText: 'Base Salary (Rs.) *',
+                        hintText: 'e.g. 35000',
+                        prefixIcon: Icon(Icons.payments_outlined),
+                      ),
                       keyboardType: TextInputType.number,
-                      validator: Validators.nonNegativeNumber,
+                      validator: _isCommissionWorker ? null : Validators.nonNegativeNumber,
                     );
 
-                    final commissionField = TextFormField(
-                      controller: _commissionRateController,
-                      decoration: const InputDecoration(labelText: 'Commission Rate (%)', hintText: 'e.g. 5'),
-                      keyboardType: TextInputType.number,
+                    final enteredRate = double.tryParse(_commissionRateController.text.trim());
+                    final commRate = enteredRate ?? 70.0;
+                    final garageShare = (100 - commRate).clamp(0, 100).toDouble();
+
+                    final commissionSection = Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        TextFormField(
+                          controller: _commissionRateController,
+                          decoration: const InputDecoration(
+                            labelText: 'Worker Commission Rate (%) *',
+                            hintText: 'e.g. 70',
+                            prefixIcon: Icon(Icons.percent_rounded),
+                            suffixText: '%',
+                          ),
+                          keyboardType: TextInputType.number,
+                          validator: (v) {
+                            if (!_isCommissionWorker) return null;
+                            final val = double.tryParse(v?.trim() ?? '');
+                            if (val == null || val <= 0 || val > 100) return 'Enter valid % between 1 and 100';
+                            return null;
+                          },
+                          onChanged: (_) => setState(() {}),
+                        ),
+                        const SizedBox(height: 10),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppColors.success.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+                          ),
+                          child: Column(
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                children: [
+                                  Column(
+                                    children: [
+                                      const Text('Worker Commission', style: TextStyle(fontSize: 11, color: AppColors.textDarkSecondary)),
+                                      Text(
+                                        enteredRate != null ? '${commRate.toStringAsFixed(0)}%' : 'e.g. 70%',
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          color: enteredRate != null ? AppColors.success : AppColors.textDarkSecondary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const Icon(Icons.compare_arrows_rounded, color: AppColors.textDarkSecondary),
+                                  Column(
+                                    children: [
+                                      const Text('Garage Profit Share', style: TextStyle(fontSize: 11, color: AppColors.textDarkSecondary)),
+                                      Text(
+                                        enteredRate != null ? '${garageShare.toStringAsFixed(0)}%' : 'e.g. 30%',
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          color: enteredRate != null ? AppColors.primaryLight : AppColors.textDarkSecondary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                enteredRate != null
+                                    ? '💡 Is worker (jaise denter) ko har kaam mein se ${commRate.toStringAsFixed(0)}% commission milega aur garage ko ${garageShare.toStringAsFixed(0)}%. Iski koi monthly basic salary nahi hogi.'
+                                    : '💡 Hint: Yahan commission percentage darj karein (e.g. 70%). Is worker ki koi monthly basic salary nahi hogi.',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(fontSize: 11, color: AppColors.textDarkSecondary),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     );
 
                     if (isWide) {
@@ -181,9 +370,20 @@ class _StaffFormDialogState extends State<StaffFormDialog> {
                           const SizedBox(height: 12),
                           Row(children: [Expanded(child: cnicField), const SizedBox(width: 12), Expanded(child: phoneField)]),
                           const SizedBox(height: 12),
-                          Row(children: [Expanded(child: designationField), const SizedBox(width: 12), Expanded(child: salaryTypeField)]),
+                          Row(
+                            children: [
+                              Expanded(child: designationField),
+                              if (!_isCommissionWorker) ...[
+                                const SizedBox(width: 12),
+                                Expanded(child: salaryTypeField),
+                              ],
+                            ],
+                          ),
                           const SizedBox(height: 12),
-                          Row(children: [Expanded(child: baseSalaryField), const SizedBox(width: 12), Expanded(child: commissionField)]),
+                          if (!_isCommissionWorker)
+                            baseSalaryField
+                          else
+                            commissionSection,
                         ],
                       );
                     } else {
@@ -199,11 +399,13 @@ class _StaffFormDialogState extends State<StaffFormDialog> {
                           const SizedBox(height: 10),
                           designationField,
                           const SizedBox(height: 10),
-                          salaryTypeField,
-                          const SizedBox(height: 10),
-                          baseSalaryField,
-                          const SizedBox(height: 10),
-                          commissionField,
+                          if (!_isCommissionWorker) ...[
+                            salaryTypeField,
+                            const SizedBox(height: 10),
+                            baseSalaryField,
+                          ] else ...[
+                            commissionSection,
+                          ],
                         ],
                       );
                     }

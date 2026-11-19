@@ -39,9 +39,9 @@ class _StaffScreenState extends State<StaffScreen> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
-    _currentTabIndex = widget.initialTabIndex.clamp(0, 3);
+    _currentTabIndex = widget.initialTabIndex.clamp(0, 4);
     _tabController = TabController(
-      length: 4,
+      length: 5,
       vsync: this,
       initialIndex: _currentTabIndex,
     );
@@ -65,10 +65,12 @@ class _StaffScreenState extends State<StaffScreen> with SingleTickerProviderStat
       case 0:
         return 'Staff List';
       case 1:
-        return 'Attendance';
+        return 'Commission Staff';
       case 2:
-        return 'Salaries';
+        return 'Attendance';
       case 3:
+        return 'Salaries';
+      case 4:
         return 'Staff Expenses';
       default:
         return 'Staff List';
@@ -81,14 +83,14 @@ class _StaffScreenState extends State<StaffScreen> with SingleTickerProviderStat
       currentRoute: AppRoutes.staff,
       currentSubItem: _currentSubItem,
       onSubItemSelect: (sub) {
-        if (sub.tabIndex >= 0 && sub.tabIndex < 4) {
+        if (sub.tabIndex >= 0 && sub.tabIndex < 5) {
           _tabController.animateTo(sub.tabIndex);
         }
       },
       title: 'Staff Management System',
       body: Column(
         children: [
-          // Sub-navigation Tabs (Staff List, Attendance, Salaries, Staff Expenses)
+          // Sub-navigation Tabs (Staff List, Commission Staff, Attendance, Salaries, Staff Expenses)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
@@ -117,6 +119,7 @@ class _StaffScreenState extends State<StaffScreen> with SingleTickerProviderStat
               unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 13),
               tabs: const [
                 Tab(icon: Icon(Icons.people_alt_rounded, size: 20), text: 'Staff List'),
+                Tab(icon: Icon(Icons.handshake_rounded, size: 20), text: 'Commission Staff'),
                 Tab(icon: Icon(Icons.event_available_rounded, size: 20), text: 'Attendance'),
                 Tab(icon: Icon(Icons.payments_rounded, size: 20), text: 'Salaries'),
                 Tab(icon: Icon(Icons.account_balance_wallet_rounded, size: 20), text: 'Staff Expenses'),
@@ -128,6 +131,7 @@ class _StaffScreenState extends State<StaffScreen> with SingleTickerProviderStat
               controller: _tabController,
               children: const [
                 StaffListSubView(),
+                CommissionStaffSubView(),
                 StaffAttendanceSubView(),
                 StaffSalariesSubView(),
                 StaffExpensesSubView(),
@@ -180,12 +184,12 @@ class _StaffListSubViewState extends State<StaffListSubView> {
                 onPressed: () async {
                   final res = await showDialog<bool>(
                     context: context,
-                    builder: (_) => const StaffFormDialog(),
+                    builder: (_) => const StaffFormDialog(isCommissionBased: false),
                   );
                   if (res == true && mounted) setState(() {});
                 },
                 icon: const Icon(Icons.person_add_alt_1_rounded),
-                label: const Text('Add Staff Member'),
+                label: const Text('Add Salaried Staff'),
               );
 
               if (isNarrow) {
@@ -216,13 +220,14 @@ class _StaffListSubViewState extends State<StaffListSubView> {
                   return const AppLoadingIndicator(message: 'Loading staff directory...');
                 }
 
-                final filtered = snapshot.data ?? [];
+                final allStaff = snapshot.data ?? [];
+                final filtered = allStaff.where((s) => s.salaryType != AppConstants.salaryTypeCommission).toList();
 
                 if (filtered.isEmpty) {
                   return const AppEmptyState(
                     icon: Icons.badge_rounded,
-                    title: 'No Staff Members Registered',
-                    description: 'Add technicians, detailers, and shop managers to track attendance and payroll.',
+                    title: 'No Salaried Staff Registered',
+                    description: 'Add technicians, detailers, and shop managers with fixed monthly/daily salaries.',
                   );
                 }
 
@@ -299,6 +304,269 @@ return ListTile(
                                 if (confirm == true) {
                                   await _staffRepo.deleteStaff(staff.id);
                                   Get.snackbar('Removed', 'Staff member deleted');
+                                  if (mounted) setState(() {});
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// -------------------------------------------------------------
+// 1.5. COMMISSION STAFF SUB-VIEW (Pure % Commission, 0 Basic Salary)
+// -------------------------------------------------------------
+class CommissionStaffSubView extends StatefulWidget {
+  const CommissionStaffSubView({super.key});
+
+  @override
+  State<CommissionStaffSubView> createState() => _CommissionStaffSubViewState();
+}
+
+class _CommissionStaffSubViewState extends State<CommissionStaffSubView> {
+  final TextEditingController _searchController = TextEditingController();
+  final _staffRepo = StaffRepository();
+  String _searchQuery = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final isCompact = MediaQuery.of(context).size.width < 600;
+
+    return Padding(
+      padding: EdgeInsets.all(isCompact ? 12 : 20),
+      child: Column(
+        children: [
+          // Banner explanation
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.success.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.handshake_rounded, size: 20, color: AppColors.success),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Commission Workers (Denters, Painters, Polishers, Contractors) har kaam par percentage (%) commission lete hain. Inki koi fixed monthly basic salary nahi hoti.',
+                    style: TextStyle(fontSize: isCompact ? 11 : 12, color: AppColors.textDarkSecondary),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Search & Add Button Bar
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 560;
+              final searchField = TextField(
+                controller: _searchController,
+                decoration: const InputDecoration(
+                  hintText: 'Search commission workers (denter, painter, phone)...',
+                  prefixIcon: Icon(Icons.search_rounded),
+                ),
+                onChanged: (v) => setState(() => _searchQuery = v.trim().toLowerCase()),
+              );
+              final addButton = ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.success,
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: () async {
+                  final res = await showDialog<bool>(
+                    context: context,
+                    builder: (_) => const StaffFormDialog(isCommissionBased: true),
+                  );
+                  if (res == true && mounted) setState(() {});
+                },
+                icon: const Icon(Icons.person_add_alt_1_rounded),
+                label: const Text('Add Commission Worker'),
+              );
+
+              if (isNarrow) {
+                return Column(
+                  children: [
+                    searchField,
+                    const SizedBox(height: 10),
+                    SizedBox(width: double.infinity, child: addButton),
+                  ],
+                );
+              }
+
+              return Row(
+                children: [
+                  Expanded(child: searchField),
+                  const SizedBox(width: 14),
+                  addButton,
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 14),
+
+          // List of Commission Workers
+          Expanded(
+            child: FutureBuilder<List<StaffModel>>(
+              future: _staffRepo.getStaffList(searchQuery: _searchQuery),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const AppLoadingIndicator(message: 'Loading commission staff directory...');
+                }
+
+                final all = snapshot.data ?? [];
+                final commissionWorkers = all.where((s) => s.salaryType == AppConstants.salaryTypeCommission).toList();
+
+                if (commissionWorkers.isEmpty) {
+                  return const AppEmptyState(
+                    icon: Icons.handshake_rounded,
+                    title: 'No Commission Workers Registered',
+                    description: 'Click "+ Add Commission Worker" to add denters, painters, or contractors working on percentage commission split (e.g. 70% worker / 30% garage).',
+                  );
+                }
+
+                return Card(
+                  child: ListView.separated(
+                    padding: const EdgeInsets.all(8),
+                    itemCount: commissionWorkers.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final staff = commissionWorkers[index];
+                      final commRate = staff.commissionRate;
+                      final garageShare = (100 - commRate).clamp(0, 100).toDouble();
+
+                      return ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: AppColors.success.withValues(alpha: 0.15),
+                          backgroundImage: staff.photoUrl != null && File(staff.photoUrl!).existsSync()
+                              ? FileImage(File(staff.photoUrl!))
+                              : null,
+                          child: (staff.photoUrl == null || !File(staff.photoUrl!).existsSync())
+                              ? Text(staff.name[0].toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.success))
+                              : null,
+                        ),
+                        title: Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                staff.name,
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: staff.status == 'Active' ? AppColors.success.withValues(alpha: 0.15) : AppColors.error.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                staff.status,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: staff.status == 'Active' ? AppColors.success : AppColors.error,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 4),
+                            Text(
+                              '${staff.designation} • ${staff.phone}',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                            const SizedBox(height: 6),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 4,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.success.withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: AppColors.success.withValues(alpha: 0.4)),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.percent_rounded, size: 13, color: AppColors.success),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Worker: ${commRate.toStringAsFixed(0)}%  |  Garage: ${garageShare.toStringAsFixed(0)}%',
+                                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.success),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primary.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: const Text(
+                                    'No Basic Salary',
+                                    style: TextStyle(fontSize: 11, color: AppColors.textDarkSecondary),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit_outlined, size: 18),
+                              tooltip: 'Edit Commission Worker',
+                              onPressed: () async {
+                                final res = await showDialog<bool>(
+                                  context: context,
+                                  builder: (_) => StaffFormDialog(staff: staff, isCommissionBased: true),
+                                );
+                                if (res == true && mounted) setState(() {});
+                              },
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.error),
+                              tooltip: 'Delete Profile',
+                              onPressed: () async {
+                                final confirm = await showDialog<bool>(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    title: const Text('Delete Worker Profile'),
+                                    content: Text('Are you sure you want to remove ${staff.name} from commission workers?'),
+                                    actions: [
+                                      TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+                                      ElevatedButton(
+                                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+                                        onPressed: () => Navigator.of(ctx).pop(true),
+                                        child: const Text('Delete'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (confirm == true) {
+                                  await _staffRepo.deleteStaff(staff.id);
                                   if (mounted) setState(() {});
                                 }
                               },
@@ -884,13 +1152,14 @@ class _StaffSalariesSubViewState extends State<StaffSalariesSubView> {
   void _generateMonthlyPayroll() async {
     try {
       final staffList = await _staffRepo.getStaffList(activeOnly: true);
+      final salariedStaff = staffList.where((s) => s.salaryType != AppConstants.salaryTypeCommission).toList();
 
-      for (var s in staffList) {
+      for (var s in salariedStaff) {
         final calc = await _staffRepo.calculateSalaryForStaff(s.id, _monthKey);
         await _staffRepo.saveSalaryRecord(calc);
       }
 
-      Get.snackbar('Payroll Synchronized', 'Calculated payroll for ${staffList.length} active staff members', backgroundColor: AppColors.success.withValues(alpha: 0.2));
+      Get.snackbar('Payroll Synchronized', 'Calculated payroll for ${salariedStaff.length} active staff members', backgroundColor: AppColors.success.withValues(alpha: 0.2));
       if (mounted) setState(() {});
     } catch (e) {
       Get.snackbar('Error', 'Payroll calculation failed: $e');

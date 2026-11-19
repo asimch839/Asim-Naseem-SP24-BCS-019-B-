@@ -6,6 +6,7 @@ class AppRoutes {
   // Exactly 11 Main Navigation Modules per Section 6
   static const dashboard = '/dashboard';
   static const staff = '/staff';
+  static const staffCommission = '/staff/commission';
   static const staffAttendance = '/staff/attendance';
   static const staffSalaries = '/staff/salaries';
   static const staffExpenses = '/staff/expenses';
