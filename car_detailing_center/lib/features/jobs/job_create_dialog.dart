@@ -37,6 +37,7 @@ class _JobCreateDialogState extends State<JobCreateDialog> {
   final TextEditingController _customVehicleController = TextEditingController();
   final TextEditingController _notesController = TextEditingController();
   final TextEditingController _discountController = TextEditingController(text: '0');
+  final TextEditingController _advancePaymentController = TextEditingController(text: '0');
   final TextEditingController _odometerInController = TextEditingController();
 
   List<CustomerModel> _customers = [];
@@ -66,6 +67,7 @@ class _JobCreateDialogState extends State<JobCreateDialog> {
     _customVehicleController.dispose();
     _notesController.dispose();
     _discountController.dispose();
+    _advancePaymentController.dispose();
     _odometerInController.dispose();
     super.dispose();
   }
@@ -147,6 +149,8 @@ class _JobCreateDialogState extends State<JobCreateDialog> {
   double get _subtotal => _selectedServices.fold(0.0, (sum, s) => sum + s.price);
   double get _discount => double.tryParse(_discountController.text) ?? 0.0;
   double get _grandTotal => (_subtotal - _discount).clamp(0.0, double.infinity);
+  double get _advance => double.tryParse(_advancePaymentController.text) ?? 0.0;
+  double get _remaining => (_grandTotal - _advance).clamp(0.0, double.infinity);
 
   void _createJob() async {
     final customerName = _customerController.text.trim();
@@ -237,6 +241,7 @@ class _JobCreateDialogState extends State<JobCreateDialog> {
         odometerOut: odoIn,
         serviceLabour: _subtotal,
         discount: _discount,
+        paidAmount: _advance,
         services: _selectedServices.map((s) => {'description': s.name, 'amount': s.price}).toList(),
         assignedStaffIds: _assignedStaff.map((st) => st.id).toList(),
         technicianName: _assignedStaff.isNotEmpty ? _assignedStaff.first.name : 'Shop Lead',
@@ -347,42 +352,37 @@ class _JobCreateDialogState extends State<JobCreateDialog> {
                           ),
                           const SizedBox(height: 14),
 
-                          // Services & Detailing Packages Section
-                          _buildServicesSection(currency, isWide),
-                          const SizedBox(height: 14),
-
-                          // Financial Summary
+                          // Advance Payment Received & Instructions
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                             decoration: BoxDecoration(
                               color: Theme.of(context).cardTheme.color,
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(10),
                               border: Border.all(color: Theme.of(context).dividerColor),
                             ),
-                            child: Wrap(
-                              alignment: WrapAlignment.spaceBetween,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              spacing: 12,
-                              runSpacing: 8,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                SizedBox(
-                                  width: 140,
-                                  child: TextFormField(
-                                    controller: _discountController,
-                                    decoration: const InputDecoration(labelText: 'Discount'),
-                                    keyboardType: TextInputType.number,
-                                    onChanged: (_) => setState(() {}),
+                                TextFormField(
+                                  controller: _advancePaymentController,
+                                  decoration: InputDecoration(
+                                    labelText: 'Advance Payment / Deposit Received (Optional)',
+                                    prefixIcon: const Icon(Icons.payments_outlined, size: 20),
+                                    hintText: 'e.g. 5000',
+                                    prefixText: _advance > 0 ? '$currency ' : null,
                                   ),
+                                  keyboardType: TextInputType.number,
+                                  onChanged: (_) => setState(() {}),
                                 ),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Text('Subtotal: ${Formatters.currency(_subtotal, symbol: currency)}', style: const TextStyle(fontSize: 12, color: AppColors.textDarkSecondary)),
-                                    Text(
-                                      'Grand Total: ${Formatters.currency(_grandTotal, symbol: currency)}',
-                                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.success),
-                                    ),
-                                  ],
+                                const SizedBox(height: 12),
+                                TextFormField(
+                                  controller: _notesController,
+                                  maxLines: 2,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Special Instructions / Notes (Optional)',
+                                    prefixIcon: Icon(Icons.note_alt_outlined, size: 20),
+                                    hintText: 'Customer requests, pre-existing vehicle marks, etc.',
+                                  ),
                                 ),
                               ],
                             ),
@@ -598,240 +598,6 @@ class _JobCreateDialogState extends State<JobCreateDialog> {
           ),
         ),
       ],
-    );
-  }
-
-  // --- Services & Detailing Packages Section ---
-  Widget _buildServicesSection(String currency, bool isWide) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardTheme.color,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Theme.of(context).dividerColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.handyman_rounded, size: 18, color: AppColors.primaryLight),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Services to be Performed',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                  ),
-                  if (_selectedServices.isNotEmpty) ...[
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        '${_selectedServices.length}',
-                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primaryLight),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-              Wrap(
-                spacing: 8,
-                runSpacing: 4,
-                children: [
-                  if (_detailingPackages.isNotEmpty)
-                    PopupMenuButton<DetailingPackageModel>(
-                      tooltip: 'Add Detailing Package',
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: AppColors.accent.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.auto_awesome, size: 14, color: AppColors.accent),
-                            SizedBox(width: 4),
-                            Text('+ Package', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.accent)),
-                          ],
-                        ),
-                      ),
-                      onSelected: (pkg) {
-                        setState(() {
-                          _selectedServices.add(SimpleServiceItem(pkg.name, pkg.price, id: pkg.id));
-                        });
-                      },
-                      itemBuilder: (_) => _detailingPackages.map((p) {
-                        return PopupMenuItem<DetailingPackageModel>(
-                          value: p,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(p.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                              const SizedBox(width: 14),
-                              Text(
-                                Formatters.currency(p.price, symbol: currency),
-                                style: const TextStyle(color: AppColors.success, fontWeight: FontWeight.bold, fontSize: 12),
-                              ),
-                            ],
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      visualDensity: VisualDensity.compact,
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    ),
-                    icon: const Icon(Icons.add_rounded, size: 15),
-                    label: const Text('Add Service', style: TextStyle(fontSize: 12)),
-                    onPressed: _showAddCustomServiceDialog,
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          if (_selectedServices.isEmpty)
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-              decoration: BoxDecoration(
-                color: AppColors.accent.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.accent.withValues(alpha: 0.15)),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.info_outline_rounded, size: 16, color: AppColors.accent),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'No services added yet. Click "+ Package" or "+ Add Service" to record the services being performed on this vehicle.',
-                      style: TextStyle(fontSize: 12, color: AppColors.textDarkSecondary),
-                    ),
-                  ),
-                ],
-              ),
-            )
-          else
-            Column(
-              children: _selectedServices.asMap().entries.map((entry) {
-                final idx = entry.key;
-                final item = entry.value;
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 6),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).scaffoldBackgroundColor,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Theme.of(context).dividerColor),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.check_circle_rounded, size: 16, color: AppColors.success),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        flex: 3,
-                        child: Text(
-                          item.name,
-                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      SizedBox(
-                        width: 110,
-                        child: TextFormField(
-                          initialValue: item.price.toStringAsFixed(0),
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            prefixText: '$currency ',
-                            prefixStyle: const TextStyle(fontSize: 11),
-                            isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                          ),
-                          onChanged: (v) {
-                            final p = double.tryParse(v.trim());
-                            if (p != null) {
-                              setState(() {
-                                item.price = p;
-                              });
-                            }
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      IconButton(
-                        icon: const Icon(Icons.delete_outline_rounded, size: 18, color: AppColors.error),
-                        tooltip: 'Remove',
-                        onPressed: () {
-                          setState(() {
-                            _selectedServices.removeAt(idx);
-                          });
-                        },
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
-            ),
-        ],
-      ),
-    );
-  }
-
-  void _showAddCustomServiceDialog() {
-    final nameCtrl = TextEditingController();
-    final priceCtrl = TextEditingController();
-    Get.dialog(
-      AlertDialog(
-        title: const Text('Add Service to Job Card', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Service Name / Description *',
-                hintText: 'e.g. Interior Steam Wash, Leather Polish',
-              ),
-              autofocus: true,
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: priceCtrl,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Price / Labour Cost',
-                hintText: 'e.g. 3500',
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () {
-              final name = nameCtrl.text.trim();
-              if (name.isNotEmpty) {
-                final price = double.tryParse(priceCtrl.text.trim()) ?? 0.0;
-                setState(() {
-                  _selectedServices.add(SimpleServiceItem(name, price));
-                });
-                Get.back();
-              }
-            },
-            child: const Text('Add Service'),
-          ),
-        ],
-      ),
     );
   }
 }

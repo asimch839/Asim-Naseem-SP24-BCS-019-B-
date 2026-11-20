@@ -118,12 +118,73 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
       );
 
       setState(() => _job = _job.copyWith(status: newStatus));
-      Get.snackbar('Status Updated', 'Job status moved forward to $newStatus', backgroundColor: AppColors.success.withValues(alpha: 0.2));
+      if (newStatus == 'Completed' || newStatus == 'Delivered') {
+        Get.snackbar(
+          'Order Completed!',
+          'Job order completed & archived to Vehicle Service History. Removed from active workshop orders.',
+          backgroundColor: AppColors.success.withValues(alpha: 0.25),
+          duration: const Duration(seconds: 4),
+        );
+      } else {
+        Get.snackbar('Status Updated', 'Job status moved forward to $newStatus', backgroundColor: AppColors.success.withValues(alpha: 0.2));
+      }
     } catch (e) {
       Get.snackbar('Error', 'Failed to update status: $e', backgroundColor: AppColors.error.withValues(alpha: 0.2));
     } finally {
       if (mounted) setState(() => _isProcessing = false);
     }
+  }
+
+  void _showEditAdvanceDialog(String currency) {
+    final ctrl = TextEditingController(text: _job.paidAmount > 0 ? _job.paidAmount.toStringAsFixed(0) : '0');
+    Get.dialog(
+      AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: const [
+            Icon(Icons.payments_rounded, color: AppColors.primary, size: 22),
+            SizedBox(width: 8),
+            Text('Record / Edit Advance Payment', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Job Total: ${Formatters.currency(_job.grandTotal, symbol: currency)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: ctrl,
+              autofocus: true,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Advance Amount Received',
+                prefixIcon: Icon(Icons.currency_exchange_rounded),
+                hintText: 'e.g. 5000',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              final val = double.tryParse(ctrl.text.trim()) ?? 0.0;
+              final jobRepo = Get.find<JobRepository>();
+              await jobRepo.updateJobAdvancePayment(jobId: _job.id, paidAmount: val);
+              Get.back();
+              await _loadJobDetails();
+              Get.snackbar(
+                'Advance Updated',
+                'Advance payment updated to ${Formatters.currency(val, symbol: currency)}',
+                backgroundColor: AppColors.success.withValues(alpha: 0.2),
+              );
+            },
+            child: const Text('Save Advance'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showAddServiceDialog() async {
@@ -778,9 +839,29 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Text('Financial Summary', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primaryLight)),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        const Text('Financial Summary', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primaryLight)),
+                                        InkWell(
+                                          onTap: () => _showEditAdvanceDialog(currency),
+                                          borderRadius: BorderRadius.circular(4),
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: const [
+                                                Icon(Icons.edit_outlined, size: 13, color: AppColors.primaryLight),
+                                                SizedBox(width: 2),
+                                                Text('Advance', style: TextStyle(fontSize: 11, color: AppColors.primaryLight, fontWeight: FontWeight.bold)),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                     const SizedBox(height: 4),
-                                    Text('Paid: ${Formatters.currency(_job.paidAmount, symbol: currency)}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                                    Text('Paid Advance: ${Formatters.currency(_job.paidAmount, symbol: currency)}', style: const TextStyle(fontWeight: FontWeight.w600)),
                                     Text(
                                       'Remaining: ${Formatters.currency(_job.remainingAmount, symbol: currency)}',
                                       style: TextStyle(
@@ -808,9 +889,29 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                               Text(_job.vehicleDisplayName, style: const TextStyle(fontWeight: FontWeight.w600)),
                               Text('Plate #: ${_job.vehicleRegNumber}', style: const TextStyle(fontSize: 12, color: AppColors.textDarkSecondary)),
                               const Divider(height: 16),
-                              const Text('Financial Summary', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primaryLight)),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text('Financial Summary', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primaryLight)),
+                                  InkWell(
+                                    onTap: () => _showEditAdvanceDialog(currency),
+                                    borderRadius: BorderRadius.circular(4),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: const [
+                                          Icon(Icons.edit_outlined, size: 13, color: AppColors.primaryLight),
+                                          SizedBox(width: 2),
+                                          Text('Advance', style: TextStyle(fontSize: 11, color: AppColors.primaryLight, fontWeight: FontWeight.bold)),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                               const SizedBox(height: 4),
-                              Text('Paid: ${Formatters.currency(_job.paidAmount, symbol: currency)}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                              Text('Paid Advance: ${Formatters.currency(_job.paidAmount, symbol: currency)}', style: const TextStyle(fontWeight: FontWeight.w600)),
                               Text(
                                 'Remaining: ${Formatters.currency(_job.remainingAmount, symbol: currency)}',
                                 style: TextStyle(

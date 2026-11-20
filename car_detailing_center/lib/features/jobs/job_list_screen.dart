@@ -29,7 +29,7 @@ class _JobListScreenState extends State<JobListScreen> {
   List<Map<String, dynamic>> _jobs = [];
   bool _isLoading = true;
   String _searchQuery = '';
-  String _selectedStatus = 'All';
+  String _selectedStatus = 'Active Orders';
   String? _startDate;
   String? _endDate;
 
@@ -44,7 +44,7 @@ class _JobListScreenState extends State<JobListScreen> {
     try {
       final list = await _jobRepo.getJobs(
         searchQuery: _searchQuery,
-        status: _selectedStatus == 'All' ? null : _selectedStatus,
+        status: _selectedStatus,
         startDate: _startDate,
         endDate: _endDate,
       );
@@ -128,21 +128,40 @@ class _JobListScreenState extends State<JobListScreen> {
                       scrollDirection: Axis.horizontal,
                       child: Row(
                         children: [
-                          'All',
+                          'Active Orders',
                           AppConstants.jobStatusInProgress,
                           AppConstants.jobStatusReadyForDelivery,
-                          AppConstants.jobStatusCompleted,
                           AppConstants.jobStatusNew,
                           AppConstants.jobStatusWaiting,
+                          'Completed Orders',
+                          'All Orders',
                           AppConstants.jobStatusCancelled,
                         ].map((st) {
                           final isSelected = _selectedStatus == st;
+                          Color chipColor;
+                          if (st == 'Active Orders') {
+                            chipColor = AppColors.primary;
+                          } else if (st == 'Completed Orders') {
+                            chipColor = AppColors.success;
+                          } else if (st == 'All Orders') {
+                            chipColor = AppColors.primaryLight;
+                          } else {
+                            chipColor = AppColors.getJobStatusColor(st);
+                          }
+
                           return Padding(
                             padding: const EdgeInsets.only(right: 6),
                             child: ChoiceChip(
-                              label: Text(st, style: TextStyle(fontSize: 12, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+                              label: Text(
+                                st == 'Active Orders' ? 'Active Orders (Floor)' : (st == 'Completed Orders' ? 'Completed (History)' : st),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                  color: isSelected ? Colors.white : null,
+                                ),
+                              ),
                               selected: isSelected,
-                              selectedColor: st == 'All' ? AppColors.primary : AppColors.getJobStatusColor(st),
+                              selectedColor: chipColor,
                               onSelected: (_) {
                                 setState(() => _selectedStatus = st);
                                 _fetchJobs();
@@ -166,7 +185,45 @@ class _JobListScreenState extends State<JobListScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
+
+            // Live Counter & Completed Filter Info
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    _selectedStatus == 'Active Orders'
+                        ? 'Active Ongoing Orders on Floor (${_jobs.length})'
+                        : (_selectedStatus == 'Completed Orders'
+                            ? 'Completed & Delivered History (${_jobs.length})'
+                            : '$_selectedStatus (${_jobs.length})'),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textDarkSecondary),
+                  ),
+                  if (_selectedStatus == 'Active Orders')
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppColors.success.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.check_circle_rounded, size: 12, color: AppColors.success),
+                          SizedBox(width: 4),
+                          Text(
+                            'Completed orders removed',
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.success),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 6),
 
             // Jobs Table
             Expanded(
@@ -174,11 +231,13 @@ class _JobListScreenState extends State<JobListScreen> {
                   ? const AppLoadingIndicator(message: 'Loading active job cards...')
                   : _jobs.isEmpty
                       ? AppEmptyState(
-                          icon: Icons.assignment_outlined,
-                          title: 'No Job Cards Found',
+                          icon: _selectedStatus == 'Active Orders' ? Icons.task_alt_rounded : Icons.assignment_outlined,
+                          title: _selectedStatus == 'Active Orders' ? 'No Active Orders on Floor' : 'No Job Cards Found',
                           description: _searchQuery.isNotEmpty
                               ? 'No job cards match your search criteria.'
-                              : 'Create your first service order to start tracking vehicle progress.',
+                              : (_selectedStatus == 'Active Orders'
+                                  ? 'All previous vehicle orders are completed and safely archived to Vehicle Service History! Create a new job card when a vehicle arrives.'
+                                  : 'No orders recorded under this status filter.'),
                           actionLabel: 'Create Job Card',
                           onAction: () async {
                             final res = await showDialog(

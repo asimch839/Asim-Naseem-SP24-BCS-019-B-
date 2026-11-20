@@ -39,9 +39,15 @@ class JobRepository {
     ''';
     final List<dynamic> args = [];
 
-    if (status != null && status.isNotEmpty && status != 'All') {
-      sql += ' AND j.status = ?';
-      args.add(status);
+    if (status != null && status.isNotEmpty && status != 'All' && status != 'All Orders') {
+      if (status == 'Active' || status == 'Active Orders') {
+        sql += " AND j.status NOT IN ('Completed', 'Delivered')";
+      } else if (status == 'Completed Orders') {
+        sql += " AND j.status IN ('Completed', 'Delivered')";
+      } else {
+        sql += ' AND j.status = ?';
+        args.add(status);
+      }
     }
     if (customerId != null && customerId.isNotEmpty) {
       sql += ' AND j.customer_id = ?';
@@ -205,6 +211,32 @@ class JobRepository {
     }
 
     await db.update('jobs', updateData, where: 'id = ?', whereArgs: [jobId]);
+    await syncJobToVehicleHistory(jobId);
+  }
+
+  /// Update advance payment received for an existing job card
+  Future<void> updateJobAdvancePayment({
+    required String jobId,
+    required double paidAmount,
+  }) async {
+    final db = await _db;
+    final now = DateTime.now().toIso8601String();
+    await db.transaction((txn) async {
+      final existing = await txn.query('jobs', where: 'id = ?', whereArgs: [jobId]);
+      if (existing.isEmpty) return;
+      final grandTotal = (existing.first['grand_total'] as num?)?.toDouble() ?? 0.0;
+      final remainingAmount = (grandTotal - paidAmount) > 0 ? (grandTotal - paidAmount) : 0.0;
+      await txn.update(
+        'jobs',
+        {
+          'paid_amount': paidAmount,
+          'remaining_amount': remainingAmount,
+          'updated_at': now,
+        },
+        where: 'id = ?',
+        whereArgs: [jobId],
+      );
+    });
     await syncJobToVehicleHistory(jobId);
   }
 

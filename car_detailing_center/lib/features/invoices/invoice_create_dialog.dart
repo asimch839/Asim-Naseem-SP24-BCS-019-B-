@@ -51,9 +51,9 @@ class _InvoiceCreateDialogState extends State<InvoiceCreateDialog> {
   List<CustomerModel> _customers = [];
   List<VehicleModel> _customerVehicles = [];
 
+  double _advancePaid = 0.0;
   bool _isLoading = true;
   bool _isSaving = false;
-  bool _markAsFullyPaid = true;
 
   @override
   void initState() {
@@ -62,10 +62,10 @@ class _InvoiceCreateDialogState extends State<InvoiceCreateDialog> {
   }
 
   void _loadData() async {
-    final customerRepo = Get.find<CustomerRepository>();
-    final customers = await customerRepo.getCustomers();
+    try {
+      final customerRepo = Get.find<CustomerRepository>();
+      final customers = await customerRepo.getCustomers();
 
-    if (mounted) {
       CustomerModel? defaultWalkIn = customers.firstWhereOrNull(
         (c) => c.fullName.toLowerCase().contains('walk-in') || c.phone.toLowerCase().contains('walk-in'),
       );
@@ -86,16 +86,16 @@ class _InvoiceCreateDialogState extends State<InvoiceCreateDialog> {
         } catch (_) {}
       }
 
-      setState(() {
-        _customers = customers;
-        _isLoading = false;
-      });
+      _customers = customers;
 
       if (widget.preselectedJob != null) {
         final job = widget.preselectedJob!;
         final matchedCustomer = customers.firstWhereOrNull((c) => c.id == job.customerId);
         if (matchedCustomer != null) {
-          _onCustomerChanged(matchedCustomer, preselectedVehicleId: job.vehicleId);
+          _selectedCustomer = matchedCustomer;
+          final vList = await customerRepo.getCustomerVehicles(matchedCustomer.id);
+          _customerVehicles = vList;
+          _selectedVehicle = vList.firstWhereOrNull((v) => v.id == job.vehicleId) ?? (vList.isNotEmpty ? vList.first : null);
         }
 
         // Populate items from job services & recorded work
@@ -127,19 +127,22 @@ class _InvoiceCreateDialogState extends State<InvoiceCreateDialog> {
             ));
           }
         }
-        _discountController.text = job.discount.toStringAsFixed(0);
-        if (job.paidAmount > 0) {
-          _paidAmountController.text = job.paidAmount.toStringAsFixed(0);
-          _markAsFullyPaid = job.paidAmount >= _grandTotal;
-        } else {
-          _syncPaidAmount();
-        }
+
+        final jDiscount = (jobDetails?['discount'] as num?)?.toDouble() ?? job.discount;
+        _discountController.text = jDiscount.toStringAsFixed(0);
+
+        final jPaid = (jobDetails?['paid_amount'] as num?)?.toDouble() ?? job.paidAmount;
+        _advancePaid = jPaid;
+
+        _syncPaidAmount();
       } else {
         // Direct retail/counter sale: default to Walk-in customer so zero friction
-        if (defaultWalkIn != null) {
-          _onCustomerChanged(defaultWalkIn);
-        } else if (customers.isNotEmpty) {
-          _onCustomerChanged(customers.first);
+        final custToSelect = defaultWalkIn ?? (customers.isNotEmpty ? customers.first : null);
+        if (custToSelect != null) {
+          _selectedCustomer = custToSelect;
+          final vList = await customerRepo.getCustomerVehicles(custToSelect.id);
+          _customerVehicles = vList;
+          if (vList.isNotEmpty) _selectedVehicle = vList.first;
         }
       }
 
@@ -156,11 +159,16 @@ class _InvoiceCreateDialogState extends State<InvoiceCreateDialog> {
         ));
         _syncPaidAmount();
       } else if (widget.isDirectSale) {
-        // Direct counter sale: auto-open the stock picker so user immediately picks item
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted && _items.isEmpty) {
             _addStockItemDialog();
           }
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
         });
       }
     }
@@ -253,15 +261,14 @@ class _InvoiceCreateDialogState extends State<InvoiceCreateDialog> {
   double get _subtotal => _items.fold(0.0, (sum, i) => sum + i.total);
   double get _discount => double.tryParse(_discountController.text) ?? 0.0;
   double get _grandTotal => (_subtotal - _discount).clamp(0.0, double.infinity);
-  double get _paid => _markAsFullyPaid
-      ? _grandTotal
-      : (double.tryParse(_paidAmountController.text) ?? 0.0);
-  double get _remaining => (_grandTotal - _paid).clamp(0.0, double.infinity);
+  double get _netPayableAfterAdvance => (_grandTotal - _advancePaid).clamp(0.0, double.infinity);
+  double get _paid => double.tryParse(_paidAmountController.text) ?? 0.0;
+  double get _totalSettled => _advancePaid + _paid;
+  double get _remaining => (_grandTotal - _totalSettled).clamp(0.0, double.infinity);
+  bool get _isFullyPaid => _grandTotal > 0 && _totalSettled >= _grandTotal;
 
   void _syncPaidAmount() {
-    if (_markAsFullyPaid) {
-      _paidAmountController.text = _grandTotal > 0 ? _grandTotal.toStringAsFixed(0) : '0';
-    }
+    _paidAmountController.text = _netPayableAfterAdvance > 0 ? _netPayableAfterAdvance.toStringAsFixed(0) : '0';
   }
 
   void _addItem() {
@@ -613,9 +620,22 @@ class _InvoiceCreateDialogState extends State<InvoiceCreateDialog> {
         notes: _notesController.text.trim(),
       );
 
-      // Record immediate payment: full bill if marked fully paid or entered amount
-      final enteredPaid = double.tryParse(_paidAmountController.text.trim()) ?? 0.0;
-      final paymentToRecord = _markAsFullyPaid ? _grandTotal : (enteredPaid > 0 ? enteredPaid : _paid);
+      // 1. If advance was already paid on the job, record it as an Advance Deposit payment on the invoice
+      if (_advancePaid > 0) {
+        await invoiceRepo.recordPayment(
+          invoiceId: savedInvoiceId,
+          customerId: _selectedCustomer!.id,
+          vehicleId: _selectedVehicle?.id,
+          amount: _advancePaid,
+          paymentDate: widget.preselectedJob?.createdAt ?? DateTime.now(),
+          paymentMethod: 'Advance Deposit',
+          referenceNumber: 'Job Advance (${widget.preselectedJob?.jobNumber ?? 'Deposit'})',
+          notes: 'Advance deposit deducted from job order',
+        );
+      }
+
+      // 2. Record immediate payment collected now at counter
+      final paymentToRecord = double.tryParse(_paidAmountController.text.trim()) ?? 0.0;
 
       if (paymentToRecord > 0) {
         await invoiceRepo.recordPayment(
@@ -626,7 +646,9 @@ class _InvoiceCreateDialogState extends State<InvoiceCreateDialog> {
           paymentDate: DateTime.now(),
           paymentMethod: _paymentMethod,
           referenceNumber: 'Invoice Payment (On-Spot)',
-          notes: _markAsFullyPaid ? 'Full bill settled upon invoice generation' : '',
+          notes: (_advancePaid + paymentToRecord) >= _grandTotal
+              ? 'Full bill settled upon invoice generation'
+              : 'Partial payment recorded',
         );
       }
 
@@ -647,9 +669,11 @@ class _InvoiceCreateDialogState extends State<InvoiceCreateDialog> {
         }
       }
 
-      // Update linked job status if present (only forward to Delivered if not already Completed)
+      // Update linked job status and total settled amount if present
       if (widget.preselectedJob != null) {
         final jobRepo = Get.find<JobRepository>();
+        final totalJobSettled = _advancePaid + paymentToRecord;
+        await jobRepo.updateJobAdvancePayment(jobId: widget.preselectedJob!.id, paidAmount: totalJobSettled);
         if (widget.preselectedJob!.status != 'Completed') {
           await jobRepo.updateJobStatus(widget.preselectedJob!.id, 'Delivered', actualDeliveryDate: DateTime.now());
         }
@@ -667,10 +691,13 @@ class _InvoiceCreateDialogState extends State<InvoiceCreateDialog> {
 
       Get.back(result: true);
 
+      final totalPaidRecorded = _advancePaid + paymentToRecord;
+      final isFull = _grandTotal > 0 && totalPaidRecorded >= _grandTotal;
+
       Get.snackbar(
-        _markAsFullyPaid ? 'Invoice Saved & Bill Paid' : 'Invoice Saved',
-        _markAsFullyPaid
-            ? 'Bill fully settled (${Formatters.currency(paymentToRecord, symbol: currency)}).'
+        isFull ? 'Invoice Saved & Bill Paid' : 'Invoice Saved',
+        isFull
+            ? 'Bill fully settled (${Formatters.currency(totalPaidRecorded, symbol: currency)}).'
             : 'Tax Invoice saved to SQLite.',
         backgroundColor: AppColors.success.withValues(alpha: 0.2),
       );
@@ -699,7 +726,7 @@ class _InvoiceCreateDialogState extends State<InvoiceCreateDialog> {
                 const SizedBox(height: 6),
                 Text(
                   'Total: ${Formatters.currency(_grandTotal, symbol: currency)}'
-                  '${_markAsFullyPaid ? ' (Paid & Settled)' : ''}',
+                  '${isFull ? ' (Paid & Settled)' : ''}',
                   style: const TextStyle(color: AppColors.textDarkSecondary),
                 ),
                 if (currentModel.customerPhone.isNotEmpty) ...[
@@ -1028,8 +1055,38 @@ class _InvoiceCreateDialogState extends State<InvoiceCreateDialog> {
                           const SizedBox(height: 16),
 
                           // Pricing & Payments Section
-                          _buildPaymentSettlementCard(context, currency),
-                          const SizedBox(height: 12),
+                          if (_advancePaid > 0)
+                            Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: AppColors.primary.withValues(alpha: 0.35)),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.info_outline_rounded, color: AppColors.primary, size: 20),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Job Advance Deducted: -${Formatters.currency(_advancePaid, symbol: currency)}',
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primaryLight),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          'Customer already paid ${Formatters.currency(_advancePaid, symbol: currency)} advance in Job Card. Net payable to collect now: ${Formatters.currency(_netPayableAfterAdvance, symbol: currency)}',
+                                          style: TextStyle(fontSize: 11, color: Theme.of(context).textTheme.bodySmall?.color),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
 
                           if (isNarrow) ...[
                             Column(
@@ -1049,18 +1106,13 @@ class _InvoiceCreateDialogState extends State<InvoiceCreateDialog> {
                                       child: TextFormField(
                                         controller: _paidAmountController,
                                         decoration: InputDecoration(
-                                          labelText: _markAsFullyPaid ? 'Paid Amount (Full Settle)' : 'Paid Amount (Advance / Partial)',
-                                          suffixIcon: _markAsFullyPaid
+                                          labelText: _advancePaid > 0 ? 'Paid Now (Settlement)' : 'Paid Amount',
+                                          suffixIcon: _isFullyPaid
                                               ? const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 18)
                                               : null,
                                         ),
                                         keyboardType: TextInputType.number,
-                                        onChanged: (val) {
-                                          final entered = double.tryParse(val.trim()) ?? 0.0;
-                                          setState(() {
-                                            _markAsFullyPaid = (_grandTotal > 0 && entered >= _grandTotal);
-                                          });
-                                        },
+                                        onChanged: (_) => setState(() {}),
                                       ),
                                     ),
                                   ],
@@ -1093,12 +1145,27 @@ class _InvoiceCreateDialogState extends State<InvoiceCreateDialog> {
                                   _buildSummaryLine('Discount', '-${Formatters.currency(_discount, symbol: currency)}'),
                                   const Divider(),
                                   _buildSummaryLine('Grand Total', Formatters.currency(_grandTotal, symbol: currency), isBold: true),
+                                  if (_advancePaid > 0) ...[
+                                    const SizedBox(height: 4),
+                                    _buildSummaryLine(
+                                      'Advance Paid (Job)',
+                                      '-${Formatters.currency(_advancePaid, symbol: currency)}',
+                                      isBold: true,
+                                      color: AppColors.primaryLight,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    _buildSummaryLine(
+                                      'Net Payable',
+                                      Formatters.currency(_netPayableAfterAdvance, symbol: currency),
+                                      isBold: true,
+                                    ),
+                                  ],
                                   const SizedBox(height: 4),
                                   _buildSummaryLine(
-                                    'Paid',
+                                    _advancePaid > 0 ? 'Paid Now' : 'Paid',
                                     Formatters.currency(_paid, symbol: currency),
-                                    isBold: _markAsFullyPaid,
-                                    color: _markAsFullyPaid ? AppColors.success : null,
+                                    isBold: _isFullyPaid,
+                                    color: _isFullyPaid ? AppColors.success : null,
                                   ),
                                   const SizedBox(height: 4),
                                   _buildSummaryLine(
@@ -1132,18 +1199,13 @@ class _InvoiceCreateDialogState extends State<InvoiceCreateDialog> {
                                             child: TextFormField(
                                               controller: _paidAmountController,
                                               decoration: InputDecoration(
-                                                labelText: _markAsFullyPaid ? 'Paid Amount (Full Settle)' : 'Paid Amount (Advance / Partial)',
-                                                suffixIcon: _markAsFullyPaid
+                                                labelText: _advancePaid > 0 ? 'Paid Now (Settlement)' : 'Paid Amount',
+                                                suffixIcon: _isFullyPaid
                                                     ? const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 18)
                                                     : null,
                                               ),
                                               keyboardType: TextInputType.number,
-                                              onChanged: (val) {
-                                                final entered = double.tryParse(val.trim()) ?? 0.0;
-                                                setState(() {
-                                                  _markAsFullyPaid = (_grandTotal > 0 && entered >= _grandTotal);
-                                                });
-                                              },
+                                              onChanged: (_) => setState(() {}),
                                             ),
                                           ),
                                         ],
@@ -1178,12 +1240,27 @@ class _InvoiceCreateDialogState extends State<InvoiceCreateDialog> {
                                       _buildSummaryLine('Discount', '-${Formatters.currency(_discount, symbol: currency)}'),
                                       const Divider(),
                                       _buildSummaryLine('Grand Total', Formatters.currency(_grandTotal, symbol: currency), isBold: true),
+                                      if (_advancePaid > 0) ...[
+                                        const SizedBox(height: 4),
+                                        _buildSummaryLine(
+                                          'Advance Paid (Job)',
+                                          '-${Formatters.currency(_advancePaid, symbol: currency)}',
+                                          isBold: true,
+                                          color: AppColors.primaryLight,
+                                        ),
+                                        const SizedBox(height: 4),
+                                        _buildSummaryLine(
+                                          'Net Payable',
+                                          Formatters.currency(_netPayableAfterAdvance, symbol: currency),
+                                          isBold: true,
+                                        ),
+                                      ],
                                       const SizedBox(height: 4),
                                       _buildSummaryLine(
-                                        'Paid',
+                                        _advancePaid > 0 ? 'Paid Now' : 'Paid',
                                         Formatters.currency(_paid, symbol: currency),
-                                        isBold: _markAsFullyPaid,
-                                        color: _markAsFullyPaid ? AppColors.success : null,
+                                        isBold: _isFullyPaid,
+                                        color: _isFullyPaid ? AppColors.success : null,
                                       ),
                                       const SizedBox(height: 4),
                                       _buildSummaryLine(
@@ -1221,99 +1298,6 @@ class _InvoiceCreateDialogState extends State<InvoiceCreateDialog> {
                   );
                 },
               ),
-      ),
-    );
-  }
-
-  Widget _buildPaymentSettlementCard(BuildContext context, String currency) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: _markAsFullyPaid
-            ? AppColors.success.withValues(alpha: 0.12)
-            : Theme.of(context).cardTheme.color,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: _markAsFullyPaid
-              ? AppColors.success.withValues(alpha: 0.45)
-              : Theme.of(context).dividerColor,
-        ),
-      ),
-      child: Row(
-        children: [
-          Checkbox(
-            value: _markAsFullyPaid,
-            activeColor: AppColors.success,
-            onChanged: (val) {
-              setState(() {
-                _markAsFullyPaid = val ?? true;
-                _syncPaidAmount();
-              });
-            },
-          ),
-          const SizedBox(width: 4),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      'Bill Paid in Full (Fully Settled)',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                        color: _markAsFullyPaid ? AppColors.success : null,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    if (_markAsFullyPaid)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.success.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Text(
-                          'Auto-Settled',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.success,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  _markAsFullyPaid
-                      ? 'Invoice will be marked Paid upon Save with receipt generated immediately.'
-                      : 'Partial payment / Credit invoice mode active.',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Theme.of(context).textTheme.bodySmall?.color,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (!_markAsFullyPaid && _grandTotal > 0)
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                textStyle: const TextStyle(fontSize: 12),
-              ),
-              icon: const Icon(Icons.check_rounded, size: 14),
-              label: Text('Pay Full (${Formatters.currency(_grandTotal, symbol: currency)})'),
-              onPressed: () {
-                setState(() {
-                  _markAsFullyPaid = true;
-                  _syncPaidAmount();
-                });
-              },
-            ),
-        ],
       ),
     );
   }
