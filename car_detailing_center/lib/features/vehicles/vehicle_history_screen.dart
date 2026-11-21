@@ -68,6 +68,67 @@ class _VehicleHistoryScreenState extends State<VehicleHistoryScreen> {
     }
   }
 
+  void _showSettlePaymentDialog(Map<String, dynamic> record) {
+    final currency = AuthService.to.currentBusiness.value?.currency ?? AppConstants.defaultCurrency;
+    final jobId = record['job_id'] as String?;
+    final amount = (record['amount'] as num?)?.toDouble() ?? 0.0;
+    final desc = record['service_description']?.toString() ?? 'Service';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.payment_rounded, color: AppColors.success),
+            SizedBox(width: 8),
+            Text('Settle Payment in Full', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Service: $desc', style: const TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 6),
+            Text('Total Amount: ${Formatters.currency(amount, symbol: currency)}'),
+            const SizedBox(height: 12),
+            const Text(
+              'Did the customer pay this bill in full? Clicking "Mark Paid in Full" will update the status to Paid and clear any remaining balance.',
+              style: TextStyle(fontSize: 12, color: AppColors.textDarkSecondary),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.check_rounded, size: 16),
+            label: const Text('Mark Paid in Full'),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              if (jobId != null && jobId.isNotEmpty) {
+                final jobRepo = Get.find<JobRepository>();
+                await jobRepo.markJobPaidInFull(jobId);
+              } else {
+                final histId = record['id'] as String?;
+                if (histId != null) {
+                  final vehRepo = Get.find<VehicleRepository>();
+                  await vehRepo.updateServiceHistoryPaymentStatus(histId, 'Paid');
+                }
+              }
+              await _loadHistory();
+              Get.snackbar(
+                'Payment Marked Paid',
+                'Payment status updated to Paid in full.',
+                backgroundColor: AppColors.success.withValues(alpha: 0.2),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final currency = AuthService.to.currentBusiness.value?.currency ?? AppConstants.defaultCurrency;
@@ -199,13 +260,43 @@ class _VehicleHistoryScreenState extends State<VehicleHistoryScreen> {
                                 DataCell(Text('${odo.toInt()} KM')),
                                 DataCell(Text(r['staff_names']?.toString().isNotEmpty == true ? r['staff_names'] : 'Tech')),
                                 DataCell(Text(Formatters.currency(amount, symbol: currency), style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.success))),
-                                DataCell(Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: (payStatus == 'Paid' ? AppColors.success : AppColors.warning).withValues(alpha: 0.15),
-                                    borderRadius: BorderRadius.circular(4),
+                                DataCell(InkWell(
+                                  onTap: payStatus == 'Paid' ? null : () => _showSettlePaymentDialog(r),
+                                  borderRadius: BorderRadius.circular(4),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: (payStatus == 'Paid' ? AppColors.success : AppColors.warning).withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(
+                                        color: (payStatus == 'Paid' ? AppColors.success : AppColors.warning).withValues(alpha: 0.4),
+                                        width: 0.8,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          payStatus == 'Paid' ? Icons.check_circle_rounded : Icons.pending_rounded,
+                                          size: 12,
+                                          color: payStatus == 'Paid' ? AppColors.success : AppColors.warning,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          payStatus,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: payStatus == 'Paid' ? AppColors.success : AppColors.warning,
+                                          ),
+                                        ),
+                                        if (payStatus != 'Paid') ...[
+                                          const SizedBox(width: 4),
+                                          const Icon(Icons.edit_outlined, size: 10, color: AppColors.warning),
+                                        ],
+                                      ],
+                                    ),
                                   ),
-                                  child: Text(payStatus, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: payStatus == 'Paid' ? AppColors.success : AppColors.warning)),
                                 )),
                                 DataCell(Text(deliveryDate != null ? Formatters.date(deliveryDate) : '-')),
                               ],
@@ -219,20 +310,45 @@ class _VehicleHistoryScreenState extends State<VehicleHistoryScreen> {
                   // Digital Job Cards
                   const Text('Linked Job Cards & Work Orders', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
-                  if (_jobs.isEmpty)
-                    const Card(
-                      child: Padding(
-                        padding: EdgeInsets.all(20),
-                        child: Center(child: Text('No job cards on record for this vehicle.')),
-                      ),
-                    )
-                  else
-                    ListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: _jobs.length,
-                      itemBuilder: (context, index) {
-                        final job = _jobs[index];
+                  Builder(
+                    builder: (context) {
+                      final activeJobCards = _jobs.where((job) {
+                        final grandTotal = (job['grand_total'] as num?)?.toDouble() ?? 0.0;
+                        final paid = (job['paid_amount'] as num?)?.toDouble() ?? 0.0;
+                        final remaining = (job['remaining_amount'] as num?)?.toDouble() ?? 0.0;
+                        final st = job['status'] as String? ?? 'New';
+                        final isDeliveredOrCompleted = (st == 'Delivered' || st == 'Completed');
+                        final isPaidFull = (remaining <= 0) || (grandTotal > 0 && paid >= grandTotal);
+
+                        // If car is delivered/completed AND payment is complete, remove from Linked Job Cards!
+                        if (isDeliveredOrCompleted && isPaidFull) {
+                          return false;
+                        }
+                        return true;
+                      }).toList();
+
+                      if (activeJobCards.isEmpty) {
+                        return Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(20),
+                            child: Center(
+                              child: Text(
+                                _jobs.isEmpty
+                                    ? 'No job cards on record for this vehicle.'
+                                    : 'All completed orders have been delivered, fully settled, and archived to Permanent Service Records above.',
+                                style: const TextStyle(color: AppColors.textDarkSecondary),
+                              ),
+                            ),
+                          ),
+                        );
+                      }
+
+                      return ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: activeJobCards.length,
+                        itemBuilder: (context, index) {
+                          final job = activeJobCards[index];
                         final grandTotal = (job['grand_total'] as num?)?.toDouble() ?? 0.0;
                         final paid = (job['paid_amount'] as num?)?.toDouble() ?? 0.0;
                         final st = job['status'] as String? ?? 'New';
@@ -385,8 +501,10 @@ class _VehicleHistoryScreenState extends State<VehicleHistoryScreen> {
                           ),
                         );
                       },
-                    ),
-                  const SizedBox(height: 24),
+                    );
+                  },
+                ),
+                const SizedBox(height: 24),
 
                   // Inspection Records
                   const Text('Inspection Records', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),

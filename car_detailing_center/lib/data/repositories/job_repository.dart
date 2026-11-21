@@ -381,6 +381,50 @@ class JobRepository {
     await syncJobToVehicleHistory(jobId);
   }
 
+  /// Mark job and all related invoice/service history records as paid in full
+  Future<void> markJobPaidInFull(String jobId) async {
+    final db = await _db;
+    final now = DateTime.now().toIso8601String();
+    final job = await getJobById(jobId);
+    if (job == null) return;
+    final grandTotal = (job['grand_total'] as num?)?.toDouble() ?? 0.0;
+
+    await db.update(
+      'jobs',
+      {
+        'paid_amount': grandTotal,
+        'remaining_amount': 0.0,
+        'updated_at': now,
+      },
+      where: 'id = ?',
+      whereArgs: [jobId],
+    );
+
+    await db.update(
+      'vehicle_service_history',
+      {
+        'payment_status': 'Paid',
+      },
+      where: 'job_id = ?',
+      whereArgs: [jobId],
+    );
+
+    // Also update any linked invoice
+    await db.update(
+      'invoices',
+      {
+        'paid_amount': grandTotal,
+        'remaining_amount': 0.0,
+        'status': 'Paid',
+        'updated_at': now,
+      },
+      where: 'job_id = ?',
+      whereArgs: [jobId],
+    );
+
+    await syncJobToVehicleHistory(jobId);
+  }
+
   /// Automatically synchronizes all services and work performed on a job card into the permanent vehicle service history
   Future<void> syncJobToVehicleHistory(String jobId) async {
     try {
@@ -401,8 +445,48 @@ class JobRepository {
       final odoIn = (job['odometer_in'] as num?)?.toDouble() ?? 0.0;
       final odoOut = (job['odometer_out'] as num?)?.toDouble() ?? 0.0;
       final grandTotal = (job['grand_total'] as num?)?.toDouble() ?? 0.0;
-      final paidAmount = (job['paid_amount'] as num?)?.toDouble() ?? 0.0;
-      final remainingAmount = (job['remaining_amount'] as num?)?.toDouble() ?? 0.0;
+      var paidAmount = (job['paid_amount'] as num?)?.toDouble() ?? 0.0;
+      var remainingAmount = (job['remaining_amount'] as num?)?.toDouble() ?? 0.0;
+
+      // Check if linked invoice exists and is settled
+      final invList = await db.query('invoices', where: 'job_id = ?', whereArgs: [jobId]);
+      if (invList.isNotEmpty) {
+        final inv = invList.first;
+        final invPaid = (inv['paid_amount'] as num?)?.toDouble() ?? 0.0;
+        final invGrand = (inv['grand_total'] as num?)?.toDouble() ?? 0.0;
+        final invRemaining = (inv['remaining_amount'] as num?)?.toDouble() ?? 0.0;
+        final invStatus = inv['status'] as String? ?? '';
+
+        if (invStatus == 'Paid' || invRemaining <= 0 || (invGrand > 0 && invPaid >= invGrand)) {
+          paidAmount = grandTotal;
+          remainingAmount = 0.0;
+          await db.update(
+            'jobs',
+            {
+              'paid_amount': grandTotal,
+              'remaining_amount': 0.0,
+              'updated_at': DateTime.now().toIso8601String(),
+            },
+            where: 'id = ?',
+            whereArgs: [jobId],
+          );
+        } else if (invPaid > paidAmount) {
+          paidAmount = invPaid;
+          remainingAmount = (grandTotal - paidAmount) > 0 ? (grandTotal - paidAmount) : 0.0;
+          await db.update(
+            'jobs',
+            {
+              'paid_amount': paidAmount,
+              'remaining_amount': remainingAmount,
+              'updated_at': DateTime.now().toIso8601String(),
+            },
+            where: 'id = ?',
+            whereArgs: [jobId],
+          );
+        }
+      }
+
+      final payStatus = remainingAmount <= 0 ? 'Paid' : (paidAmount > 0 ? 'Partial' : 'Unpaid');
 
       await VehicleRepository().addServiceHistory(
         vehicleId: vehicleId,
@@ -413,7 +497,7 @@ class JobRepository {
         odometer: odoOut > 0 ? odoOut : odoIn,
         amount: grandTotal,
         deliveryDate: actualDelDate ?? expDelDate,
-        paymentStatus: remainingAmount <= 0 ? 'Paid' : (paidAmount > 0 ? 'Partial' : 'Unpaid'),
+        paymentStatus: payStatus,
         staffNames: job['technician_name'] as String?,
       );
     } catch (e) {

@@ -272,95 +272,50 @@ class _StaffFormDialogState extends State<StaffFormDialog> {
                       },
                     );
 
+                    String salaryLabel;
+                    String salaryHint;
+                    IconData salaryIcon;
+
+                    if (_salaryType == AppConstants.salaryTypeDaily) {
+                      salaryLabel = 'Daily Wage / Amount (Rs.) *';
+                      salaryHint = 'e.g. 1500';
+                      salaryIcon = Icons.today_rounded;
+                    } else if (_salaryType == AppConstants.salaryTypeWeekly) {
+                      salaryLabel = 'Weekly Wage / Amount (Rs.) *';
+                      salaryHint = 'e.g. 9000';
+                      salaryIcon = Icons.date_range_rounded;
+                    } else {
+                      salaryLabel = 'Monthly Base Salary (Rs.) *';
+                      salaryHint = 'e.g. 35000';
+                      salaryIcon = Icons.payments_outlined;
+                    }
+
                     final baseSalaryField = TextFormField(
                       controller: _baseSalaryController,
-                      decoration: const InputDecoration(
-                        labelText: 'Base Salary (Rs.) *',
-                        hintText: 'e.g. 35000',
-                        prefixIcon: Icon(Icons.payments_outlined),
+                      decoration: InputDecoration(
+                        labelText: salaryLabel,
+                        hintText: salaryHint,
+                        prefixIcon: Icon(salaryIcon),
                       ),
                       keyboardType: TextInputType.number,
                       validator: _isCommissionWorker ? null : Validators.nonNegativeNumber,
                     );
 
-                    final enteredRate = double.tryParse(_commissionRateController.text.trim());
-                    final commRate = enteredRate ?? 70.0;
-                    final garageShare = (100 - commRate).clamp(0, 100).toDouble();
-
-                    final commissionSection = Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        TextFormField(
-                          controller: _commissionRateController,
-                          decoration: const InputDecoration(
-                            labelText: 'Worker Commission Rate (%) *',
-                            hintText: 'e.g. 70',
-                            prefixIcon: Icon(Icons.percent_rounded),
-                            suffixText: '%',
-                          ),
-                          keyboardType: TextInputType.number,
-                          validator: (v) {
-                            if (!_isCommissionWorker) return null;
-                            final val = double.tryParse(v?.trim() ?? '');
-                            if (val == null || val <= 0 || val > 100) return 'Enter valid % between 1 and 100';
-                            return null;
-                          },
-                          onChanged: (_) => setState(() {}),
-                        ),
-                        const SizedBox(height: 10),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: AppColors.success.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
-                          ),
-                          child: Column(
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                                children: [
-                                  Column(
-                                    children: [
-                                      const Text('Worker Commission', style: TextStyle(fontSize: 11, color: AppColors.textDarkSecondary)),
-                                      Text(
-                                        enteredRate != null ? '${commRate.toStringAsFixed(0)}%' : 'e.g. 70%',
-                                        style: TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                          color: enteredRate != null ? AppColors.success : AppColors.textDarkSecondary,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const Icon(Icons.compare_arrows_rounded, color: AppColors.textDarkSecondary),
-                                  Column(
-                                    children: [
-                                      const Text('Garage Profit Share', style: TextStyle(fontSize: 11, color: AppColors.textDarkSecondary)),
-                                      Text(
-                                        enteredRate != null ? '${garageShare.toStringAsFixed(0)}%' : 'e.g. 30%',
-                                        style: TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                          color: enteredRate != null ? AppColors.primaryLight : AppColors.textDarkSecondary,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                enteredRate != null
-                                    ? '💡 Is worker (jaise denter) ko har kaam mein se ${commRate.toStringAsFixed(0)}% commission milega aur garage ko ${garageShare.toStringAsFixed(0)}%. Iski koi monthly basic salary nahi hogi.'
-                                    : '💡 Hint: Yahan commission percentage darj karein (e.g. 70%). Is worker ki koi monthly basic salary nahi hogi.',
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(fontSize: 11, color: AppColors.textDarkSecondary),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                    final commissionSection = TextFormField(
+                      controller: _commissionRateController,
+                      decoration: const InputDecoration(
+                        labelText: 'Worker Commission Rate (%) *',
+                        hintText: 'e.g. 70',
+                        prefixIcon: Icon(Icons.percent_rounded),
+                        suffixText: '%',
+                      ),
+                      keyboardType: TextInputType.number,
+                      validator: (v) {
+                        if (!_isCommissionWorker) return null;
+                        final val = double.tryParse(v?.trim() ?? '');
+                        if (val == null || val <= 0 || val > 100) return 'Enter valid % between 1 and 100';
+                        return null;
+                      },
                     );
 
                     if (isWide) {

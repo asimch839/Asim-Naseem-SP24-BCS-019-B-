@@ -205,6 +205,16 @@ class VehicleRepository {
     );
   }
 
+  Future<void> updateServiceHistoryPaymentStatus(String historyId, String status) async {
+    final db = await _db;
+    await db.update(
+      'vehicle_service_history',
+      {'payment_status': status},
+      where: 'id = ?',
+      whereArgs: [historyId],
+    );
+  }
+
   Future<void> deleteVehicle(String id) async {
     final db = await _db;
     await db.update(

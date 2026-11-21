@@ -42,7 +42,6 @@ class _JobCreateDialogState extends State<JobCreateDialog> {
 
   List<CustomerModel> _customers = [];
   List<VehicleModel> _customerVehicles = [];
-  List<DetailingPackageModel> _detailingPackages = [];
 
   CustomerModel? _selectedCustomer;
   VehicleModel? _selectedVehicle;
@@ -75,16 +74,10 @@ class _JobCreateDialogState extends State<JobCreateDialog> {
   void _loadData() async {
     final customerRepo = Get.find<CustomerRepository>();
     final customers = await customerRepo.getCustomers();
-    List<DetailingPackageModel> packages = [];
-    try {
-      final pkgRepo = DetailingPackageRepository();
-      packages = await pkgRepo.getPackages();
-    } catch (_) {}
 
     if (mounted) {
       setState(() {
         _customers = customers;
-        _detailingPackages = packages;
 
         if (widget.preselectedVehicle != null) {
           _selectedVehicle = widget.preselectedVehicle;

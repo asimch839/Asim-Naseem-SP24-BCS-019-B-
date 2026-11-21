@@ -141,7 +141,14 @@ class _StaffListScreenState extends State<StaffListScreen> {
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
-                                    const Text('Base Salary', style: TextStyle(fontSize: 10, color: AppColors.textDarkSecondary)),
+                                    Text(
+                                      st.salaryType == AppConstants.salaryTypeDaily
+                                          ? 'Daily Wage'
+                                          : st.salaryType == AppConstants.salaryTypeWeekly
+                                              ? 'Weekly Wage'
+                                              : 'Base Salary',
+                                      style: const TextStyle(fontSize: 10, color: AppColors.textDarkSecondary),
+                                    ),
                                     Text(
                                       Formatters.currency(st.baseSalary, symbol: currency),
                                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),

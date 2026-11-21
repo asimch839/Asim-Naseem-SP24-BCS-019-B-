@@ -266,7 +266,7 @@ return ListTile(
                           ],
                         ),
                         subtitle: Text(
-                          '${staff.designation} • Phone: ${staff.phone} ${staff.cnic != null && staff.cnic!.isNotEmpty ? "• CNIC: ${staff.cnic}" : ""} • Salary: ${Formatters.currency(staff.basicSalary, symbol: currency)} (${staff.salaryType})',
+                          '${staff.designation} • Phone: ${staff.phone} ${staff.cnic != null && staff.cnic!.isNotEmpty ? "• CNIC: ${staff.cnic}" : ""} • ${staff.salaryType == AppConstants.salaryTypeDaily ? "Daily Rate: " : staff.salaryType == AppConstants.salaryTypeWeekly ? "Weekly Rate: " : "Salary: "}${Formatters.currency(staff.basicSalary, symbol: currency)} (${staff.salaryType})',
                           style: const TextStyle(fontSize: 12, color: AppColors.textDarkSecondary),
                         ),
                         trailing: Row(
