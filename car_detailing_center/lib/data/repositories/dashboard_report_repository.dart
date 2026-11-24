@@ -507,13 +507,20 @@ class DashboardReportRepository {
   Future<List<Map<String, dynamic>>> getTopOutstandingCustomers() async {
     final db = await _db;
     final res = await db.rawQuery('''
-      SELECT c.name as customer_name, COALESCE(SUM(inv.remaining_amount), 0.0) as outstanding
+      SELECT 
+        COALESCE(c.id, inv.customer_id, 'cust_unknown') as customer_id,
+        COALESCE(c.name, inv.customer_name, 'Customer') as customer_name,
+        COALESCE(c.name, inv.customer_name, 'Customer') as name,
+        COALESCE(c.phone, inv.customer_phone, '') as phone,
+        COALESCE(SUM(inv.remaining_amount), 0.0) as outstanding,
+        COALESCE(SUM(inv.remaining_amount), 0.0) as balance,
+        COUNT(inv.id) as pending_invoices_count
       FROM invoices inv
-      INNER JOIN customers c ON inv.customer_id = c.id
-      WHERE inv.status != 'Cancelled' AND inv.remaining_amount > 0
-      GROUP BY c.id
-      ORDER BY outstanding DESC
-      LIMIT 6
+      LEFT JOIN customers c ON inv.customer_id = c.id
+      WHERE inv.status != 'Cancelled' AND inv.remaining_amount > 0.01
+      GROUP BY COALESCE(c.id, inv.customer_id, inv.customer_name)
+      ORDER BY balance DESC
+      LIMIT 10
     ''');
     return res;
   }

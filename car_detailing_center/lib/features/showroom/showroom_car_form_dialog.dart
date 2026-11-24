@@ -332,7 +332,7 @@ class _ShowroomCarFormDialogState extends State<ShowroomCarFormDialog> {
                                   decoration: InputDecoration(
                                     labelText: 'Commission ($currency) *',
                                     hintText: 'e.g. 30000',
-                                    prefixIcon: const Icon(Icons.monetization_on_outlined, color: AppColors.success),
+                                    prefixIcon: const Icon(Icons.payments_outlined, color: AppColors.success),
                                   ),
                                   onChanged: (_) => setState(() {}),
                                   validator: (v) => v == null || v.trim().isEmpty ? 'Commission required' : null,

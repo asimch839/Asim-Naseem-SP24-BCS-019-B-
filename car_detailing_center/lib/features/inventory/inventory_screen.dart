@@ -15,6 +15,7 @@ import '../../data/repositories/settings_repository.dart';
 import 'inventory_form_dialog.dart';
 import 'stock_adjustment_dialog.dart';
 import 'stock_history_dialog.dart';
+import 'staff_usage_log_dialog.dart';
 import '../invoices/invoice_create_dialog.dart';
 
 class InventoryScreen extends StatefulWidget {
@@ -55,6 +56,25 @@ class _InventoryScreenState extends State<InventoryScreen> {
     }
   }
 
+  Future<void> _openStaffUsageLog() async {
+    await showDialog(
+      context: context,
+      builder: (_) => const StaffUsageLogDialog(),
+    );
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _openIssueToStaffDialog() async {
+    final res = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const StockAdjustmentDialog(isAdding: false),
+    );
+    if (res == true && mounted) {
+      setState(() {});
+    }
+  }
+
   void _showMobileStockOptions(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -74,6 +94,36 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 const SizedBox(height: 16),
                 const Text('Stock Management Options', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 const SizedBox(height: 16),
+                ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: AppColors.warning.withValues(alpha: 0.15),
+                    child: const Icon(Icons.outbox_rounded, color: AppColors.warning),
+                  ),
+                  title: const Text('Issue Material to Staff', style: TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: const Text('Record shampoo, cloths, or chemicals given to staff for a car'),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  tileColor: AppColors.cardDark,
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _openIssueToStaffDialog();
+                  },
+                ),
+                const SizedBox(height: 10),
+                ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: AppColors.primaryLight.withValues(alpha: 0.15),
+                    child: const Icon(Icons.assignment_ind_rounded, color: AppColors.primaryLight),
+                  ),
+                  title: const Text('Staff Usage History / Log', style: TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: const Text('View daily records of which staff took what items and when'),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  tileColor: AppColors.cardDark,
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _openStaffUsageLog();
+                  },
+                ),
+                const SizedBox(height: 10),
                 ListTile(
                   leading: CircleAvatar(
                     backgroundColor: AppColors.success.withValues(alpha: 0.15),
@@ -127,6 +177,16 @@ class _InventoryScreenState extends State<InventoryScreen> {
       actions: isMobile
           ? [
               IconButton(
+                icon: const Icon(Icons.assignment_ind_rounded, color: AppColors.primaryLight),
+                tooltip: 'Staff Usage Log',
+                onPressed: _openStaffUsageLog,
+              ),
+              IconButton(
+                icon: const Icon(Icons.outbox_rounded, color: AppColors.warning),
+                tooltip: 'Issue to Staff',
+                onPressed: _openIssueToStaffDialog,
+              ),
+              IconButton(
                 icon: const Icon(Icons.point_of_sale_rounded, color: AppColors.success),
                 tooltip: 'Sell Stock (Counter Bill)',
                 onPressed: () async {
@@ -144,6 +204,30 @@ class _InventoryScreenState extends State<InventoryScreen> {
               ),
             ]
           : [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                child: OutlinedButton.icon(
+                  onPressed: _openStaffUsageLog,
+                  icon: const Icon(Icons.assignment_ind_rounded, size: 17),
+                  label: const Text('Staff Usage Log'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primaryLight,
+                    side: const BorderSide(color: AppColors.primaryLight),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                child: ElevatedButton.icon(
+                  onPressed: _openIssueToStaffDialog,
+                  icon: const Icon(Icons.outbox_rounded, size: 17),
+                  label: const Text('Issue to Staff'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.warning,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                 child: ElevatedButton.icon(
@@ -617,8 +701,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                       },
                                     ),
                                     IconButton(
-                                      icon: const Icon(Icons.remove_circle_outline_rounded, color: AppColors.error, size: 22),
-                                      tooltip: '- Decrease Quantity',
+                                      icon: const Icon(Icons.outbox_rounded, color: AppColors.warning, size: 22),
+                                      tooltip: 'Issue to Staff / Job',
                                       onPressed: () async {
                                         final res = await showDialog<bool>(
                                           context: context,

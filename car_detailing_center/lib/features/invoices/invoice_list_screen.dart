@@ -40,9 +40,18 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
   String? _startDate;
   String? _endDate;
 
+  double _totalInvoicedAll = 0.0;
+  double _totalPaidAll = 0.0;
+  double _totalPendingAll = 0.0;
+  int _pendingCountAll = 0;
+
   @override
   void initState() {
     super.initState();
+    final args = Get.arguments;
+    if (args is Map && args['status'] != null) {
+      _statusFilter = args['status'] as String;
+    }
     _fetchInvoices();
   }
 
@@ -63,9 +72,22 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
       );
 
       final models = list.map((m) => InvoiceModel.fromSqlite(m)).toList();
+
+      // Compute overall stats for KPIs across the period
+      final allList = await _invoiceRepo.getInvoices(startDate: _startDate, endDate: _endDate);
+      final allModels = allList.map((m) => InvoiceModel.fromSqlite(m)).toList();
+      final billed = allModels.fold(0.0, (sum, inv) => sum + inv.grandTotal);
+      final paid = allModels.fold(0.0, (sum, inv) => sum + inv.paidAmount);
+      final pending = allModels.fold(0.0, (sum, inv) => sum + inv.remainingAmount);
+      final pCount = allModels.where((inv) => inv.remainingAmount > 0.01).length;
+
       if (mounted) {
         setState(() {
           _invoices = models;
+          _totalInvoicedAll = billed;
+          _totalPaidAll = paid;
+          _totalPendingAll = pending;
+          _pendingCountAll = pCount;
           _isLoading = false;
         });
       }
@@ -144,6 +166,63 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
       return invoice.copyWith(items: [fallbackItem]);
     }
     return invoice;
+  }
+
+  Widget _buildSummaryKpiCard({
+    required String title,
+    required double amount,
+    required String currency,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+    bool isSelected = false,
+    VoidCallback? onTap,
+  }) {
+    return Card(
+      elevation: isSelected ? 3 : 1,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: isSelected ? BorderSide(color: color, width: 1.5) : BorderSide.none,
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: color, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(title, style: const TextStyle(fontSize: 11.5, color: AppColors.textDarkSecondary)),
+                    const SizedBox(height: 2),
+                    Text(
+                      Formatters.currency(amount, symbol: currency),
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: color),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(subtitle, style: const TextStyle(fontSize: 11, color: AppColors.textDarkSecondary)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _viewInvoice(InvoiceModel invoice) async {
@@ -455,6 +534,68 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
         padding: EdgeInsets.all(isMobile ? 12 : 24),
         child: Column(
           children: [
+            // 1. KPI Summary Cards (Billed, Paid, Pending Dues)
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final isSmall = constraints.maxWidth < 720;
+                final cardBilled = _buildSummaryKpiCard(
+                  title: 'Total Invoiced',
+                  amount: _totalInvoicedAll,
+                  currency: currency,
+                  subtitle: '${_invoices.length} Invoices',
+                  icon: Icons.receipt_long_rounded,
+                  color: AppColors.primaryLight,
+                );
+                final cardPaid = _buildSummaryKpiCard(
+                  title: 'Total Paid (Collected)',
+                  amount: _totalPaidAll,
+                  currency: currency,
+                  subtitle: 'Client payments received',
+                  icon: Icons.check_circle_outline_rounded,
+                  color: AppColors.success,
+                );
+                final cardPending = _buildSummaryKpiCard(
+                  title: 'Total Pending / Due',
+                  amount: _totalPendingAll,
+                  currency: currency,
+                  subtitle: '$_pendingCountAll Clients with Baqaya',
+                  icon: Icons.warning_amber_rounded,
+                  color: _totalPendingAll > 0 ? AppColors.error : AppColors.success,
+                  isSelected: _statusFilter == 'Pending',
+                  onTap: () {
+                    setState(() => _statusFilter = _statusFilter == 'Pending' ? 'All' : 'Pending');
+                    _fetchInvoices();
+                  },
+                );
+
+                if (isSmall) {
+                  return Column(
+                    children: [
+                      cardPending,
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(child: cardBilled),
+                          const SizedBox(width: 8),
+                          Expanded(child: cardPaid),
+                        ],
+                      ),
+                    ],
+                  );
+                }
+                return Row(
+                  children: [
+                    Expanded(child: cardBilled),
+                    const SizedBox(width: 12),
+                    Expanded(child: cardPaid),
+                    const SizedBox(width: 12),
+                    Expanded(child: cardPending),
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: 12),
+
             // Filter Bar
             Card(
               child: Padding(
@@ -501,9 +642,10 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                             ),
                             items: const [
                               DropdownMenuItem(value: 'All', child: Text('All Payment Statuses')),
-                              DropdownMenuItem(value: 'Paid', child: Text('Fully Paid')),
+                              DropdownMenuItem(value: 'Pending', child: Text('⚠️ Pending Dues Only (Baqaya)')),
                               DropdownMenuItem(value: 'Partially Paid', child: Text('Partially Paid')),
                               DropdownMenuItem(value: 'Unpaid', child: Text('Unpaid Only')),
+                              DropdownMenuItem(value: 'Paid', child: Text('Fully Paid')),
                             ],
                             onChanged: (val) {
                               if (val != null) {
@@ -535,9 +677,10 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                           value: _statusFilter,
                           items: const [
                             DropdownMenuItem(value: 'All', child: Text('All Payment Statuses')),
-                            DropdownMenuItem(value: 'Paid', child: Text('Fully Paid')),
+                            DropdownMenuItem(value: 'Pending', child: Text('⚠️ Pending Dues Only (Baqaya)')),
                             DropdownMenuItem(value: 'Partially Paid', child: Text('Partially Paid')),
                             DropdownMenuItem(value: 'Unpaid', child: Text('Unpaid Only')),
+                            DropdownMenuItem(value: 'Paid', child: Text('Fully Paid')),
                           ],
                           onChanged: (val) {
                             if (val != null) {
@@ -565,6 +708,66 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                     });
                     _fetchInvoices();
                   },
+                ),
+                const SizedBox(height: 10),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      ChoiceChip(
+                        label: Text('All Invoices (${_invoices.length})'),
+                        selected: _statusFilter == 'All',
+                        onSelected: (_) {
+                          setState(() => _statusFilter = 'All');
+                          _fetchInvoices();
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      ChoiceChip(
+                        avatar: const Icon(Icons.warning_amber_rounded, size: 14, color: AppColors.error),
+                        label: Text(
+                          '⚠️ Pending Dues ($_pendingCountAll Clients)',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: _statusFilter == 'Pending' ? Colors.white : AppColors.error,
+                          ),
+                        ),
+                        selected: _statusFilter == 'Pending',
+                        selectedColor: AppColors.error,
+                        onSelected: (_) {
+                          setState(() => _statusFilter = _statusFilter == 'Pending' ? 'All' : 'Pending');
+                          _fetchInvoices();
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      ChoiceChip(
+                        label: const Text('Partially Paid'),
+                        selected: _statusFilter == 'Partially Paid',
+                        onSelected: (_) {
+                          setState(() => _statusFilter = 'Partially Paid');
+                          _fetchInvoices();
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      ChoiceChip(
+                        label: const Text('Unpaid Only'),
+                        selected: _statusFilter == 'Unpaid',
+                        onSelected: (_) {
+                          setState(() => _statusFilter = 'Unpaid');
+                          _fetchInvoices();
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      ChoiceChip(
+                        label: const Text('Fully Paid'),
+                        selected: _statusFilter == 'Paid',
+                        onSelected: (_) {
+                          setState(() => _statusFilter = 'Paid');
+                          _fetchInvoices();
+                        },
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -605,222 +808,279 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                                   ? AppColors.success
                                   : (isPartial ? AppColors.warning : AppColors.error);
 
-                              return ListTile(
-                                contentPadding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 20, vertical: 8),
-                                leading: Container(
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: BoxDecoration(
-                                    color: statusColor.withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Icon(Icons.receipt_rounded, color: statusColor),
-                                ),
-                                title: Row(
-                                  children: [
-                                    Text(invoice.invoiceNumber, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                                    const SizedBox(width: 6),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: statusColor.withValues(alpha: 0.15),
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      child: Text(
-                                        invoice.status,
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
-                                          color: statusColor,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Expanded(
-                                      child: Text(
-                                        '• ${invoice.customerName}',
-                                        style: const TextStyle(fontSize: 13),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                subtitle: Padding(
-                                  padding: const EdgeInsets.only(top: 4),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                              return InkWell(
+                                onTap: () => _viewInvoice(invoice),
+                                child: Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 20, vertical: 12),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.center,
                                     children: [
-                                      Text(
-                                        '${invoice.vehicleDisplayName ?? "General Detailing"} ${invoice.vehicleRegNumber != null && invoice.vehicleRegNumber!.isNotEmpty ? "(${invoice.vehicleRegNumber})" : ""} • ${Formatters.date(invoice.createdAt)}',
-                                        style: const TextStyle(fontSize: 12, color: AppColors.textDarkSecondary),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      if (isMobile) ...[
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          'Total: ${Formatters.currency(invoice.grandTotal, symbol: currency)} • ${invoice.remainingAmount > 0 ? "Due: ${Formatters.currency(invoice.remainingAmount, symbol: currency)}" : "Fully Settled"}',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w600,
-                                            color: invoice.remainingAmount > 0 ? AppColors.error : AppColors.success,
-                                          ),
+                                      Container(
+                                        padding: const EdgeInsets.all(10),
+                                        decoration: BoxDecoration(
+                                          color: statusColor.withValues(alpha: 0.12),
+                                          borderRadius: BorderRadius.circular(10),
                                         ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                                trailing: isMobile
-                                    ? PopupMenuButton<String>(
-                                        icon: const Icon(Icons.more_vert_rounded),
-                                        onSelected: (action) async {
-                                          if (action == 'view') {
-                                            _viewInvoice(invoice);
-                                          } else if (action == 'share') {
-                                            _shareInvoice(invoice);
-                                          } else if (action == 'print') {
-                                            final business = AuthService.to.currentBusiness.value;
-                                            if (business != null) {
-                                              final fullInvoice = await _loadFullInvoice(invoice);
-                                              await PdfService.printInvoice(business: business, invoice: fullInvoice);
-                                            }
-                                          } else if (action == 'pay') {
-                                            final res = await showDialog(
-                                              context: context,
-                                              builder: (_) => RecordPaymentDialog(invoice: invoice),
-                                            );
-                                            if (res == true) _fetchInvoices();
-                                          }
-                                        },
-                                        itemBuilder: (context) => [
-                                          const PopupMenuItem(
-                                            value: 'view',
-                                            child: Row(
+                                        child: Icon(Icons.receipt_rounded, color: statusColor),
+                                      ),
+                                      const SizedBox(width: 14),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Row(
                                               children: [
-                                                Icon(Icons.visibility_rounded, size: 18, color: AppColors.primaryLight),
-                                                SizedBox(width: 8),
-                                                Text('View Invoice'),
+                                                Text(invoice.invoiceNumber, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                                const SizedBox(width: 6),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                  decoration: BoxDecoration(
+                                                    color: statusColor.withValues(alpha: 0.15),
+                                                    borderRadius: BorderRadius.circular(4),
+                                                  ),
+                                                  child: Text(
+                                                    invoice.status,
+                                                    style: TextStyle(
+                                                      fontSize: 10,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: statusColor,
+                                                    ),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 6),
+                                                Expanded(
+                                                  child: Text(
+                                                    '• ${invoice.customerName}',
+                                                    style: const TextStyle(fontSize: 13),
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
                                               ],
                                             ),
-                                          ),
-                                          const PopupMenuItem(
-                                            value: 'share',
-                                            child: Row(
-                                              children: [
-                                                Icon(Icons.share_rounded, size: 18, color: Color(0xFF25D366)),
-                                                SizedBox(width: 8),
-                                                Text('Share WhatsApp', style: TextStyle(color: Color(0xFF25D366), fontWeight: FontWeight.bold)),
-                                              ],
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              '${invoice.vehicleDisplayName ?? "General Detailing"} ${invoice.vehicleRegNumber != null && invoice.vehicleRegNumber!.isNotEmpty ? "(${invoice.vehicleRegNumber})" : ""} • ${Formatters.date(invoice.createdAt)}',
+                                              style: const TextStyle(fontSize: 12, color: AppColors.textDarkSecondary),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
                                             ),
-                                          ),
-                                          const PopupMenuItem(
-                                            value: 'print',
-                                            child: Row(
-                                              children: [
-                                                Icon(Icons.print_rounded, size: 18),
-                                                SizedBox(width: 8),
-                                                Text('Print / Save PDF'),
-                                              ],
-                                            ),
-                                          ),
-                                          if (invoice.remainingAmount > 0)
-                                            const PopupMenuItem(
-                                              value: 'pay',
-                                              child: Row(
+                                            if (isMobile) ...[
+                                              const SizedBox(height: 4),
+                                              Wrap(
+                                                spacing: 8,
+                                                runSpacing: 4,
                                                 children: [
-                                                  Icon(Icons.price_check_rounded, color: AppColors.success, size: 18),
-                                                  SizedBox(width: 8),
-                                                  Text('Collect Payment', style: TextStyle(color: AppColors.success, fontWeight: FontWeight.bold)),
+                                                  Text(
+                                                    'Total: ${Formatters.currency(invoice.grandTotal, symbol: currency)}',
+                                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                                                  ),
+                                                  Text(
+                                                    'Paid: ${Formatters.currency(invoice.paidAmount, symbol: currency)}',
+                                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.success),
+                                                  ),
+                                                  Text(
+                                                    invoice.remainingAmount > 0
+                                                        ? 'Due: ${Formatters.currency(invoice.remainingAmount, symbol: currency)}'
+                                                        : 'Settled (Rs. 0)',
+                                                    style: TextStyle(
+                                                      fontSize: 11,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: invoice.remainingAmount > 0 ? AppColors.error : AppColors.success,
+                                                    ),
+                                                  ),
                                                 ],
                                               ),
-                                            ),
-                                        ],
-                                      )
-                                    : Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Column(
-                                            mainAxisAlignment: MainAxisAlignment.center,
-                                            crossAxisAlignment: CrossAxisAlignment.end,
-                                            children: [
-                                              Text(
-                                                Formatters.currency(invoice.grandTotal, symbol: currency),
-                                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                                              ),
-                                              Text(
-                                                invoice.remainingAmount > 0
-                                                    ? 'Due: ${Formatters.currency(invoice.remainingAmount, symbol: currency)}'
-                                                    : 'Fully Settled',
-                                                style: TextStyle(
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: invoice.remainingAmount > 0 ? AppColors.error : AppColors.success,
-                                                ),
-                                              ),
                                             ],
-                                          ),
-                                          const SizedBox(width: 14),
-                                          // 1. View Button
-                                          OutlinedButton.icon(
-                                            icon: const Icon(Icons.visibility_rounded, size: 15),
-                                            label: const Text('View'),
-                                            style: OutlinedButton.styleFrom(
-                                              foregroundColor: AppColors.primaryLight,
-                                              side: const BorderSide(color: AppColors.primaryLight),
-                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                            ),
-                                            onPressed: () => _viewInvoice(invoice),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          // 2. Share WhatsApp Button
-                                          ElevatedButton.icon(
-                                            icon: const Icon(Icons.share_rounded, size: 15),
-                                            label: const Text('Share'),
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: const Color(0xFF25D366),
-                                              foregroundColor: Colors.white,
-                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                            ),
-                                            onPressed: () => _shareInvoice(invoice),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          // 3. Print PDF Button
-                                          ElevatedButton.icon(
-                                            icon: const Icon(Icons.print_rounded, size: 15),
-                                            label: const Text('Print PDF'),
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: AppColors.primary,
-                                              foregroundColor: Colors.white,
-                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                            ),
-                                            onPressed: () async {
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      if (isMobile)
+                                        PopupMenuButton<String>(
+                                          icon: const Icon(Icons.more_vert_rounded),
+                                          onSelected: (action) async {
+                                            if (action == 'view') {
+                                              _viewInvoice(invoice);
+                                            } else if (action == 'share') {
+                                              _shareInvoice(invoice);
+                                            } else if (action == 'print') {
                                               final business = AuthService.to.currentBusiness.value;
                                               if (business != null) {
                                                 final fullInvoice = await _loadFullInvoice(invoice);
                                                 await PdfService.printInvoice(business: business, invoice: fullInvoice);
                                               }
-                                            },
-                                          ),
-                                          if (invoice.remainingAmount > 0) ...[
+                                            } else if (action == 'pay') {
+                                              final res = await showDialog(
+                                                context: context,
+                                                builder: (_) => RecordPaymentDialog(invoice: invoice),
+                                              );
+                                              if (res == true) _fetchInvoices();
+                                            }
+                                          },
+                                          itemBuilder: (context) => [
+                                            const PopupMenuItem(
+                                              value: 'view',
+                                              child: Row(
+                                                children: [
+                                                  Icon(Icons.visibility_rounded, size: 18, color: AppColors.primaryLight),
+                                                  SizedBox(width: 8),
+                                                  Text('View Invoice'),
+                                                ],
+                                              ),
+                                            ),
+                                            const PopupMenuItem(
+                                              value: 'share',
+                                              child: Row(
+                                                children: [
+                                                  Icon(Icons.share_rounded, size: 18, color: Color(0xFF25D366)),
+                                                  SizedBox(width: 8),
+                                                  Text('Share WhatsApp', style: TextStyle(color: Color(0xFF25D366), fontWeight: FontWeight.bold)),
+                                                ],
+                                              ),
+                                            ),
+                                            const PopupMenuItem(
+                                              value: 'print',
+                                              child: Row(
+                                                children: [
+                                                  Icon(Icons.print_rounded, size: 18),
+                                                  SizedBox(width: 8),
+                                                  Text('Print / Save PDF'),
+                                                ],
+                                              ),
+                                            ),
+                                            if (invoice.remainingAmount > 0)
+                                              const PopupMenuItem(
+                                                value: 'pay',
+                                                child: Row(
+                                                  children: [
+                                                    Icon(Icons.price_check_rounded, color: AppColors.success, size: 18),
+                                                    SizedBox(width: 8),
+                                                    Text('Collect Payment', style: TextStyle(color: AppColors.success, fontWeight: FontWeight.bold)),
+                                                  ],
+                                                ),
+                                              ),
+                                          ],
+                                        )
+                                      else
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          crossAxisAlignment: CrossAxisAlignment.center,
+                                          children: [
+                                            Column(
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              crossAxisAlignment: CrossAxisAlignment.end,
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    const Text('Total Bill: ', style: TextStyle(fontSize: 11, color: AppColors.textDarkSecondary)),
+                                                    Text(
+                                                      Formatters.currency(invoice.grandTotal, symbol: currency),
+                                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                                    ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 2),
+                                                Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    const Text('Client Paid: ', style: TextStyle(fontSize: 11, color: AppColors.textDarkSecondary)),
+                                                    Text(
+                                                      Formatters.currency(invoice.paidAmount, symbol: currency),
+                                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.success),
+                                                    ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 2),
+                                                Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Text(
+                                                      invoice.remainingAmount > 0 ? 'Pending Due: ' : 'Status: ',
+                                                      style: const TextStyle(fontSize: 11, color: AppColors.textDarkSecondary),
+                                                    ),
+                                                    Text(
+                                                      invoice.remainingAmount > 0
+                                                          ? Formatters.currency(invoice.remainingAmount, symbol: currency)
+                                                          : 'Settled (Rs. 0)',
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                        fontWeight: FontWeight.bold,
+                                                        color: invoice.remainingAmount > 0 ? AppColors.error : AppColors.success,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(width: 14),
+                                            if (invoice.remainingAmount > 0) ...[
+                                              ElevatedButton.icon(
+                                                icon: const Icon(Icons.price_check_rounded, size: 15),
+                                                label: const Text('Collect Due'),
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: AppColors.success,
+                                                  foregroundColor: Colors.white,
+                                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                                ),
+                                                onPressed: () async {
+                                                  final res = await showDialog(
+                                                    context: context,
+                                                    builder: (_) => RecordPaymentDialog(invoice: invoice),
+                                                  );
+                                                  if (res == true) _fetchInvoices();
+                                                },
+                                              ),
+                                              const SizedBox(width: 8),
+                                            ],
+                                            // 1. View Button
+                                            OutlinedButton.icon(
+                                              icon: const Icon(Icons.visibility_rounded, size: 15),
+                                              label: const Text('View'),
+                                              style: OutlinedButton.styleFrom(
+                                                foregroundColor: AppColors.primaryLight,
+                                                side: const BorderSide(color: AppColors.primaryLight),
+                                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                              ),
+                                              onPressed: () => _viewInvoice(invoice),
+                                            ),
                                             const SizedBox(width: 8),
+                                            // 2. Share WhatsApp Button
                                             ElevatedButton.icon(
-                                              onPressed: () async {
-                                                final res = await showDialog(
-                                                  context: context,
-                                                  builder: (_) => RecordPaymentDialog(invoice: invoice),
-                                                );
-                                                if (res == true) _fetchInvoices();
-                                              },
-                                              icon: const Icon(Icons.price_check_rounded, size: 15),
-                                              label: const Text('Pay'),
+                                              icon: const Icon(Icons.share_rounded, size: 15),
+                                              label: const Text('Share'),
                                               style: ElevatedButton.styleFrom(
-                                                backgroundColor: AppColors.success,
+                                                backgroundColor: const Color(0xFF25D366),
                                                 foregroundColor: Colors.white,
                                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                                               ),
+                                              onPressed: () => _shareInvoice(invoice),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            // 3. Print PDF Button
+                                            ElevatedButton.icon(
+                                              icon: const Icon(Icons.print_rounded, size: 15),
+                                              label: const Text('Print PDF'),
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: AppColors.primary,
+                                                foregroundColor: Colors.white,
+                                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                              ),
+                                              onPressed: () async {
+                                                final business = AuthService.to.currentBusiness.value;
+                                                if (business != null) {
+                                                  final fullInvoice = await _loadFullInvoice(invoice);
+                                                  await PdfService.printInvoice(business: business, invoice: fullInvoice);
+                                                }
+                                              },
                                             ),
                                           ],
-                                        ],
-                                      ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
                               );
                             },
                           ),

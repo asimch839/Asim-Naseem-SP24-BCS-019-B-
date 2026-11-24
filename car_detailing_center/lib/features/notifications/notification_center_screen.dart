@@ -22,7 +22,7 @@ class NotificationCenterScreen extends StatelessWidget {
         IconButton(
           onPressed: () => controller.refreshReminders(),
           icon: const Icon(Icons.sync_rounded),
-          tooltip: 'Refresh Reminders from SQLite',
+          tooltip: 'Refresh Reminders',
         ),
         TextButton.icon(
           onPressed: () => controller.markAllAsRead(),

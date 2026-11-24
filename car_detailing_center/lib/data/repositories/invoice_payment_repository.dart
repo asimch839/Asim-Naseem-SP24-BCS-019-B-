@@ -25,19 +25,23 @@ class InvoicePaymentRepository {
   }) async {
     final db = await _db;
     String sql = '''
-      SELECT inv.*, c.name as customer_name, c.phone as customer_phone, c.address as customer_address,
+      SELECT inv.*, COALESCE(c.name, 'Customer') as customer_name, COALESCE(c.phone, '') as customer_phone, c.address as customer_address,
              v.vehicle_name, v.registration_number, v.color, v.model_year,
              (SELECT COUNT(*) FROM invoice_items WHERE invoice_id = inv.id) as items_count
       FROM invoices inv
-      INNER JOIN customers c ON inv.customer_id = c.id
+      LEFT JOIN customers c ON inv.customer_id = c.id
       LEFT JOIN vehicles v ON inv.vehicle_id = v.id
       WHERE 1=1
     ''';
     final List<dynamic> args = [];
 
     if (status != null && status.isNotEmpty && status != 'All') {
-      sql += ' AND inv.status = ?';
-      args.add(status);
+      if (status == 'Pending') {
+        sql += " AND (inv.status IN ('Partially Paid', 'Partial', 'Unpaid') OR inv.remaining_amount > 0.01)";
+      } else {
+        sql += ' AND inv.status = ?';
+        args.add(status);
+      }
     }
     if (customerId != null && customerId.isNotEmpty) {
       sql += ' AND inv.customer_id = ?';
@@ -49,7 +53,7 @@ class InvoicePaymentRepository {
     }
     if (searchQuery != null && searchQuery.trim().isNotEmpty) {
       final q = '%${searchQuery.trim().toLowerCase()}%';
-      sql += ' AND (LOWER(inv.invoice_number) LIKE ? OR LOWER(c.name) LIKE ? OR c.phone LIKE ? OR LOWER(v.registration_number) LIKE ?)';
+      sql += ' AND (LOWER(inv.invoice_number) LIKE ? OR LOWER(COALESCE(c.name, inv.description, "")) LIKE ? OR COALESCE(c.phone, "") LIKE ? OR LOWER(COALESCE(v.registration_number, "")) LIKE ?)';
       args.addAll([q, q, q, q]);
     }
 

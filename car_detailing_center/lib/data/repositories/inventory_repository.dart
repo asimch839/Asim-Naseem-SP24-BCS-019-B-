@@ -176,9 +176,10 @@ class InventoryRepository {
     String? userName,
     String? jobId,
     String? vendorReference,
+    DateTime? customDateTime,
   }) async {
     final db = await _db;
-    final now = DateTime.now().toIso8601String();
+    final now = (customDateTime ?? DateTime.now()).toIso8601String();
 
     await db.transaction((txn) async {
       final res = await txn.query('inventory_items', where: 'id = ?', whereArgs: [itemId]);
@@ -218,6 +219,48 @@ class InventoryRepository {
         'created_at': now,
       });
     });
+  }
+
+  /// Get staff usage and material consumption transactions
+  Future<List<Map<String, dynamic>>> getStaffUsageTransactions({
+    String? staffName,
+    String? itemId,
+    String? searchQuery,
+    String? startDate,
+    String? endDate,
+  }) async {
+    final db = await _db;
+    String sql = '''
+      SELECT t.*, i.item_name, i.brand, i.unit, i.purchase_price, i.selling_price
+      FROM inventory_transactions t
+      INNER JOIN inventory_items i ON t.item_id = i.id
+      WHERE t.quantity_change < 0
+    ''';
+    final List<dynamic> args = [];
+
+    if (staffName != null && staffName.isNotEmpty && staffName != 'All Staff') {
+      sql += ' AND t.user_name = ?';
+      args.add(staffName);
+    }
+
+    if (itemId != null && itemId.isNotEmpty && itemId != 'All Items') {
+      sql += ' AND t.item_id = ?';
+      args.add(itemId);
+    }
+
+    if (startDate != null && endDate != null) {
+      sql += ' AND t.date_time BETWEEN ? AND ?';
+      args.addAll([startDate, endDate]);
+    }
+
+    if (searchQuery != null && searchQuery.trim().isNotEmpty) {
+      final q = '%${searchQuery.trim().toLowerCase()}%';
+      sql += ' AND (LOWER(i.item_name) LIKE ? OR LOWER(t.user_name) LIKE ? OR LOWER(t.job_id) LIKE ? OR LOWER(t.reason_notes) LIKE ?)';
+      args.addAll([q, q, q, q]);
+    }
+
+    sql += ' ORDER BY t.date_time DESC';
+    return await db.rawQuery(sql, args);
   }
 
   Future<List<Map<String, dynamic>>> getItemTransactions(String itemId) async {

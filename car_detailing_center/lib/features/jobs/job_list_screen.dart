@@ -208,24 +208,11 @@ class _JobListScreenState extends State<JobListScreen> {
                         color: AppColors.success.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(6),
                       ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.check_circle_rounded, size: 12, color: AppColors.success),
-                          SizedBox(width: 4),
-                          Text(
-                            'Completed orders removed',
-                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.success),
-                          ),
-                        ],
-                      ),
                     ),
                 ],
               ),
             ),
-            const SizedBox(height: 6),
-
-            // Jobs Table
+          // Jobs Table
             Expanded(
               child: _isLoading
                   ? const AppLoadingIndicator(message: 'Loading active job cards...')

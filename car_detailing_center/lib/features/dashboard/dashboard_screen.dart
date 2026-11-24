@@ -318,12 +318,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       SizedBox(
                         width: cardWidth,
                         child: SummaryCard(
-                          title: 'Receivables Due',
+                          title: 'Pending Dues (Baqaya)',
                           value: Formatters.compactCurrency(m.outstandingPayments, symbol: currency),
-                          subtitle: 'Pending invoice dues',
+                          subtitle: m.outstandingPayments > 0 ? 'Click to view pending clients' : 'All invoices settled',
                           icon: Icons.pending_actions_rounded,
                           iconColor: m.outstandingPayments > 0 ? AppColors.error : AppColors.success,
-                          onTap: () => Get.toNamed(AppRoutes.payments),
+                          onTap: () => Get.toNamed(AppRoutes.invoices, arguments: {'status': 'Pending'}),
                         ),
                       ),
                       SizedBox(
@@ -374,7 +374,57 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   );
                 },
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
+
+              // Pending Dues Alert Banner
+              if (m.outstandingPayments > 0) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: AppColors.error.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppColors.error.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.warning_amber_rounded, color: AppColors.error, size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Pending Customer Dues: ${Formatters.currency(m.outstandingPayments, symbol: currency)}',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.error),
+                            ),
+
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton.icon(
+                        onPressed: () => Get.toNamed(AppRoutes.invoices, arguments: {'status': 'Pending'}),
+                        icon: const Icon(Icons.arrow_forward_rounded, size: 14),
+                        label: const Text('View Pending Dues'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.error,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+              const SizedBox(height: 8),
 
               // 4. Visual Progress / Gauges with Responsive Stacking
               LayoutBuilder(
@@ -704,21 +754,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Expanded(
-                    child: Text(
-                      'Outstanding Receivables',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? AppColors.textDarkPrimary : AppColors.textLightPrimary,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    child: Row(
+                      children: [
+                        const Icon(Icons.pending_actions_rounded, color: AppColors.error, size: 18),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Pending Client Dues (Baqaya Kis Kis Ka Hai)',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: isDark ? AppColors.textDarkPrimary : AppColors.textLightPrimary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   TextButton.icon(
-                    onPressed: () => Get.toNamed(AppRoutes.invoices),
+                    onPressed: () => Get.toNamed(AppRoutes.invoices, arguments: {'status': 'Pending'}),
                     icon: const Icon(Icons.arrow_forward_rounded, size: 14),
-                    label: const Text('Invoices', style: TextStyle(fontSize: 12)),
+                    label: const Text('View All Pending', style: TextStyle(fontSize: 12)),
                   ),
                 ],
               ),
@@ -733,7 +791,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     padding: EdgeInsets.symmetric(vertical: 20),
                     child: Center(
                       child: Text(
-                        'All customer invoices are fully settled!',
+                        'All customer invoices are fully settled! No pending dues.',
                         style: TextStyle(fontSize: 12, color: AppColors.success),
                       ),
                     ),
@@ -741,10 +799,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 }
 
                 return Column(
-                  children: debtors.take(4).map((debtor) {
-                    final name = (debtor['name'] as String?) ?? 'Customer';
+                  children: debtors.take(6).map((debtor) {
+                    final name = (debtor['customer_name'] as String?) ?? (debtor['name'] as String?) ?? 'Customer';
                     final phone = (debtor['phone'] as String?) ?? '';
-                    final balance = (debtor['balance'] as num?)?.toDouble() ?? 0.0;
+                    final balance = (debtor['balance'] as num?)?.toDouble() ?? (debtor['outstanding'] as num?)?.toDouble() ?? 0.0;
+                    final pCount = (debtor['pending_invoices_count'] as num?)?.toInt() ?? 1;
 
                     return Container(
                       margin: const EdgeInsets.only(bottom: 8),
@@ -773,26 +832,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
-                                if (phone.isNotEmpty) ...[
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    phone,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted,
-                                    ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  phone.isNotEmpty ? '$phone • $pCount pending bill(s)' : '$pCount pending bill(s)',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: isDark ? AppColors.textDarkMuted : AppColors.textLightMuted,
                                   ),
-                                ],
+                                ),
                               ],
                             ),
                           ),
-                          Text(
-                            Formatters.compactCurrency(balance, symbol: currency),
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.error,
-                            ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                Formatters.currency(balance, symbol: currency),
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.error,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              InkWell(
+                                onTap: () => Get.toNamed(AppRoutes.invoices, arguments: {'status': 'Pending'}),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.success.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+                                  ),
+                                  child: const Text('Collect', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.success)),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),

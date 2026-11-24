@@ -110,6 +110,7 @@ class StockHistoryDialog extends StatelessWidget {
                       final txType = tx['transaction_type'] as String? ?? 'Adjustment';
                       final reason = tx['reason_notes'] as String? ?? '';
                       final userName = tx['user_name'] as String? ?? 'Admin';
+                      final jobId = tx['job_id'] as String? ?? '';
                       final vendorRef = tx['vendor_reference'] as String?;
                       final dateTime = DateTime.tryParse(tx['date_time']?.toString() ?? '') ?? DateTime.now();
 
@@ -143,12 +144,20 @@ class StockHistoryDialog extends StatelessWidget {
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            if (reason.isNotEmpty) Text('Reason: $reason', style: const TextStyle(fontSize: 13, color: AppColors.textDarkPrimary)),
+                            if (!isPositive && jobId.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 2, bottom: 2),
+                                child: Text('🚗 Vehicle / Job: $jobId', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primaryLight)),
+                              ),
+                            if (reason.isNotEmpty) Text('Purpose / Notes: $reason', style: const TextStyle(fontSize: 12, color: AppColors.textDarkPrimary)),
                             if (vendorRef != null && vendorRef.isNotEmpty)
                               Text('Vendor Ref: $vendorRef', style: const TextStyle(fontSize: 11, color: AppColors.primaryLight)),
-                            Text(
-                              '${Formatters.dateTime(dateTime)} • Logged by: $userName',
-                              style: const TextStyle(fontSize: 11, color: AppColors.textDarkMuted),
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Text(
+                                '${Formatters.dateTime(dateTime)} • ${isPositive ? "Logged by" : "Taken by Staff"}: $userName',
+                                style: const TextStyle(fontSize: 11, color: AppColors.textDarkMuted),
+                              ),
                             ),
                           ],
                         ),

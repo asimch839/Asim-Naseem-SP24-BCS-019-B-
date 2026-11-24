@@ -1096,7 +1096,7 @@ class _InvoiceCreateDialogState extends State<InvoiceCreateDialog> {
                                     Expanded(
                                       child: TextFormField(
                                         controller: _discountController,
-                                        decoration: const InputDecoration(labelText: 'Discount Amount'),
+                                        decoration: const InputDecoration(labelText: 'Discount Amount (Rs.)', prefixIcon: Icon(Icons.discount_outlined)),
                                         keyboardType: TextInputType.number,
                                         onChanged: (_) => setState(() => _syncPaidAmount()),
                                       ),
@@ -1106,13 +1106,59 @@ class _InvoiceCreateDialogState extends State<InvoiceCreateDialog> {
                                       child: TextFormField(
                                         controller: _paidAmountController,
                                         decoration: InputDecoration(
-                                          labelText: _advancePaid > 0 ? 'Paid Now (Settlement)' : 'Paid Amount',
+                                          labelText: 'Client Paid Amount (Rs.) *',
+                                          hintText: 'e.g. ${_netPayableAfterAdvance.toStringAsFixed(0)}',
+                                          prefixIcon: const Icon(Icons.payments_outlined),
                                           suffixIcon: _isFullyPaid
                                               ? const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 18)
                                               : null,
                                         ),
                                         keyboardType: TextInputType.number,
                                         onChanged: (_) => setState(() {}),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                Row(
+                                  children: [
+                                    InkWell(
+                                      onTap: () => setState(() => _paidAmountController.text = _netPayableAfterAdvance.toStringAsFixed(0)),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.success.withValues(alpha: 0.15),
+                                          borderRadius: BorderRadius.circular(6),
+                                          border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+                                        ),
+                                        child: const Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.check_rounded, size: 12, color: AppColors.success),
+                                            SizedBox(width: 4),
+                                            Text('Full Paid', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.success)),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    InkWell(
+                                      onTap: () => setState(() => _paidAmountController.text = '0'),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.warning.withValues(alpha: 0.15),
+                                          borderRadius: BorderRadius.circular(6),
+                                          border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
+                                        ),
+                                        child: const Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.hourglass_top_rounded, size: 12, color: AppColors.warning),
+                                            SizedBox(width: 4),
+                                            Text('Zero Paid / Credit', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.warning)),
+                                          ],
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -1144,35 +1190,65 @@ class _InvoiceCreateDialogState extends State<InvoiceCreateDialog> {
                                   const SizedBox(height: 4),
                                   _buildSummaryLine('Discount', '-${Formatters.currency(_discount, symbol: currency)}'),
                                   const Divider(),
-                                  _buildSummaryLine('Grand Total', Formatters.currency(_grandTotal, symbol: currency), isBold: true),
+                                  _buildSummaryLine('Grand Total (Bill)', Formatters.currency(_grandTotal, symbol: currency), isBold: true),
                                   if (_advancePaid > 0) ...[
                                     const SizedBox(height: 4),
                                     _buildSummaryLine(
-                                      'Advance Paid (Job)',
+                                      'Advance Deducted',
                                       '-${Formatters.currency(_advancePaid, symbol: currency)}',
                                       isBold: true,
                                       color: AppColors.primaryLight,
                                     ),
                                     const SizedBox(height: 4),
                                     _buildSummaryLine(
-                                      'Net Payable',
+                                      'Net Payable Bill',
                                       Formatters.currency(_netPayableAfterAdvance, symbol: currency),
                                       isBold: true,
                                     ),
                                   ],
                                   const SizedBox(height: 4),
                                   _buildSummaryLine(
-                                    _advancePaid > 0 ? 'Paid Now' : 'Paid',
+                                    'Client Paid (Received)',
                                     Formatters.currency(_paid, symbol: currency),
-                                    isBold: _isFullyPaid,
-                                    color: _isFullyPaid ? AppColors.success : null,
+                                    isBold: true,
+                                    color: _paid > 0 ? AppColors.success : null,
                                   ),
                                   const SizedBox(height: 4),
                                   _buildSummaryLine(
-                                    'Remaining Due',
+                                    'Pending / Due Balance',
                                     Formatters.currency(_remaining, symbol: currency),
                                     isBold: true,
                                     color: _remaining > 0 ? AppColors.error : AppColors.success,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: (_remaining > 0 ? AppColors.error : AppColors.success).withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: (_remaining > 0 ? AppColors.error : AppColors.success).withValues(alpha: 0.3)),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          _remaining > 0 ? Icons.pending_actions_rounded : Icons.check_circle_rounded,
+                                          size: 14,
+                                          color: _remaining > 0 ? AppColors.error : AppColors.success,
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          _remaining > 0
+                                              ? 'Due: ${Formatters.currency(_remaining, symbol: currency)} Pending'
+                                              : 'Bill Fully Settled (No Pending Dues)',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: _remaining > 0 ? AppColors.error : AppColors.success,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ],
                               ),
@@ -1183,13 +1259,14 @@ class _InvoiceCreateDialogState extends State<InvoiceCreateDialog> {
                               children: [
                                 Expanded(
                                   child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Row(
                                         children: [
                                           Expanded(
                                             child: TextFormField(
                                               controller: _discountController,
-                                              decoration: const InputDecoration(labelText: 'Discount Amount'),
+                                              decoration: const InputDecoration(labelText: 'Discount Amount (Rs.)', prefixIcon: Icon(Icons.discount_outlined)),
                                               keyboardType: TextInputType.number,
                                               onChanged: (_) => setState(() => _syncPaidAmount()),
                                             ),
@@ -1199,13 +1276,59 @@ class _InvoiceCreateDialogState extends State<InvoiceCreateDialog> {
                                             child: TextFormField(
                                               controller: _paidAmountController,
                                               decoration: InputDecoration(
-                                                labelText: _advancePaid > 0 ? 'Paid Now (Settlement)' : 'Paid Amount',
+                                                labelText: 'Client Paid Amount (Rs.) *',
+                                                hintText: 'e.g. ${_netPayableAfterAdvance.toStringAsFixed(0)}',
+                                                prefixIcon: const Icon(Icons.payments_outlined),
                                                 suffixIcon: _isFullyPaid
                                                     ? const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 18)
                                                     : null,
                                               ),
                                               keyboardType: TextInputType.number,
                                               onChanged: (_) => setState(() {}),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Row(
+                                        children: [
+                                          InkWell(
+                                            onTap: () => setState(() => _paidAmountController.text = _netPayableAfterAdvance.toStringAsFixed(0)),
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                              decoration: BoxDecoration(
+                                                color: AppColors.success.withValues(alpha: 0.15),
+                                                borderRadius: BorderRadius.circular(6),
+                                                border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+                                              ),
+                                              child: const Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(Icons.check_rounded, size: 12, color: AppColors.success),
+                                                  SizedBox(width: 4),
+                                                  Text('Full Paid', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.success)),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          InkWell(
+                                            onTap: () => setState(() => _paidAmountController.text = '0'),
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                              decoration: BoxDecoration(
+                                                color: AppColors.warning.withValues(alpha: 0.15),
+                                                borderRadius: BorderRadius.circular(6),
+                                                border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
+                                              ),
+                                              child: const Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(Icons.hourglass_top_rounded, size: 12, color: AppColors.warning),
+                                                  SizedBox(width: 4),
+                                                  Text('Zero Paid / Credit', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.warning)),
+                                                ],
+                                              ),
                                             ),
                                           ),
                                         ],
@@ -1225,7 +1348,7 @@ class _InvoiceCreateDialogState extends State<InvoiceCreateDialog> {
                                 ),
                                 const SizedBox(width: 24),
                                 Container(
-                                  width: 260,
+                                  width: 280,
                                   padding: const EdgeInsets.all(14),
                                   decoration: BoxDecoration(
                                     color: Theme.of(context).cardTheme.color,
@@ -1239,35 +1362,65 @@ class _InvoiceCreateDialogState extends State<InvoiceCreateDialog> {
                                       const SizedBox(height: 4),
                                       _buildSummaryLine('Discount', '-${Formatters.currency(_discount, symbol: currency)}'),
                                       const Divider(),
-                                      _buildSummaryLine('Grand Total', Formatters.currency(_grandTotal, symbol: currency), isBold: true),
+                                      _buildSummaryLine('Grand Total (Bill)', Formatters.currency(_grandTotal, symbol: currency), isBold: true),
                                       if (_advancePaid > 0) ...[
                                         const SizedBox(height: 4),
                                         _buildSummaryLine(
-                                          'Advance Paid (Job)',
+                                          'Advance Deducted',
                                           '-${Formatters.currency(_advancePaid, symbol: currency)}',
                                           isBold: true,
                                           color: AppColors.primaryLight,
                                         ),
                                         const SizedBox(height: 4),
                                         _buildSummaryLine(
-                                          'Net Payable',
+                                          'Net Payable Bill',
                                           Formatters.currency(_netPayableAfterAdvance, symbol: currency),
                                           isBold: true,
                                         ),
                                       ],
                                       const SizedBox(height: 4),
                                       _buildSummaryLine(
-                                        _advancePaid > 0 ? 'Paid Now' : 'Paid',
+                                        'Client Paid (Received)',
                                         Formatters.currency(_paid, symbol: currency),
-                                        isBold: _isFullyPaid,
-                                        color: _isFullyPaid ? AppColors.success : null,
+                                        isBold: true,
+                                        color: _paid > 0 ? AppColors.success : null,
                                       ),
                                       const SizedBox(height: 4),
                                       _buildSummaryLine(
-                                        'Remaining Due',
+                                        'Pending / Due Balance',
                                         Formatters.currency(_remaining, symbol: currency),
                                         isBold: true,
                                         color: _remaining > 0 ? AppColors.error : AppColors.success,
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: (_remaining > 0 ? AppColors.error : AppColors.success).withValues(alpha: 0.12),
+                                          borderRadius: BorderRadius.circular(6),
+                                          border: Border.all(color: (_remaining > 0 ? AppColors.error : AppColors.success).withValues(alpha: 0.3)),
+                                        ),
+                                        child: Row(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Icon(
+                                              _remaining > 0 ? Icons.pending_actions_rounded : Icons.check_circle_rounded,
+                                              size: 14,
+                                              color: _remaining > 0 ? AppColors.error : AppColors.success,
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              _remaining > 0
+                                                  ? 'Due: ${Formatters.currency(_remaining, symbol: currency)} Pending'
+                                                  : 'Bill Fully Settled (No Pending Dues)',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.bold,
+                                                color: _remaining > 0 ? AppColors.error : AppColors.success,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ),
                                     ],
                                   ),

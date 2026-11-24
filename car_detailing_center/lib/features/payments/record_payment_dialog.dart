@@ -142,7 +142,11 @@ class _RecordPaymentDialogState extends State<RecordPaymentDialog> {
 
                 TextFormField(
                   controller: _amountController,
-                  decoration: const InputDecoration(labelText: 'Received Amount *', prefixIcon: Icon(Icons.attach_money_rounded)),
+                  decoration: InputDecoration(
+                    labelText: 'Received Amount ($currency) *',
+                    prefixIcon: const Icon(Icons.payments_outlined, color: AppColors.primaryLight),
+                    prefixText: '$currency ',
+                  ),
                   keyboardType: TextInputType.number,
                   validator: Validators.positiveNumber,
                 ),

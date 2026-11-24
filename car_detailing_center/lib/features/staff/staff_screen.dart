@@ -346,29 +346,6 @@ class _CommissionStaffSubViewState extends State<CommissionStaffSubView> {
       padding: EdgeInsets.all(isCompact ? 12 : 20),
       child: Column(
         children: [
-          // Banner explanation
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: AppColors.success.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.handshake_rounded, size: 20, color: AppColors.success),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Commission Workers (Denters, Painters, Polishers, Contractors) har kaam par percentage (%) commission lete hain. Inki koi fixed monthly basic salary nahi hoti.',
-                    style: TextStyle(fontSize: isCompact ? 11 : 12, color: AppColors.textDarkSecondary),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-
           // Search & Add Button Bar
           LayoutBuilder(
             builder: (context, constraints) {
@@ -2092,31 +2069,6 @@ class _StaffExpenseFormDialogState extends State<StaffExpenseFormDialog> {
                   ),
                   onChanged: (val) => setState(() {}),
                   validator: (v) => v == null || v.trim().isEmpty ? 'Please enter a category' : null,
-                ),
-                const SizedBox(height: 12),
-
-                // Auto-deduction info banner
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: AppColors.info.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.info.withValues(alpha: 0.3)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.info_outline_rounded, size: 16, color: AppColors.info),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _categoryController.text.trim().toLowerCase().contains('bonus')
-                              ? '💡 Bonus category will be added to the staff member\'s gross salary.'
-                              : '💡 This expense will be automatically deducted from the staff member\'s monthly salary.',
-                          style: const TextStyle(fontSize: 11, color: AppColors.info),
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
                 const SizedBox(height: 14),
 

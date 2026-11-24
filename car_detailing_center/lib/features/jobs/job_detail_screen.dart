@@ -338,6 +338,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     final defaultPrice = selectedItem.sellingPrice > 0 ? selectedItem.sellingPrice : selectedItem.purchasePrice;
     final priceCtrl = TextEditingController(text: defaultPrice.toStringAsFixed(0));
     bool billToCustomer = true;
+    String selectedStaff = _job.assignedStaffNames.isNotEmpty ? _job.assignedStaffNames.first : 'Shop Lead';
 
     if (!mounted) return;
     await showDialog(
@@ -403,6 +404,25 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                       },
                     ),
                     const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: selectedStaff,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Staff Member (Who Took Item) *',
+                        prefixIcon: Icon(Icons.person_rounded, size: 18),
+                      ),
+                      items: [
+                        ..._job.assignedStaffNames.map((s) => DropdownMenuItem(value: s, child: Text('$s (Assigned Staff)'))),
+                        if (!_job.assignedStaffNames.contains('Shop Lead'))
+                          const DropdownMenuItem(value: 'Shop Lead', child: Text('Shop Lead')),
+                        if (!_job.assignedStaffNames.contains('General Staff'))
+                          const DropdownMenuItem(value: 'General Staff', child: Text('General Staff')),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) setDialogState(() => selectedStaff = val);
+                      },
+                    ),
+                    const SizedBox(height: 12),
                     Row(
                       children: [
                         Expanded(
@@ -453,13 +473,15 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                     }
                     final charge = double.tryParse(priceCtrl.text.trim()) ?? 0.0;
                     try {
-                      // 1. Deduct from Inventory
+                      // 1. Deduct from Inventory with staff & vehicle tracking
+                      final carInfo = '${_job.jobNumber} • ${_job.vehicleDisplayName}${_job.vehicleRegNumber.isNotEmpty ? " (${_job.vehicleRegNumber})" : ""}';
                       await invRepo.adjustStock(
                         itemId: selectedItem.id,
                         changeAmount: -qty,
-                        transactionType: 'Job Usage',
-                        reasonNotes: 'Material usage on Job #${_job.jobNumber}',
-                        jobId: _job.id,
+                        transactionType: 'Staff / Job Usage',
+                        reasonNotes: 'Material usage on $carInfo',
+                        userName: selectedStaff,
+                        jobId: carInfo,
                       );
 
                       // 2. Add as item on Job Card if checked
